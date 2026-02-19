@@ -1,0 +1,36 @@
+<html>
+
+<link rel="stylesheet" href="blockGrider.css">
+
+<h1>🎨 Sprite Editor - Canvas Scaler</h1>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label for="scaleRange">확대 배율:</label>
+            <input type="range" id="scaleRange" min="0" max="5" value="2" step="1">
+            <span class="scale-value" id="scaleDisplay">8x</span>
+        </div>
+        <div class="info">
+          <span>클릭 원래 좌표: <span id="coordDisplay">-,-</span> <span id="colorBox" style="display:inline-block;width:20px;height:20px;border:1px solid #888;vertical-align:middle;margin-left:6px;"></span></span>
+            💡 <kbd>F2</kbd> 키를 눌러 Canvas1을 Canvas2에 확대하여 복사합니다.
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="canvas-section">
+            <h3>Canvas 1 (64x64) - 원본</h3>
+            <canvas id="canvas1" width="64" height="64"></canvas>
+        </div>
+        
+        <div class="canvas-section">
+            <h3>Canvas 2 - 확대된 이미지</h3>
+            <div class="canvas2-wrapper">
+                <canvas id="canvas2" width="128" height="128"></canvas>
+            </div>
+        </div>
+    </div>
+	
+<script src="blockGrider.js"></script>
+
+</html>
+	
