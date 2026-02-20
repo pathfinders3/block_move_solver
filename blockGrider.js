@@ -182,6 +182,50 @@ function countWhitePixels(ctx, x, y, size) {
             }
         }
         
+        // 클립보드에서 이미지 가져오기
+        async function loadImageFromClipboard() {
+            try {
+                const clipboardItems = await navigator.clipboard.read();
+                
+                for (const clipboardItem of clipboardItems) {
+                    for (const type of clipboardItem.types) {
+                        if (type.startsWith('image/')) {
+                            const blob = await clipboardItem.getType(type);
+                            const img = new Image();
+                            
+                            img.onload = function() {
+                                // 배경을 흰색으로 설정
+                                ctx1.fillStyle = 'white';
+                                ctx1.fillRect(0, 0, 64, 64);
+                                
+                                // 이미지를 64x64에 맞춰서 그리기 (비율 유지)
+                                const scale = Math.min(64 / img.width, 64 / img.height);
+                                const scaledWidth = img.width * scale;
+                                const scaledHeight = img.height * scale;
+                                const offsetX = (64 - scaledWidth) / 2;
+                                const offsetY = (64 - scaledHeight) / 2;
+                                
+                                ctx1.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
+                                console.log('클립보드에서 이미지를 가져왔습니다.');
+                            };
+                            
+                            img.src = URL.createObjectURL(blob);
+                            return;
+                        }
+                    }
+                }
+                
+                alert('클립보드에 이미지가 없습니다.');
+            } catch (err) {
+                console.error('클립보드 읽기 오류:', err);
+                alert('클립보드에서 이미지를 가져오는데 실패했습니다. \n\n클립보드 접근 권한을 허용해주세요.');
+            }
+        }
+        
+        // 버튼 이벤트 리스너
+        document.getElementById('btnLoadClipboard').addEventListener('click', loadImageFromClipboard);
+        document.getElementById('btnRandomize').addEventListener('click', drawRandomPixels);
+        
         // Range 바 값 변경 시 표시 업데이트
         scaleRange.addEventListener('input', (e) => {
             const index = parseInt(e.target.value);
@@ -216,6 +260,14 @@ function countWhitePixels(ctx, x, y, size) {
                     if(cornerPixelsDisplay) {
                         cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
                     }
+                    
+                    // 기준 사각형의 흰색점 개수 계산 및 표시
+                    const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
+                    const baseRectWhite = document.getElementById('baseRectWhite');
+                    if(baseRectWhite) {
+                        baseRectWhite.textContent = baseWhiteCount;
+                    }
+                    console.log(`기준 사각형 (${selectedPixel.x},${selectedPixel.y}) 크기${rectSize}x${rectSize}: 흰색점 ${baseWhiteCount}개`);
                     
                     // 4가지 경로 모두 계산
                     pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
@@ -268,6 +320,9 @@ function countWhitePixels(ctx, x, y, size) {
                     // 귀퉁이 픽셀수 초기화
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
+                    // 기준 사각형 흰색점 초기화
+                    const baseRectWhite = document.getElementById('baseRectWhite');
+                    if(baseRectWhite) baseRectWhite.textContent = '—';
                     // 개수 초기화
                     ['pathCount01', 'pathCount23', 'pathCount02', 'pathCount13'].forEach(id => {
                         if(document.getElementById(id)) document.getElementById(id).textContent = 0;
@@ -312,6 +367,11 @@ function countWhitePixels(ctx, x, y, size) {
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
                     
+                    // 기준 사각형의 흰색점 개수 계산 및 표시
+                    const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
+                    const baseRectWhite = document.getElementById('baseRectWhite');
+                    if(baseRectWhite) baseRectWhite.textContent = baseWhiteCount;
+                    
                     // 4가지 경로 모두 계산
                     pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
                     pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
@@ -355,6 +415,9 @@ function countWhitePixels(ctx, x, y, size) {
                     // 귀퉁이 픽셀수 초기화
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
+                    // 기준 사각형 흰색점 초기화
+                    const baseRectWhite = document.getElementById('baseRectWhite');
+                    if(baseRectWhite) baseRectWhite.textContent = '—';
                     // 개수 초기화
                     ['pathCount01', 'pathCount23', 'pathCount02', 'pathCount13'].forEach(id => {
                         if(document.getElementById(id)) document.getElementById(id).textContent = 0;
@@ -452,6 +515,11 @@ function countWhitePixels(ctx, x, y, size) {
                 const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                 if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
                 
+                // 기준 사각형의 흰색점 개수 계산 및 표시
+                const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
+                const baseRectWhite = document.getElementById('baseRectWhite');
+                if(baseRectWhite) baseRectWhite.textContent = baseWhiteCount;
+                
                 // 4가지 경로 모두 계산
                 pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
                 pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
@@ -495,6 +563,9 @@ function countWhitePixels(ctx, x, y, size) {
                 // 귀퉁이 픽셀수 초기화
                 const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                 if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
+                // 기준 사각형 흰색점 초기화
+                const baseRectWhite = document.getElementById('baseRectWhite');
+                if(baseRectWhite) baseRectWhite.textContent = '—';
                 // 개수 초기화
                 ['pathCount01', 'pathCount23', 'pathCount02', 'pathCount13'].forEach(id => {
                     if(document.getElementById(id)) document.getElementById(id).textContent = 0;

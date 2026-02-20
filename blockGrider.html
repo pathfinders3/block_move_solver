@@ -18,7 +18,8 @@
         </div>
         <div class="info">
           <span>클릭 원래 좌표: <span id="coordDisplay">-,-</span> <span id="colorBox" style="display:inline-block;width:20px;height:20px;border:1px solid #888;vertical-align:middle;margin-left:6px;"></span></span>
-          <span style="margin-left:20px;">🔵 귀퉁이 유효 픽셀수: <span id="cornerPixelsDisplay" style="font-weight:bold;color:#009900;">[—,—,—,—]</span></span>
+          <span style="margin-left:20px;">기준 사각형 흰색점: <span id="baseRectWhite" style="font-weight:bold;color:#cc0000;">—</span>개</span>
+          <span style="margin-left:20px;">귀퉁이 유효 픽셀수: <span id="cornerPixelsDisplay" style="font-weight:bold;color:#009900;">[—,—,—,—]</span></span>
           <div style="margin-top:5px;">
             <strong>📍 경로별 사각형 개수:</strong><br>
             <span style="margin-left:20px;">→ 상단 수평 (0→1): <span id="pathCount01" style="color:#0066cc;">0</span>개</span>
@@ -43,6 +44,10 @@
         <div class="canvas-section">
             <h3>Canvas 1 (64x64) - 원본</h3>
             <canvas id="canvas1" width="64" height="64"></canvas>
+            <div style="margin-top: 10px;">
+                <button id="btnLoadClipboard" style="padding: 5px 10px; cursor: pointer;">📋 클립보드에서 이미지 가져오기</button>
+                <button id="btnRandomize" style="padding: 5px 10px; cursor: pointer; margin-left: 5px;">🎲 임의 이미지 생성</button>
+            </div>
         </div>
         
         <div class="canvas-section">
