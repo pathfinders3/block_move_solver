@@ -216,47 +216,66 @@ function countWhitePixels(ctx, x, y, size) {
                     if(cornerPixelsDisplay) {
                         cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
                     }
-                    // 입력된 인덱스로 경로 계산
-                    const idxStart = parseInt(document.getElementById('idxStart').value) || 0;
-                    const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
-                    pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, idxStart, idxEnd) || [];
-                    console.log(`경로 계산: 원래사각형=${rectSize}x${rectSize}, 귀퉁이=${cornerSize}x${cornerSize}, 인덱스 ${idxStart} → ${idxEnd}, 결과: ${pathRects.length}개 좌표`);
                     
-                    // 경로 사각형들의 흰색 픽셀 개수 계산
+                    // 4가지 경로 모두 계산
+                    pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
+                    pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
+                    pathRects02 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [];
+                    pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
+                    
+                    console.log(`경로 계산 (원래:${rectSize}x${rectSize}, 귀퉁이:${cornerSize}x${cornerSize}):`);
+                    console.log(`  0→1 (상단 수평): ${pathRects01.length}개`);
+                    console.log(`  2→3 (하단 수평): ${pathRects23.length}개`);
+                    console.log(`  0→2 (좌측 수직): ${pathRects02.length}개`);
+                    console.log(`  1→3 (우측 수직): ${pathRects13.length}개`);
+                    
                     const maxPixels = cornerSize * cornerSize;
-                    const whitePixelCounts = [];
-                    pathRects.forEach((pt, idx) => {
-                        const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                        // 모두 흰색이면 진한 초록색으로 강조
-                        if (count === maxPixels) {
-                            whitePixelCounts.push(`<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`);
-                        } else {
-                            whitePixelCounts.push(`[${idx}] ${count}`);
-                        }
-                    });
-                    console.log('경로 사각형 흰색점 개수:', whitePixelCounts.map(s => s.replace(/<[^>]*>/g, '')).join(', '));
                     
-                    // 경로 개수 표시 업데이트
-                    const pathCountDisplay = document.getElementById('pathCountDisplay');
-                    if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
+                    // 각 경로별 흰색 픽셀 개수 계산 및 표시
+                    const calculateWhiteCounts = (rects) => {
+                        return rects.map((pt, idx) => {
+                            const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
+                            if (count === maxPixels) {
+                                return `<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`;
+                            } else {
+                                return `[${idx}] ${count}`;
+                            }
+                        });
+                    };
                     
-                    // 경로 흰색 픽셀 개수 표시 업데이트 (HTML 태그 포함)
-                    const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
-                    if(pathWhitePixelsDisplay) {
-                        pathWhitePixelsDisplay.innerHTML = whitePixelCounts.join(', ');
-                    }
+                    const whiteCounts01 = calculateWhiteCounts(pathRects01);
+                    const whiteCounts23 = calculateWhiteCounts(pathRects23);
+                    const whiteCounts02 = calculateWhiteCounts(pathRects02);
+                    const whiteCounts13 = calculateWhiteCounts(pathRects13);
+                    
+                    // 개수 표시 업데이트
+                    if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01.length;
+                    if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = pathRects23.length;
+                    if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02.length;
+                    if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13.length;
+                    
+                    // 흰색점 개수 표시 업데이트
+                    if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(', ') || '-';
+                    if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(', ') || '-';
+                    if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(', ') || '-';
+                    if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(', ') || '-';
                 } else {
                     cornerRects = [];
-                    pathRects = [];
-                    // 경로 개수 초기화
-                    const pathCountDisplay = document.getElementById('pathCountDisplay');
-                    if(pathCountDisplay) pathCountDisplay.textContent = 0;
+                    pathRects01 = [];
+                    pathRects23 = [];
+                    pathRects02 = [];
+                    pathRects13 = [];
                     // 귀퉁이 픽셀수 초기화
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
-                    // 경로 흰색 픽셀 초기화
-                    const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
-                    if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.textContent = '-';
+                    // 개수 초기화
+                    ['pathCount01', 'pathCount23', 'pathCount02', 'pathCount13'].forEach(id => {
+                        if(document.getElementById(id)) document.getElementById(id).textContent = 0;
+                    });
+                    // 흰색점 초기화
+                    ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
+                        if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
+                    });
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -287,42 +306,63 @@ function countWhitePixels(ctx, x, y, size) {
                     const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
                     const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
                     cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
-                    // 경로도 업데이트
-                    const idxStart = parseInt(document.getElementById('idxStart').value) || 0;
-                    const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
-                    pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, idxStart, idxEnd) || [];
-                    // 경로 개수 표시 업데이트
-                    const pathCountDisplay = document.getElementById('pathCountDisplay');
-                    if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
+                    
                     // 귀퉁이 유효 픽셀수 업데이트
                     const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
-                    // 경로 흰색 픽셀 개수 업데이트
+                    
+                    // 4가지 경로 모두 계산
+                    pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
+                    pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
+                    pathRects02 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [];
+                    pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
+                    
                     const maxPixels = cornerSize * cornerSize;
-                    const whitePixelCounts = pathRects.map((pt, idx) => {
-                        const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                        // 모두 흰색이면 진한 초록색으로 강조
-                        if (count === maxPixels) {
-                            return `<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`;
-                        } else {
-                            return `[${idx}] ${count}`;
-                        }
-                    });
-                    const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
-                    if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.innerHTML = whitePixelCounts.join(', ');
+                    const calculateWhiteCounts = (rects) => {
+                        return rects.map((pt, idx) => {
+                            const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
+                            if (count === maxPixels) {
+                                return `<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`;
+                            } else {
+                                return `[${idx}] ${count}`;
+                            }
+                        });
+                    };
+                    
+                    const whiteCounts01 = calculateWhiteCounts(pathRects01);
+                    const whiteCounts23 = calculateWhiteCounts(pathRects23);
+                    const whiteCounts02 = calculateWhiteCounts(pathRects02);
+                    const whiteCounts13 = calculateWhiteCounts(pathRects13);
+                    
+                    // 개수 표시 업데이트
+                    if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01.length;
+                    if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = pathRects23.length;
+                    if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02.length;
+                    if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13.length;
+                    
+                    // 흰색점 개수 표시 업데이트
+                    if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(', ') || '-';
+                    if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(', ') || '-';
+                    if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(', ') || '-';
+                    if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(', ') || '-';
                 } else {
                     cornerRects = [];
-                    pathRects = [];
-                    // 경로 개수 초기화
-                    const pathCountDisplay = document.getElementById('pathCountDisplay');
-                    if(pathCountDisplay) pathCountDisplay.textContent = 0;
+                    pathRects01 = [];
+                    pathRects23 = [];
+                    pathRects02 = [];
+                    pathRects13 = [];
                     // 귀퉁이 픽셀수 초기화
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
-                    // 경로 흰색 픽셀 초기화
-                    const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
-                    if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.textContent = '-';
+                    // 개수 초기화
+                    ['pathCount01', 'pathCount23', 'pathCount02', 'pathCount13'].forEach(id => {
+                        if(document.getElementById(id)) document.getElementById(id).textContent = 0;
+                    });
+                    // 흰색점 초기화
+                    ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
+                        if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
+                    });
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -370,7 +410,11 @@ function countWhitePixels(ctx, x, y, size) {
         // F4: 귀퉁이 점선 모드 토글용 변수
         let showCorners = false;
         let cornerRects = [];
-        let pathRects = [];
+        // 4가지 경로를 저장하는 배열들
+        let pathRects01 = []; // 상단 수평 (0→1)
+        let pathRects23 = []; // 하단 수평 (2→3)
+        let pathRects02 = []; // 좌측 수직 (0→2)
+        let pathRects13 = []; // 우측 수직 (1→3)
 
         canvas2.addEventListener('click', function(e) {
             const index = parseInt(scaleRange.value);
@@ -402,42 +446,63 @@ function countWhitePixels(ctx, x, y, size) {
                 const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
                 const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
                 cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
-                // 경로도 업데이트
-                const idxStart = parseInt(document.getElementById('idxStart').value) || 0;
-                const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
-                pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, idxStart, idxEnd) || [];
-                // 경로 개수 표시 업데이트
-                const pathCountDisplay = document.getElementById('pathCountDisplay');
-                if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
+                
                 // 귀퉁이 유효 픽셀수 업데이트
                 const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
                 const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                 if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
-                // 경로 흰색 픽셀 개수 업데이트
+                
+                // 4가지 경로 모두 계산
+                pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
+                pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
+                pathRects02 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [];
+                pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
+                
                 const maxPixels = cornerSize * cornerSize;
-                const whitePixelCounts = pathRects.map((pt, idx) => {
-                    const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                    // 모두 흰색이면 진한 초록색으로 강조
-                    if (count === maxPixels) {
-                        return `<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`;
-                    } else {
-                        return `[${idx}] ${count}`;
-                    }
-                });
-                const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
-                if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.innerHTML = whitePixelCounts.join(', ');
+                const calculateWhiteCounts = (rects) => {
+                    return rects.map((pt, idx) => {
+                        const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
+                        if (count === maxPixels) {
+                            return `<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`;
+                        } else {
+                            return `[${idx}] ${count}`;
+                        }
+                    });
+                };
+                
+                const whiteCounts01 = calculateWhiteCounts(pathRects01);
+                const whiteCounts23 = calculateWhiteCounts(pathRects23);
+                const whiteCounts02 = calculateWhiteCounts(pathRects02);
+                const whiteCounts13 = calculateWhiteCounts(pathRects13);
+                
+                // 개수 표시 업데이트
+                if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01.length;
+                if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = pathRects23.length;
+                if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02.length;
+                if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13.length;
+                
+                // 흰색점 개수 표시 업데이트
+                if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(', ') || '-';
+                if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(', ') || '-';
+                if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(', ') || '-';
+                if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(', ') || '-';
             } else {
                 cornerRects = [];
-                pathRects = [];
-                // 경로 개수 초기화
-                const pathCountDisplay = document.getElementById('pathCountDisplay');
-                if(pathCountDisplay) pathCountDisplay.textContent = 0;
+                pathRects01 = [];
+                pathRects23 = [];
+                pathRects02 = [];
+                pathRects13 = [];
                 // 귀퉁이 픽셀수 초기화
                 const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                 if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
-                // 경로 흰색 픽셀 초기화
-                const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
-                if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.textContent = '-';
+                // 개수 초기화
+                ['pathCount01', 'pathCount23', 'pathCount02', 'pathCount13'].forEach(id => {
+                    if(document.getElementById(id)) document.getElementById(id).textContent = 0;
+                });
+                // 흰색점 초기화
+                ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
+                    if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
+                });
             }
             // 캔버스2 다시 그림 (사각형 오버레이 위해)
             scaleCanvas();
@@ -479,14 +544,48 @@ function countWhitePixels(ctx, x, y, size) {
                     }
                     ctx2.setLineDash([]);
                 }
-                // 경로 점들 표시 (녹색 원으로)
-                if (showCorners && pathRects.length > 0) {
+                // 경로 점들 표시 (4가지 경로를 각각 다른 색으로)
+                if (showCorners) {
                     const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
-                    ctx2.fillStyle = 'rgba(0, 255, 0, 0.5)';
-                    for (const pt of pathRects) {
-                        ctx2.beginPath();
-                        ctx2.arc(pt.x * scale + (cornerSize * scale)/2, pt.y * scale + (cornerSize * scale)/2, Math.max(2, scale/4), 0, Math.PI * 2);
-                        ctx2.fill();
+                    
+                    // 상단 수평 (0→1): 녹색
+                    if (pathRects01.length > 0) {
+                        ctx2.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                        for (const pt of pathRects01) {
+                            ctx2.beginPath();
+                            ctx2.arc(pt.x * scale + (cornerSize * scale)/2, pt.y * scale + (cornerSize * scale)/2, Math.max(2, scale/4), 0, Math.PI * 2);
+                            ctx2.fill();
+                        }
+                    }
+                    
+                    // 하단 수평 (2→3): 청록색
+                    if (pathRects23.length > 0) {
+                        ctx2.fillStyle = 'rgba(0, 200, 200, 0.5)';
+                        for (const pt of pathRects23) {
+                            ctx2.beginPath();
+                            ctx2.arc(pt.x * scale + (cornerSize * scale)/2, pt.y * scale + (cornerSize * scale)/2, Math.max(2, scale/4), 0, Math.PI * 2);
+                            ctx2.fill();
+                        }
+                    }
+                    
+                    // 좌측 수직 (0→2): 주황색
+                    if (pathRects02.length > 0) {
+                        ctx2.fillStyle = 'rgba(255, 165, 0, 0.5)';
+                        for (const pt of pathRects02) {
+                            ctx2.beginPath();
+                            ctx2.arc(pt.x * scale + (cornerSize * scale)/2, pt.y * scale + (cornerSize * scale)/2, Math.max(2, scale/4), 0, Math.PI * 2);
+                            ctx2.fill();
+                        }
+                    }
+                    
+                    // 우측 수직 (1→3): 보라색
+                    if (pathRects13.length > 0) {
+                        ctx2.fillStyle = 'rgba(200, 0, 200, 0.5)';
+                        for (const pt of pathRects13) {
+                            ctx2.beginPath();
+                            ctx2.arc(pt.x * scale + (cornerSize * scale)/2, pt.y * scale + (cornerSize * scale)/2, Math.max(2, scale/4), 0, Math.PI * 2);
+                            ctx2.fill();
+                        }
                     }
                 }
                 ctx2.setLineDash([]);
