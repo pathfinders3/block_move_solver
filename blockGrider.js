@@ -199,9 +199,11 @@ function countWhitePixels(ctx, x, y, size) {
                 showCorners = !showCorners;
                 // F4 on일 때만 귀퉁이 rects 새로 계산
                 if(showCorners && selectedPixel) {
-                    cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, 4, 4);
+                    const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+                    const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
+                    cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
                     // 귀퉁이 사각형 정보 출력
-                    console.log('=== 귀퉁이 사각형 정보 ===');
+                    console.log(`=== 귀퉁이 사각형 정보 (원래:${rectSize}x${rectSize}, 귀퉁이:${cornerSize}x${cornerSize}) ===`);
                     const pixelCounts = [];
                     cornerRects.forEach((r, idx) => {
                         const labels = ['좌상', '우상', '좌하', '우하'];
@@ -217,13 +219,13 @@ function countWhitePixels(ctx, x, y, size) {
                     // 입력된 인덱스로 경로 계산
                     const idxStart = parseInt(document.getElementById('idxStart').value) || 0;
                     const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
-                    pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, 4, 4, idxStart, idxEnd) || [];
-                    console.log(`경로 계산: 인덱스 ${idxStart} → ${idxEnd}, 결과: ${pathRects.length}개 좌표`);
+                    pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, idxStart, idxEnd) || [];
+                    console.log(`경로 계산: 원래사각형=${rectSize}x${rectSize}, 귀퉁이=${cornerSize}x${cornerSize}, 인덱스 ${idxStart} → ${idxEnd}, 결과: ${pathRects.length}개 좌표`);
                     
                     // 경로 사각형들의 흰색 픽셀 개수 계산
                     const whitePixelCounts = [];
                     pathRects.forEach((pt, idx) => {
-                        const count = countWhitePixels(ctx1, pt.x, pt.y, 4);
+                        const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
                         whitePixelCounts.push(`[${idx}] ${count}`);
                     });
                     console.log('경로 사각형 흰색점 개수:', whitePixelCounts.join(', '));
@@ -276,11 +278,13 @@ function countWhitePixels(ctx, x, y, size) {
                 if(colorBox) colorBox.style.background = `rgb(${r},${g},${b})`;
                 // 귀퉁이 갱신
                 if(showCorners && selectedPixel) {
-                    cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, 4, 4);
+                    const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+                    const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
+                    cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
                     // 경로도 업데이트
                     const idxStart = parseInt(document.getElementById('idxStart').value) || 0;
                     const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
-                    pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, 4, 4, idxStart, idxEnd) || [];
+                    pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, idxStart, idxEnd) || [];
                     // 경로 개수 표시 업데이트
                     const pathCountDisplay = document.getElementById('pathCountDisplay');
                     if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
@@ -290,7 +294,7 @@ function countWhitePixels(ctx, x, y, size) {
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
                     // 경로 흰색 픽셀 개수 업데이트
                     const whitePixelCounts = pathRects.map((pt, idx) => {
-                        const count = countWhitePixels(ctx1, pt.x, pt.y, 4);
+                        const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
                         return `[${idx}] ${count}`;
                     });
                     const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
@@ -383,11 +387,13 @@ function countWhitePixels(ctx, x, y, size) {
             if(colorBox) colorBox.style.background = `rgb(${r},${g},${b})`;
             // 귀퉁이 반영
             if(showCorners && selectedPixel) {
-                cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, 4, 4);
+                const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+                const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
+                cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
                 // 경로도 업데이트
                 const idxStart = parseInt(document.getElementById('idxStart').value) || 0;
                 const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
-                pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, 4, 4, idxStart, idxEnd) || [];
+                pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, idxStart, idxEnd) || [];
                 // 경로 개수 표시 업데이트
                 const pathCountDisplay = document.getElementById('pathCountDisplay');
                 if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
@@ -397,7 +403,7 @@ function countWhitePixels(ctx, x, y, size) {
                 if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
                 // 경로 흰색 픽셀 개수 업데이트
                 const whitePixelCounts = pathRects.map((pt, idx) => {
-                    const count = countWhitePixels(ctx1, pt.x, pt.y, 4);
+                    const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
                     return `[${idx}] ${count}`;
                 });
                 const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
@@ -426,17 +432,18 @@ function countWhitePixels(ctx, x, y, size) {
             const index = parseInt(scaleRange.value);
             const scale = scaleValues[index];
             if (selectedPixel) {
+                const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
                 ctx2.save();
                 // 메인 사각형: 빨강/검정 점선
                 ctx2.strokeStyle = 'red';
                 ctx2.lineWidth = Math.max(1, scale/8);
                 ctx2.setLineDash([4, 4]);
                 ctx2.lineDashOffset = 0;
-                ctx2.strokeRect(selectedPixel.x * scale+0.5, selectedPixel.y * scale+0.5, scale-1, scale-1);
+                ctx2.strokeRect(selectedPixel.x * scale+0.5, selectedPixel.y * scale+0.5, rectSize * scale-1, rectSize * scale-1);
                 ctx2.strokeStyle = 'black';
                 ctx2.setLineDash([4, 4]);
                 ctx2.lineDashOffset = 4;
-                ctx2.strokeRect(selectedPixel.x * scale+0.5, selectedPixel.y * scale+0.5, scale-1, scale-1);
+                ctx2.strokeRect(selectedPixel.x * scale+0.5, selectedPixel.y * scale+0.5, rectSize * scale-1, rectSize * scale-1);
 
                 // 귀퉁이 사각형 (원래 계산된 위치에 표시, 음수 좌표 포함)
                 if (showCorners && cornerRects.length > 0) {
@@ -456,10 +463,11 @@ function countWhitePixels(ctx, x, y, size) {
                 }
                 // 경로 점들 표시 (녹색 원으로)
                 if (showCorners && pathRects.length > 0) {
+                    const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
                     ctx2.fillStyle = 'rgba(0, 255, 0, 0.5)';
                     for (const pt of pathRects) {
                         ctx2.beginPath();
-                        ctx2.arc(pt.x * scale + scale/2, pt.y * scale + scale/2, Math.max(2, scale/4), 0, Math.PI * 2);
+                        ctx2.arc(pt.x * scale + (cornerSize * scale)/2, pt.y * scale + (cornerSize * scale)/2, Math.max(2, scale/4), 0, Math.PI * 2);
                         ctx2.fill();
                     }
                 }
