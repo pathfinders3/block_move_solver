@@ -86,6 +86,60 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
     return path;
 }
 
+/**
+ * 특정 사각형 영역에서 흰색 픽셀(RGB 255,255,255) 개수를 셉니다.
+ * @param {CanvasRenderingContext2D} ctx - 캔버스 컨텍스트
+ * @param {number} x - 사각형 시작 x 좌표
+ * @param {number} y - 사각형 시작 y 좌표
+ * @param {number} size - 사각형 크기
+ * @returns {number} 흰색 픽셀 개수
+ */
+function countWhitePixels(ctx, x, y, size) {
+    // 경계 밖을 범위는 0을 반환
+    if (x < 0 || y < 0 || x + size > 64 || y + size > 64) {
+        // 부분적으로 경계 안에 있는 경우 처리
+        const startX = Math.max(0, x);
+        const startY = Math.max(0, y);
+        const endX = Math.min(64, x + size);
+        const endY = Math.min(64, y + size);
+        const width = endX - startX;
+        const height = endY - startY;
+        
+        if (width <= 0 || height <= 0) return 0;
+        
+        const imageData = ctx.getImageData(startX, startY, width, height);
+        const data = imageData.data;
+        let count = 0;
+        
+        for (let i = 0; i < data.length; i += 4) {
+            if (data[i] === 255 && data[i+1] === 255 && data[i+2] === 255) {
+                count++;
+            }
+        }
+        return count;
+    }
+    
+    try {
+        const imageData = ctx.getImageData(x, y, size, size);
+        const data = imageData.data;
+        let count = 0;
+        
+        // RGBA 형식이므로 4바이트씩 건너뜀
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            // 흰색 픽셀 확인
+            if (r === 255 && g === 255 && b === 255) {
+                count++;
+            }
+        }
+        
+        return count;
+    } catch (ex) {
+        return 0;
+    }
+}
 
 // Canvas 요소 가져오기
         const canvas1 = document.getElementById('canvas1');
@@ -165,9 +219,24 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                     const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
                     pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, 4, 4, idxStart, idxEnd) || [];
                     console.log(`경로 계산: 인덱스 ${idxStart} → ${idxEnd}, 결과: ${pathRects.length}개 좌표`);
+                    
+                    // 경로 사각형들의 흰색 픽셀 개수 계산
+                    const whitePixelCounts = [];
+                    pathRects.forEach((pt, idx) => {
+                        const count = countWhitePixels(ctx1, pt.x, pt.y, 4);
+                        whitePixelCounts.push(`[${idx}] ${count}`);
+                    });
+                    console.log('경로 사각형 흰색점 개수:', whitePixelCounts.join(', '));
+                    
                     // 경로 개수 표시 업데이트
                     const pathCountDisplay = document.getElementById('pathCountDisplay');
                     if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
+                    
+                    // 경로 흰색 픽셀 개수 표시 업데이트
+                    const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
+                    if(pathWhitePixelsDisplay) {
+                        pathWhitePixelsDisplay.textContent = whitePixelCounts.join(', ');
+                    }
                 } else {
                     cornerRects = [];
                     pathRects = [];
@@ -177,6 +246,9 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                     // 귀퉁이 픽셀수 초기화
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
+                    // 경로 흰색 픽셀 초기화
+                    const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
+                    if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.textContent = '-';
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -216,6 +288,13 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                     const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
+                    // 경로 흰색 픽셀 개수 업데이트
+                    const whitePixelCounts = pathRects.map((pt, idx) => {
+                        const count = countWhitePixels(ctx1, pt.x, pt.y, 4);
+                        return `[${idx}] ${count}`;
+                    });
+                    const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
+                    if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.textContent = whitePixelCounts.join(', ');
                 } else {
                     cornerRects = [];
                     pathRects = [];
@@ -225,6 +304,9 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                     // 귀퉁이 픽셀수 초기화
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
+                    // 경로 흰색 픽셀 초기화
+                    const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
+                    if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.textContent = '-';
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -313,6 +395,13 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                 const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
                 const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                 if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
+                // 경로 흰색 픽셀 개수 업데이트
+                const whitePixelCounts = pathRects.map((pt, idx) => {
+                    const count = countWhitePixels(ctx1, pt.x, pt.y, 4);
+                    return `[${idx}] ${count}`;
+                });
+                const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
+                if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.textContent = whitePixelCounts.join(', ');
             } else {
                 cornerRects = [];
                 pathRects = [];
@@ -322,6 +411,9 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                 // 귀퉁이 픽셀수 초기화
                 const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                 if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
+                // 경로 흰색 픽셀 초기화
+                const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
+                if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.textContent = '-';
             }
             // 캔버스2 다시 그림 (사각형 오버레이 위해)
             scaleCanvas();
