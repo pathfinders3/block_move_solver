@@ -223,21 +223,27 @@ function countWhitePixels(ctx, x, y, size) {
                     console.log(`경로 계산: 원래사각형=${rectSize}x${rectSize}, 귀퉁이=${cornerSize}x${cornerSize}, 인덱스 ${idxStart} → ${idxEnd}, 결과: ${pathRects.length}개 좌표`);
                     
                     // 경로 사각형들의 흰색 픽셀 개수 계산
+                    const maxPixels = cornerSize * cornerSize;
                     const whitePixelCounts = [];
                     pathRects.forEach((pt, idx) => {
                         const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                        whitePixelCounts.push(`[${idx}] ${count}`);
+                        // 모두 흰색이면 진한 초록색으로 강조
+                        if (count === maxPixels) {
+                            whitePixelCounts.push(`<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`);
+                        } else {
+                            whitePixelCounts.push(`[${idx}] ${count}`);
+                        }
                     });
-                    console.log('경로 사각형 흰색점 개수:', whitePixelCounts.join(', '));
+                    console.log('경로 사각형 흰색점 개수:', whitePixelCounts.map(s => s.replace(/<[^>]*>/g, '')).join(', '));
                     
                     // 경로 개수 표시 업데이트
                     const pathCountDisplay = document.getElementById('pathCountDisplay');
                     if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
                     
-                    // 경로 흰색 픽셀 개수 표시 업데이트
+                    // 경로 흰색 픽셀 개수 표시 업데이트 (HTML 태그 포함)
                     const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
                     if(pathWhitePixelsDisplay) {
-                        pathWhitePixelsDisplay.textContent = whitePixelCounts.join(', ');
+                        pathWhitePixelsDisplay.innerHTML = whitePixelCounts.join(', ');
                     }
                 } else {
                     cornerRects = [];
@@ -293,12 +299,18 @@ function countWhitePixels(ctx, x, y, size) {
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
                     // 경로 흰색 픽셀 개수 업데이트
+                    const maxPixels = cornerSize * cornerSize;
                     const whitePixelCounts = pathRects.map((pt, idx) => {
                         const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                        return `[${idx}] ${count}`;
+                        // 모두 흰색이면 진한 초록색으로 강조
+                        if (count === maxPixels) {
+                            return `<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`;
+                        } else {
+                            return `[${idx}] ${count}`;
+                        }
                     });
                     const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
-                    if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.textContent = whitePixelCounts.join(', ');
+                    if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.innerHTML = whitePixelCounts.join(', ');
                 } else {
                     cornerRects = [];
                     pathRects = [];
@@ -402,12 +414,18 @@ function countWhitePixels(ctx, x, y, size) {
                 const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                 if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
                 // 경로 흰색 픽셀 개수 업데이트
+                const maxPixels = cornerSize * cornerSize;
                 const whitePixelCounts = pathRects.map((pt, idx) => {
                     const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                    return `[${idx}] ${count}`;
+                    // 모두 흰색이면 진한 초록색으로 강조
+                    if (count === maxPixels) {
+                        return `<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`;
+                    } else {
+                        return `[${idx}] ${count}`;
+                    }
                 });
                 const pathWhitePixelsDisplay = document.getElementById('pathWhitePixelsDisplay');
-                if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.textContent = whitePixelCounts.join(', ');
+                if(pathWhitePixelsDisplay) pathWhitePixelsDisplay.innerHTML = whitePixelCounts.join(', ');
             } else {
                 cornerRects = [];
                 pathRects = [];
