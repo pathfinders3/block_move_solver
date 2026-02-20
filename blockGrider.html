@@ -10,9 +10,17 @@
             <input type="range" id="scaleRange" min="0" max="5" value="2" step="1">
             <span class="scale-value" id="scaleDisplay">8x</span>
         </div>
+        <div class="control-group">
+            <label for="idxStart">시작 귀퉁이 (0~3):</label>
+            <input type="number" id="idxStart" min="0" max="3" value="0" style="width:60px;">
+            <label for="idxEnd" style="margin-left:10px;">끝 귀퉁이 (0~3):</label>
+            <input type="number" id="idxEnd" min="0" max="3" value="1" style="width:60px;">
+            <span style="margin-left:10px; font-size:0.9em; color:#666;">(0:좌상, 1:우상, 2:좌하, 3:우하)</span>
+        </div>
         <div class="info">
           <span>클릭 원래 좌표: <span id="coordDisplay">-,-</span> <span id="colorBox" style="display:inline-block;width:20px;height:20px;border:1px solid #888;vertical-align:middle;margin-left:6px;"></span></span>
-            💡 <kbd>F2</kbd> 키를 눌러 Canvas1을 Canvas2에 확대하여 복사합니다.
+          <span style="margin-left:20px;">📍 경로 사각형 개수: <span id="pathCountDisplay" style="font-weight:bold;color:#0066cc;">0</span>개</span>
+            💡 <kbd>F2</kbd>: 확대 복사 | <kbd>F4</kbd>: 귀퉁이 경로 표시 토글
         </div>
     </div>
     

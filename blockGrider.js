@@ -5,18 +5,87 @@
  * @param {number} y - 원래 사각형의 y 좌표
  * @param {number} size - 원래 사각형의 한 변의 길이
  * @param {number} size2 - 귀퉁이 사각형의 한 변의 길이
- * @returns {Array<{x: number, y: number, w: number, h: number}>}
+ * @returns {Array<{x: number, y: number, w: number, h: number, visibleX: number, visibleY: number, visibleW: number, visibleH: number}>}
  */
 function getCornerRects(x, y, size, size2) {
-    // 각 귀퉁이가 캔버스(0~63) 밖이면 잘라서 조정
-    const clamp = v => Math.max(0, Math.min(63, v));
-    return [
-        { x: clamp(x - size2), y: clamp(y - size2), w: Math.min(size2, 64 - clamp(x - size2)), h: Math.min(size2, 64 - clamp(y - size2)) }, // 좌상
-        { x: clamp(x + size),  y: clamp(y - size2), w: Math.min(size2, 64 - clamp(x + size)), h: Math.min(size2, 64 - clamp(y - size2)) }, // 우상
-        { x: clamp(x - size2), y: clamp(y + size),  w: Math.min(size2, 64 - clamp(x - size2)), h: Math.min(size2, 64 - clamp(y + size)) },  // 좌하
-        { x: clamp(x + size),  y: clamp(y + size),  w: Math.min(size2, 64 - clamp(x + size)), h: Math.min(size2, 64 - clamp(y + size)) }    // 우하
+    // 원래 좌표를 계산 (음수 포함, 경계 밖도 허용)
+    const corners = [
+        { x: x - size2, y: y - size2 }, // 좌상
+        { x: x + size,  y: y - size2 }, // 우상
+        { x: x - size2, y: y + size  }, // 좌하
+        { x: x + size,  y: y + size  }  // 우하
     ];
+    
+    return corners.map(corner => {
+        // 실제로 화면(0~63)에 보이는 영역만 계산
+        const visibleStartX = Math.max(0, corner.x);
+        const visibleStartY = Math.max(0, corner.y);
+        const visibleEndX = Math.min(64, corner.x + size2);
+        const visibleEndY = Math.min(64, corner.y + size2);
+        const visibleW = Math.max(0, visibleEndX - visibleStartX);
+        const visibleH = Math.max(0, visibleEndY - visibleStartY);
+        
+        return {
+            x: corner.x,           // 원래 계산된 좌표 (음수/경계 밖 포함)
+            y: corner.y,           // 원래 계산된 좌표 (음수/경계 밖 포함)
+            w: size2,              // 원래 크기
+            h: size2,              // 원래 크기
+            visibleX: visibleStartX,  // 실제 보이는 시작 x좌표
+            visibleY: visibleStartY,  // 실제 보이는 시작 y좌표
+            visibleW: visibleW,       // 실제 보이는 너비
+            visibleH: visibleH        // 실제 보이는 높이
+        };
+    });
 }
+
+/**
+ * 두 귀퉁이 인덱스 사이의 관계를 판별하고 사이의 모든 사각형 좌표를 반환합니다.
+ * @param {number} x - 원래 사각형의 x
+ * @param {number} y - 원래 사각형의 y
+ * @param {number} size - 원래 사각형의 크기
+ * @param {number} size2 - 귀퉁이 사각형의 크기
+ * @param {number} idxStart - 시작 귀퉁이 인덱스 (0~3)
+ * @param {number} idxEnd - 끝 귀퉁이 인덱스 (0~3)
+ * @returns {Array<{x: number, y: number}> | null} 수평/수직이 아니면 null 리턴
+ */
+/**
+ * 두 귀퉁이 사이를 1px씩 이동하며 겹치는 모든 사각형 좌표를 리턴합니다.
+ */
+function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
+    const corners = [
+        { x: x - size2, y: y - size2 }, // 0: 좌상
+        { x: x + size,  y: y - size2 }, // 1: 우상
+        { x: x - size2, y: y + size  }, // 2: 좌하
+        { x: x + size,  y: y + size  }  // 3: 우하
+    ];
+
+    const start = corners[idxStart];
+    const end = corners[idxEnd];
+    const path = [];
+
+    if (start.y === end.y) {
+        // --- 수평 이동 (x축 1px씩) ---
+        const minX = Math.min(start.x, end.x);
+        const maxX = Math.max(start.x, end.x);
+        for (let curX = minX; curX <= maxX; curX += 1) { // 1px 단위
+            path.push({ x: curX, y: start.y });
+        }
+    } 
+    else if (start.x === end.x) {
+        // --- 수직 이동 (y축 1px씩) ---
+        const minY = Math.min(start.y, end.y);
+        const maxY = Math.max(start.y, end.y);
+        for (let curY = minY; curY <= maxY; curY += 1) { // 1px 단위
+            path.push({ x: start.x, y: curY });
+        }
+    } 
+    else {
+        return null;
+    }
+
+    return path;
+}
+
 
 // Canvas 요소 가져오기
         const canvas1 = document.getElementById('canvas1');
@@ -77,8 +146,26 @@ function getCornerRects(x, y, size, size2) {
                 // F4 on일 때만 귀퉁이 rects 새로 계산
                 if(showCorners && selectedPixel) {
                     cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, 4, 4);
+                    // 귀퉁이 사각형 정보 출력
+                    console.log('=== 귀퉁이 사각형 정보 ===');
+                    cornerRects.forEach((r, idx) => {
+                        const labels = ['좌상', '우상', '좌하', '우하'];
+                        console.log(`${labels[idx]}: 원래좌표(${r.x},${r.y}) 크기${r.w}x${r.h} | 보이는영역(${r.visibleX},${r.visibleY}) 크기${r.visibleW}x${r.visibleH}`);
+                    });
+                    // 입력된 인덱스로 경로 계산
+                    const idxStart = parseInt(document.getElementById('idxStart').value) || 0;
+                    const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
+                    pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, 4, 4, idxStart, idxEnd) || [];
+                    console.log(`경로 계산: 인덱스 ${idxStart} → ${idxEnd}, 결과: ${pathRects.length}개 좌표`);
+                    // 경로 개수 표시 업데이트
+                    const pathCountDisplay = document.getElementById('pathCountDisplay');
+                    if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
                 } else {
                     cornerRects = [];
+                    pathRects = [];
+                    // 경로 개수 초기화
+                    const pathCountDisplay = document.getElementById('pathCountDisplay');
+                    if(pathCountDisplay) pathCountDisplay.textContent = 0;
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -107,8 +194,19 @@ function getCornerRects(x, y, size, size2) {
                 // 귀퉁이 갱신
                 if(showCorners && selectedPixel) {
                     cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, 4, 4);
+                    // 경로도 업데이트
+                    const idxStart = parseInt(document.getElementById('idxStart').value) || 0;
+                    const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
+                    pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, 4, 4, idxStart, idxEnd) || [];
+                    // 경로 개수 표시 업데이트
+                    const pathCountDisplay = document.getElementById('pathCountDisplay');
+                    if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
                 } else {
                     cornerRects = [];
+                    pathRects = [];
+                    // 경로 개수 초기화
+                    const pathCountDisplay = document.getElementById('pathCountDisplay');
+                    if(pathCountDisplay) pathCountDisplay.textContent = 0;
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -157,6 +255,7 @@ function getCornerRects(x, y, size, size2) {
         // F4: 귀퉁이 점선 모드 토글용 변수
         let showCorners = false;
         let cornerRects = [];
+        let pathRects = [];
 
         canvas2.addEventListener('click', function(e) {
             const index = parseInt(scaleRange.value);
@@ -186,8 +285,19 @@ function getCornerRects(x, y, size, size2) {
             // 귀퉁이 반영
             if(showCorners && selectedPixel) {
                 cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, 4, 4);
+                // 경로도 업데이트
+                const idxStart = parseInt(document.getElementById('idxStart').value) || 0;
+                const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
+                pathRects = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, 4, 4, idxStart, idxEnd) || [];
+                // 경로 개수 표시 업데이트
+                const pathCountDisplay = document.getElementById('pathCountDisplay');
+                if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
             } else {
                 cornerRects = [];
+                pathRects = [];
+                // 경로 개수 초기화
+                const pathCountDisplay = document.getElementById('pathCountDisplay');
+                if(pathCountDisplay) pathCountDisplay.textContent = 0;
             }
             // 캔버스2 다시 그림 (사각형 오버레이 위해)
             scaleCanvas();
@@ -212,9 +322,11 @@ function getCornerRects(x, y, size, size2) {
                 ctx2.lineDashOffset = 4;
                 ctx2.strokeRect(selectedPixel.x * scale+0.5, selectedPixel.y * scale+0.5, scale-1, scale-1);
 
-                // 귀퉁이 사각형
+                // 귀퉁이 사각형 (원래 계산된 위치에 표시, 음수 좌표 포함)
                 if (showCorners && cornerRects.length > 0) {
                     for (const r of cornerRects) {
+                        // 원래 좌표(r.x, r.y)와 원래 크기(r.w, r.h)로 그림
+                        // 캔버스가 자동으로 보이는 영역만 렌더링
                         ctx2.strokeStyle = 'blue';
                         ctx2.setLineDash([2, 2]);
                         ctx2.lineDashOffset = 0;
@@ -225,6 +337,15 @@ function getCornerRects(x, y, size, size2) {
                         ctx2.strokeRect(r.x * scale+0.5, r.y * scale+0.5, r.w * scale-1, r.h * scale-1);
                     }
                     ctx2.setLineDash([]);
+                }
+                // 경로 점들 표시 (녹색 원으로)
+                if (showCorners && pathRects.length > 0) {
+                    ctx2.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                    for (const pt of pathRects) {
+                        ctx2.beginPath();
+                        ctx2.arc(pt.x * scale + scale/2, pt.y * scale + scale/2, Math.max(2, scale/4), 0, Math.PI * 2);
+                        ctx2.fill();
+                    }
                 }
                 ctx2.setLineDash([]);
                 ctx2.restore();
