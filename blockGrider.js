@@ -265,7 +265,9 @@ function countWhitePixels(ctx, x, y, size) {
                     const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
                     const baseRectWhite = document.getElementById('baseRectWhite');
                     if(baseRectWhite) {
+                        const baseMaxPixels = rectSize * rectSize;
                         baseRectWhite.textContent = baseWhiteCount;
+                        baseRectWhite.style.color = (baseWhiteCount === baseMaxPixels) ? '#006600' : '#cc0000';
                     }
                     console.log(`기준 사각형 (${selectedPixel.x},${selectedPixel.y}) 크기${rectSize}x${rectSize}: 흰색점 ${baseWhiteCount}개`);
                     
@@ -370,7 +372,11 @@ function countWhitePixels(ctx, x, y, size) {
                     // 기준 사각형의 흰색점 개수 계산 및 표시
                     const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
                     const baseRectWhite = document.getElementById('baseRectWhite');
-                    if(baseRectWhite) baseRectWhite.textContent = baseWhiteCount;
+                    if(baseRectWhite) {
+                        const baseMaxPixels = rectSize * rectSize;
+                        baseRectWhite.textContent = baseWhiteCount;
+                        baseRectWhite.style.color = (baseWhiteCount === baseMaxPixels) ? '#006600' : '#cc0000';
+                    }
                     
                     // 4가지 경로 모두 계산
                     pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
@@ -518,7 +524,11 @@ function countWhitePixels(ctx, x, y, size) {
                 // 기준 사각형의 흰색점 개수 계산 및 표시
                 const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
                 const baseRectWhite = document.getElementById('baseRectWhite');
-                if(baseRectWhite) baseRectWhite.textContent = baseWhiteCount;
+                if(baseRectWhite) {
+                    const baseMaxPixels = rectSize * rectSize;
+                    baseRectWhite.textContent = baseWhiteCount;
+                    baseRectWhite.style.color = (baseWhiteCount === baseMaxPixels) ? '#006600' : '#cc0000';
+                }
                 
                 // 4가지 경로 모두 계산
                 pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
