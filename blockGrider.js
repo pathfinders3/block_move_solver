@@ -148,10 +148,18 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                     cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, 4, 4);
                     // 귀퉁이 사각형 정보 출력
                     console.log('=== 귀퉁이 사각형 정보 ===');
+                    const pixelCounts = [];
                     cornerRects.forEach((r, idx) => {
                         const labels = ['좌상', '우상', '좌하', '우하'];
-                        console.log(`${labels[idx]}: 원래좌표(${r.x},${r.y}) 크기${r.w}x${r.h} | 보이는영역(${r.visibleX},${r.visibleY}) 크기${r.visibleW}x${r.visibleH}`);
+                        const pixelCount = r.visibleW * r.visibleH;
+                        pixelCounts.push(pixelCount);
+                        console.log(`${labels[idx]}: 원래좌표(${r.x},${r.y}) 크기${r.w}x${r.h} | 보이는영역(${r.visibleX},${r.visibleY}) 크기${r.visibleW}x${r.visibleH} | 유효픽셀: ${pixelCount}`);
                     });
+                    // 귀퉁이 유효 픽셀수 표시 업데이트
+                    const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
+                    if(cornerPixelsDisplay) {
+                        cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
+                    }
                     // 입력된 인덱스로 경로 계산
                     const idxStart = parseInt(document.getElementById('idxStart').value) || 0;
                     const idxEnd = parseInt(document.getElementById('idxEnd').value) || 1;
@@ -166,6 +174,9 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                     // 경로 개수 초기화
                     const pathCountDisplay = document.getElementById('pathCountDisplay');
                     if(pathCountDisplay) pathCountDisplay.textContent = 0;
+                    // 귀퉁이 픽셀수 초기화
+                    const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
+                    if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -201,12 +212,19 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                     // 경로 개수 표시 업데이트
                     const pathCountDisplay = document.getElementById('pathCountDisplay');
                     if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
+                    // 귀퉁이 유효 픽셀수 업데이트
+                    const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
+                    const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
+                    if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
                 } else {
                     cornerRects = [];
                     pathRects = [];
                     // 경로 개수 초기화
                     const pathCountDisplay = document.getElementById('pathCountDisplay');
                     if(pathCountDisplay) pathCountDisplay.textContent = 0;
+                    // 귀퉁이 픽셀수 초기화
+                    const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
+                    if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -243,8 +261,7 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                     ctx2.fillRect(x * scale, y * scale, scale, scale);
                 }
             }
-            
-            console.log(`Canvas1을 ${scale}배로 확대하여 Canvas2에 복사했습니다.`);
+
         }
         
         // 초기 스케일 표시 설정
@@ -292,12 +309,19 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
                 // 경로 개수 표시 업데이트
                 const pathCountDisplay = document.getElementById('pathCountDisplay');
                 if(pathCountDisplay) pathCountDisplay.textContent = pathRects.length;
+                // 귀퉁이 유효 픽셀수 업데이트
+                const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
+                const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
+                if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
             } else {
                 cornerRects = [];
                 pathRects = [];
                 // 경로 개수 초기화
                 const pathCountDisplay = document.getElementById('pathCountDisplay');
                 if(pathCountDisplay) pathCountDisplay.textContent = 0;
+                // 귀퉁이 픽셀수 초기화
+                const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
+                if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
             }
             // 캔버스2 다시 그림 (사각형 오버레이 위해)
             scaleCanvas();
