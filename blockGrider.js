@@ -233,11 +233,34 @@ function countWhitePixels(ctx, x, y, size) {
             scaleDisplay.textContent = `${scale}x`;
         });
         
-        // F2, F4, IJKL 키 이벤트 리스너
+        // F2, F4, F8, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F2') {
                 e.preventDefault();
                 scaleCanvas();
+            }
+            if (e.key === 'F8') {
+                // 선택된 픽셀과 showCorners가 활성화되어 있고, 기준 사각형이 모두 흰색일 때만
+                if (selectedPixel && showCorners) {
+                    const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+                    const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
+                    const baseMaxPixels = rectSize * rectSize;
+                    
+                    if (baseWhiteCount === baseMaxPixels) {
+                        // 모두 흰색이면 녹색 사각형으로 저장
+                        greenRects.push({
+                            x: selectedPixel.x,
+                            y: selectedPixel.y,
+                            size: rectSize
+                        });
+                        console.log(`✅ 녹색 사각형 추가: (${selectedPixel.x}, ${selectedPixel.y}), 크기: ${rectSize}x${rectSize}`);
+                        console.log(`   총 ${greenRects.length}개의 녹색 사각형 저장됨`);
+                        scaleCanvas(); // 화면 갱신
+                    } else {
+                        console.log(`❌ 사각형이 모두 흰색이 아닙니다. (흰색: ${baseWhiteCount}/${baseMaxPixels})`);
+                    }
+                }
+                e.preventDefault();
             }
             if (e.key === 'F4') {
                 showCorners = !showCorners;
@@ -484,6 +507,8 @@ function countWhitePixels(ctx, x, y, size) {
         let pathRects23 = []; // 하단 수평 (2→3)
         let pathRects02 = []; // 좌측 수직 (0→2)
         let pathRects13 = []; // 우측 수직 (1→3)
+        // F8: 녹색으로 칠한 사각형들을 저장하는 배열
+        let greenRects = []; // {x: number, y: number, size: number}[]
 
         canvas2.addEventListener('click', function(e) {
             const index = parseInt(scaleRange.value);
@@ -670,6 +695,20 @@ function countWhitePixels(ctx, x, y, size) {
                     }
                 }
                 ctx2.setLineDash([]);
+                
+                // F8로 저장된 녹색 사각형들 그리기
+                if (greenRects.length > 0) {
+                    ctx2.fillStyle = 'rgba(0, 255, 0, 0.3)'; // 반투명 녹색
+                    ctx2.strokeStyle = 'rgba(0, 200, 0, 0.8)';
+                    ctx2.lineWidth = Math.max(1, scale/8);
+                    ctx2.setLineDash([]);
+                    
+                    for (const rect of greenRects) {
+                        ctx2.fillRect(rect.x * scale, rect.y * scale, rect.size * scale, rect.size * scale);
+                        ctx2.strokeRect(rect.x * scale+0.5, rect.y * scale+0.5, rect.size * scale-1, rect.size * scale-1);
+                    }
+                }
+                
                 ctx2.restore();
             }
         }
