@@ -305,6 +305,11 @@ function countWhitePixels(ctx, x, y, size) {
                     });
                     console.log(`✅ 노란색 사각형 확정: (${tempYellowRect.x}, ${tempYellowRect.y}), 크기: ${tempYellowRect.size}x${tempYellowRect.size}`);
                     console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
+                    
+                    // 방금 추가된 사각형을 현재 선택으로 설정
+                    currentYellowIndex = yellowRects.length - 1;
+                    updateYellowIndexDisplay();
+                    
                     tempYellowRect = null; // 임시 사각형 초기화
                     
                     // 각도 표시 제거
@@ -656,6 +661,43 @@ function countWhitePixels(ctx, x, y, size) {
         let tempYellowRect = null; // {x: number, y: number, size: number} | null
         // F9: 확정된 노란색 사각형들을 저장하는 배열
         let yellowRects = []; // {x: number, y: number, size: number}[]
+        let currentYellowIndex = -1; // 현재 선택된 노란색 사각형 인덱스 (-1은 선택 안 됨)
+
+        // 노란색 사각형 탐색 기능
+        function updateYellowIndexDisplay() {
+            const display = document.getElementById('yellowIndexDisplay');
+            if (yellowRects.length === 0) {
+                display.value = '-';
+                currentYellowIndex = -1;
+            } else {
+                display.value = `${currentYellowIndex + 1}/${yellowRects.length}`;
+            }
+        }
+        
+        document.getElementById('btnPrevYellow').addEventListener('click', () => {
+            if (yellowRects.length === 0) return;
+            if (currentYellowIndex === -1) {
+                currentYellowIndex = yellowRects.length - 1; // 마지막으로 이동
+            } else {
+                currentYellowIndex = (currentYellowIndex - 1 + yellowRects.length) % yellowRects.length;
+            }
+            updateYellowIndexDisplay();
+            scaleCanvas();
+        });
+        
+        document.getElementById('btnNextYellow').addEventListener('click', () => {
+            if (yellowRects.length === 0) return;
+            if (currentYellowIndex === -1) {
+                currentYellowIndex = 0; // 처음으로 이동
+            } else {
+                currentYellowIndex = (currentYellowIndex + 1) % yellowRects.length;
+            }
+            updateYellowIndexDisplay();
+            scaleCanvas();
+        });
+        
+        // 초기 디스플레이 설정
+        updateYellowIndexDisplay();
 
         canvas2.addEventListener('click', function(e) {
             const index = parseInt(scaleRange.value);
@@ -900,12 +942,23 @@ function countWhitePixels(ctx, x, y, size) {
                 
                 // F9로 확정된 노란색 사각형들 그리기
                 if (yellowRects.length > 0) {
-                    ctx2.fillStyle = 'rgba(255, 255, 0, 0.3)'; // 반투명 노란색
-                    ctx2.strokeStyle = 'rgba(200, 200, 0, 0.8)';
-                    ctx2.lineWidth = Math.max(1, scale/8);
-                    ctx2.setLineDash([]);
-                    
-                    for (const rect of yellowRects) {
+                    for (let i = 0; i < yellowRects.length; i++) {
+                        const rect = yellowRects[i];
+                        const isSelected = (i === currentYellowIndex);
+                        
+                        if (isSelected) {
+                            // 선택된 사각형: 빨간색 두꺼운 테두리
+                            ctx2.fillStyle = 'rgba(255, 100, 100, 0.4)';
+                            ctx2.strokeStyle = 'rgba(255, 0, 0, 1.0)';
+                            ctx2.lineWidth = Math.max(3, scale/4);
+                        } else {
+                            // 일반 노란색 사각형
+                            ctx2.fillStyle = 'rgba(255, 255, 0, 0.3)';
+                            ctx2.strokeStyle = 'rgba(200, 200, 0, 0.8)';
+                            ctx2.lineWidth = Math.max(1, scale/8);
+                        }
+                        
+                        ctx2.setLineDash([]);
                         ctx2.fillRect(rect.x * scale, rect.y * scale, rect.size * scale, rect.size * scale);
                         ctx2.strokeRect(rect.x * scale+0.5, rect.y * scale+0.5, rect.size * scale-1, rect.size * scale-1);
                     }
