@@ -255,6 +255,12 @@ function countWhitePixels(ctx, x, y, size) {
                     angleDisplay.innerHTML = `| 각도: <span style="font-weight:bold;color:#cc6600;">${angle}°</span>`;
                 }
                 
+                // 좌표 표시
+                const tempYellowXInput = document.getElementById('tempYellowX');
+                const tempYellowYInput = document.getElementById('tempYellowY');
+                if (tempYellowXInput) tempYellowXInput.value = tempYellowRect.x;
+                if (tempYellowYInput) tempYellowYInput.value = tempYellowRect.y;
+                
                 return angle;
             }
             return null;
@@ -304,6 +310,12 @@ function countWhitePixels(ctx, x, y, size) {
                     // 각도 표시 제거
                     const angleDisplay = document.getElementById('tempYellowAngleDisplay');
                     if (angleDisplay) angleDisplay.innerHTML = '';
+                    
+                    // 좌표 표시 초기화
+                    const tempYellowXInput = document.getElementById('tempYellowX');
+                    const tempYellowYInput = document.getElementById('tempYellowY');
+                    if (tempYellowXInput) tempYellowXInput.value = '-';
+                    if (tempYellowYInput) tempYellowYInput.value = '-';
                     
                     scaleCanvas(); // 화면 갱신
                 } else {

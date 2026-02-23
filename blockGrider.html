@@ -9,12 +9,13 @@
             <label for="scaleRange">확대 배율:</label>
             <input type="range" id="scaleRange" min="0" max="5" value="2" step="1">
             <span class="scale-value" id="scaleDisplay">8x</span>
-        </div>
-        <div class="control-group">
-            <label for="rectSize">원래 사각형 크기:</label>
+            <label for="rectSize" style="margin-left:20px;">원래 사각형 크기:</label>
             <input type="number" id="rectSize" min="1" max="32" value="4" style="width:60px;">
             <label for="cornerSize" style="margin-left:10px;">귀퉁이 사각형 크기:</label>
             <input type="number" id="cornerSize" min="1" max="32" value="4" style="width:60px;">
+            <label style="margin-left:15px;">임시 노란색 좌표:</label>
+            <span style="margin-left:5px;">X: <input type="text" id="tempYellowX" value="-" readonly style="width:40px; text-align:center;"></span>
+            <span style="margin-left:8px;">Y: <input type="text" id="tempYellowY" value="-" readonly style="width:40px; text-align:center;"></span>
         </div>
         <div class="info">
           <span>클릭 원래 좌표: <span id="coordDisplay">-,-</span> <span id="colorBox" style="display:inline-block;width:20px;height:20px;border:1px solid #888;vertical-align:middle;margin-left:6px;"></span></span>
