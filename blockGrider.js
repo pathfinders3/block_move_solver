@@ -308,22 +308,28 @@ function countWhitePixels(ctx, x, y, size) {
                     
                     const maxPixels = cornerSize * cornerSize;
                     
-                    // 각 경로별 흰색 픽셀 개수 계산 및 표시
-                    const calculateWhiteCounts = (rects) => {
+                    // 각 경로별 흰색 픽셀 개수 계산 및 버튼 생성
+                    const calculateWhiteCounts = (rects, pathName) => {
                         return rects.map((pt, idx) => {
                             const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                            if (count === maxPixels) {
-                                return `<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`;
-                            } else {
-                                return `[${idx}] ${count}`;
-                            }
+                            const isAllWhite = (count === maxPixels);
+                            
+                            // 버튼 생성
+                            const btnStyle = isAllWhite 
+                                ? 'background:#e6ffe6; color:#006600; font-weight:bold; border:1px solid #00aa00; cursor:pointer;'
+                                : 'background:#f0f0f0; color:#999; border:1px solid #ccc; cursor:not-allowed;';
+                            
+                            const disabled = isAllWhite ? '' : ' disabled';
+                            const btnId = `btn_${pathName}_${idx}`;
+                            
+                            return `<button id="${btnId}" data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" ${disabled} style="padding:2px 6px; margin:1px; font-size:0.85em; ${btnStyle}">[${idx}] ${count}</button>`;
                         });
                     };
                     
-                    const whiteCounts01 = calculateWhiteCounts(pathRects01);
-                    const whiteCounts23 = calculateWhiteCounts(pathRects23);
-                    const whiteCounts02 = calculateWhiteCounts(pathRects02);
-                    const whiteCounts13 = calculateWhiteCounts(pathRects13);
+                    const whiteCounts01 = calculateWhiteCounts(pathRects01, 'path01');
+                    const whiteCounts23 = calculateWhiteCounts(pathRects23, 'path23');
+                    const whiteCounts02 = calculateWhiteCounts(pathRects02, 'path02');
+                    const whiteCounts13 = calculateWhiteCounts(pathRects13, 'path13');
                     
                     // 개수 표시 업데이트
                     if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01.length;
@@ -331,11 +337,31 @@ function countWhitePixels(ctx, x, y, size) {
                     if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02.length;
                     if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13.length;
                     
-                    // 흰색점 개수 표시 업데이트
-                    if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(', ') || '-';
-                    if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(', ') || '-';
-                    if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(', ') || '-';
-                    if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(', ') || '-';
+                    // 흰색점 개수 버튼 표시 업데이트
+                    if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(' ') || '-';
+                    if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(' ') || '-';
+                    if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(' ') || '-';
+                    if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(' ') || '-';
+                    
+                    // 버튼 클릭 이벤트 추가
+                    const addButtonClickEvents = (pathName) => {
+                        document.querySelectorAll(`button[data-path="${pathName}"]`).forEach(btn => {
+                            if (!btn.disabled) {
+                                btn.onclick = () => {
+                                    const idx = btn.getAttribute('data-idx');
+                                    const x = parseInt(btn.getAttribute('data-x'));
+                                    const y = parseInt(btn.getAttribute('data-y'));
+                                    console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
+                                    // TODO: 여기에 녹색 사각형으로 추가하는 로직을 넣을 수 있습니다.
+                                };
+                            }
+                        });
+                    };
+                    
+                    addButtonClickEvents('path01');
+                    addButtonClickEvents('path23');
+                    addButtonClickEvents('path02');
+                    addButtonClickEvents('path13');
                 } else {
                     cornerRects = [];
                     pathRects01 = [];
@@ -408,21 +434,29 @@ function countWhitePixels(ctx, x, y, size) {
                     pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
                     
                     const maxPixels = cornerSize * cornerSize;
-                    const calculateWhiteCounts = (rects) => {
+                    
+                    // 각 경로별 흰색 픽셀 개수 계산 및 버튼 생성
+                    const calculateWhiteCounts = (rects, pathName) => {
                         return rects.map((pt, idx) => {
                             const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                            if (count === maxPixels) {
-                                return `<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`;
-                            } else {
-                                return `[${idx}] ${count}`;
-                            }
+                            const isAllWhite = (count === maxPixels);
+                            
+                            // 버튼 생성
+                            const btnStyle = isAllWhite 
+                                ? 'background:#e6ffe6; color:#006600; font-weight:bold; border:1px solid #00aa00; cursor:pointer;'
+                                : 'background:#f0f0f0; color:#999; border:1px solid #ccc; cursor:not-allowed;';
+                            
+                            const disabled = isAllWhite ? '' : ' disabled';
+                            const btnId = `btn_${pathName}_${idx}`;
+                            
+                            return `<button id="${btnId}" data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" ${disabled} style="padding:2px 6px; margin:1px; font-size:0.85em; ${btnStyle}">[${idx}] ${count}</button>`;
                         });
                     };
                     
-                    const whiteCounts01 = calculateWhiteCounts(pathRects01);
-                    const whiteCounts23 = calculateWhiteCounts(pathRects23);
-                    const whiteCounts02 = calculateWhiteCounts(pathRects02);
-                    const whiteCounts13 = calculateWhiteCounts(pathRects13);
+                    const whiteCounts01 = calculateWhiteCounts(pathRects01, 'path01');
+                    const whiteCounts23 = calculateWhiteCounts(pathRects23, 'path23');
+                    const whiteCounts02 = calculateWhiteCounts(pathRects02, 'path02');
+                    const whiteCounts13 = calculateWhiteCounts(pathRects13, 'path13');
                     
                     // 개수 표시 업데이트
                     if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01.length;
@@ -430,11 +464,31 @@ function countWhitePixels(ctx, x, y, size) {
                     if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02.length;
                     if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13.length;
                     
-                    // 흰색점 개수 표시 업데이트
-                    if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(', ') || '-';
-                    if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(', ') || '-';
-                    if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(', ') || '-';
-                    if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(', ') || '-';
+                    // 흰색점 개수 버튼 표시 업데이트
+                    if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(' ') || '-';
+                    if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(' ') || '-';
+                    if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(' ') || '-';
+                    if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(' ') || '-';
+                    
+                    // 버튼 클릭 이벤트 추가
+                    const addButtonClickEvents = (pathName) => {
+                        document.querySelectorAll(`button[data-path="${pathName}"]`).forEach(btn => {
+                            if (!btn.disabled) {
+                                btn.onclick = () => {
+                                    const idx = btn.getAttribute('data-idx');
+                                    const x = parseInt(btn.getAttribute('data-x'));
+                                    const y = parseInt(btn.getAttribute('data-y'));
+                                    console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
+                                    // TODO: 여기에 녹색 사각형으로 추가하는 로직을 넣을 수 있습니다.
+                                };
+                            }
+                        });
+                    };
+                    
+                    addButtonClickEvents('path01');
+                    addButtonClickEvents('path23');
+                    addButtonClickEvents('path02');
+                    addButtonClickEvents('path13');
                 } else {
                     cornerRects = [];
                     pathRects01 = [];
@@ -562,21 +616,29 @@ function countWhitePixels(ctx, x, y, size) {
                 pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
                 
                 const maxPixels = cornerSize * cornerSize;
-                const calculateWhiteCounts = (rects) => {
+                
+                // 각 경로별 흰색 픽셀 개수 계산 및 버튼 생성
+                const calculateWhiteCounts = (rects, pathName) => {
                     return rects.map((pt, idx) => {
                         const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                        if (count === maxPixels) {
-                            return `<span style="font-weight:bold; color:#006600;">[${idx}] ${count}</span>`;
-                        } else {
-                            return `[${idx}] ${count}`;
-                        }
+                        const isAllWhite = (count === maxPixels);
+                        
+                        // 버튼 생성
+                        const btnStyle = isAllWhite 
+                            ? 'background:#e6ffe6; color:#006600; font-weight:bold; border:1px solid #00aa00; cursor:pointer;'
+                            : 'background:#f0f0f0; color:#999; border:1px solid #ccc; cursor:not-allowed;';
+                        
+                        const disabled = isAllWhite ? '' : ' disabled';
+                        const btnId = `btn_${pathName}_${idx}`;
+                        
+                        return `<button id="${btnId}" data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" ${disabled} style="padding:2px 6px; margin:1px; font-size:0.85em; ${btnStyle}">[${idx}] ${count}</button>`;
                     });
                 };
                 
-                const whiteCounts01 = calculateWhiteCounts(pathRects01);
-                const whiteCounts23 = calculateWhiteCounts(pathRects23);
-                const whiteCounts02 = calculateWhiteCounts(pathRects02);
-                const whiteCounts13 = calculateWhiteCounts(pathRects13);
+                const whiteCounts01 = calculateWhiteCounts(pathRects01, 'path01');
+                const whiteCounts23 = calculateWhiteCounts(pathRects23, 'path23');
+                const whiteCounts02 = calculateWhiteCounts(pathRects02, 'path02');
+                const whiteCounts13 = calculateWhiteCounts(pathRects13, 'path13');
                 
                 // 개수 표시 업데이트
                 if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01.length;
@@ -584,11 +646,31 @@ function countWhitePixels(ctx, x, y, size) {
                 if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02.length;
                 if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13.length;
                 
-                // 흰색점 개수 표시 업데이트
-                if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(', ') || '-';
-                if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(', ') || '-';
-                if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(', ') || '-';
-                if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(', ') || '-';
+                // 흰색점 개수 버튼 표시 업데이트
+                if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(' ') || '-';
+                if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(' ') || '-';
+                if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(' ') || '-';
+                if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(' ') || '-';
+                
+                // 버튼 클릭 이벤트 추가
+                const addButtonClickEvents = (pathName) => {
+                    document.querySelectorAll(`button[data-path="${pathName}"]`).forEach(btn => {
+                        if (!btn.disabled) {
+                            btn.onclick = () => {
+                                const idx = btn.getAttribute('data-idx');
+                                const x = parseInt(btn.getAttribute('data-x'));
+                                const y = parseInt(btn.getAttribute('data-y'));
+                                console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
+                                // TODO: 여기에 녹색 사각형으로 추가하는 로직을 넣을 수 있습니다.
+                            };
+                        }
+                    });
+                };
+                
+                addButtonClickEvents('path01');
+                addButtonClickEvents('path23');
+                addButtonClickEvents('path02');
+                addButtonClickEvents('path13');
             } else {
                 cornerRects = [];
                 pathRects01 = [];
