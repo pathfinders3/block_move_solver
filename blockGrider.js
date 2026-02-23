@@ -233,7 +233,34 @@ function countWhitePixels(ctx, x, y, size) {
             scaleDisplay.textContent = `${scale}x`;
         });
         
-        // F2, F4, F8, IJKL 키 이벤트 리스너
+        // 각도 계산 및 표시 함수
+        function updateTempYellowAngle() {
+            if (tempYellowRect && selectedPixel) {
+                const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+                const baseX = selectedPixel.x + rectSize / 2;
+                const baseY = selectedPixel.y + rectSize / 2;
+                const targetX = tempYellowRect.x + tempYellowRect.size / 2;
+                const targetY = tempYellowRect.y + tempYellowRect.size / 2;
+                
+                const dx = targetX - baseX;
+                const dy = targetY - baseY;
+                
+                // atan2는 -180~180 범위를 반환, 0~359로 변환
+                let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                if (angle < 0) angle += 360;
+                angle = Math.round(angle);
+                
+                const angleDisplay = document.getElementById('tempYellowAngleDisplay');
+                if (angleDisplay) {
+                    angleDisplay.innerHTML = `| 각도: <span style="font-weight:bold;color:#cc6600;">${angle}°</span>`;
+                }
+                
+                return angle;
+            }
+            return null;
+        }
+        
+        // F2, F4, F8, F9, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F2') {
                 e.preventDefault();
@@ -273,6 +300,11 @@ function countWhitePixels(ctx, x, y, size) {
                     console.log(`✅ 노란색 사각형 확정: (${tempYellowRect.x}, ${tempYellowRect.y}), 크기: ${tempYellowRect.size}x${tempYellowRect.size}`);
                     console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
                     tempYellowRect = null; // 임시 사각형 초기화
+                    
+                    // 각도 표시 제거
+                    const angleDisplay = document.getElementById('tempYellowAngleDisplay');
+                    if (angleDisplay) angleDisplay.innerHTML = '';
+                    
                     scaleCanvas(); // 화면 갱신
                 } else {
                     console.log(`❌ 확정할 임시 노란색 사각형이 없습니다.`);
@@ -375,6 +407,13 @@ function countWhitePixels(ctx, x, y, size) {
                                         y: y,
                                         size: cornerSize
                                     };
+                                    
+                                    // 각도 계산 및 표시
+                                    const angle = updateTempYellowAngle();
+                                    if (angle !== null) {
+                                        console.log(`   각도: ${angle}° (기준 사각형 중심으로부터)`);
+                                    }
+                                    
                                     console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
                                     scaleCanvas(); // 화면 갱신
                                 };
@@ -509,6 +548,13 @@ function countWhitePixels(ctx, x, y, size) {
                                         y: y,
                                         size: cornerSize
                                     };
+                                    
+                                    // 각도 계산 및 표시
+                                    const angle = updateTempYellowAngle();
+                                    if (angle !== null) {
+                                        console.log(`   각도: ${angle}° (기준 사각형 중심으로부터)`);
+                                    }
+                                    
                                     console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
                                     scaleCanvas(); // 화면 갱신
                                 };
@@ -702,6 +748,13 @@ function countWhitePixels(ctx, x, y, size) {
                                     y: y,
                                     size: cornerSize
                                 };
+                                
+                                // 각도 계산 및 표시
+                                const angle = updateTempYellowAngle();
+                                if (angle !== null) {
+                                    console.log(`   각도: ${angle}° (기준 사각형 중심으로부터)`);
+                                }
+                                
                                 console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
                                 scaleCanvas(); // 화면 갱신
                             };
