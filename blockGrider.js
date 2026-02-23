@@ -262,6 +262,23 @@ function countWhitePixels(ctx, x, y, size) {
                 }
                 e.preventDefault();
             }
+            if (e.key === 'F9') {
+                // 임시 노란색 사각형이 있으면 확정하여 배열에 추가
+                if (tempYellowRect) {
+                    yellowRects.push({
+                        x: tempYellowRect.x,
+                        y: tempYellowRect.y,
+                        size: tempYellowRect.size
+                    });
+                    console.log(`✅ 노란색 사각형 확정: (${tempYellowRect.x}, ${tempYellowRect.y}), 크기: ${tempYellowRect.size}x${tempYellowRect.size}`);
+                    console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
+                    tempYellowRect = null; // 임시 사각형 초기화
+                    scaleCanvas(); // 화면 갱신
+                } else {
+                    console.log(`❌ 확정할 임시 노란색 사각형이 없습니다.`);
+                }
+                e.preventDefault();
+            }
             if (e.key === 'F4') {
                 showCorners = !showCorners;
                 // F4 on일 때만 귀퉁이 rects 새로 계산
@@ -352,7 +369,14 @@ function countWhitePixels(ctx, x, y, size) {
                                     const x = parseInt(btn.getAttribute('data-x'));
                                     const y = parseInt(btn.getAttribute('data-y'));
                                     console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
-                                    // TODO: 여기에 녹색 사각형으로 추가하는 로직을 넣을 수 있습니다.
+                                    // 임시 노란색 사각형으로 설정 (F9로 확정)
+                                    tempYellowRect = {
+                                        x: x,
+                                        y: y,
+                                        size: cornerSize
+                                    };
+                                    console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
+                                    scaleCanvas(); // 화면 갱신
                                 };
                             }
                         });
@@ -479,7 +503,14 @@ function countWhitePixels(ctx, x, y, size) {
                                     const x = parseInt(btn.getAttribute('data-x'));
                                     const y = parseInt(btn.getAttribute('data-y'));
                                     console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
-                                    // TODO: 여기에 녹색 사각형으로 추가하는 로직을 넣을 수 있습니다.
+                                    // 임시 노란색 사각형으로 설정 (F9로 확정)
+                                    tempYellowRect = {
+                                        x: x,
+                                        y: y,
+                                        size: cornerSize
+                                    };
+                                    console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
+                                    scaleCanvas(); // 화면 갱신
                                 };
                             }
                         });
@@ -563,6 +594,10 @@ function countWhitePixels(ctx, x, y, size) {
         let pathRects13 = []; // 우측 수직 (1→3)
         // F8: 녹색으로 칠한 사각형들을 저장하는 배열
         let greenRects = []; // {x: number, y: number, size: number}[]
+        // 경로 버튼 클릭: 임시 노란색 사각형 (F9로 확정 전)
+        let tempYellowRect = null; // {x: number, y: number, size: number} | null
+        // F9: 확정된 노란색 사각형들을 저장하는 배열
+        let yellowRects = []; // {x: number, y: number, size: number}[]
 
         canvas2.addEventListener('click', function(e) {
             const index = parseInt(scaleRange.value);
@@ -661,7 +696,14 @@ function countWhitePixels(ctx, x, y, size) {
                                 const x = parseInt(btn.getAttribute('data-x'));
                                 const y = parseInt(btn.getAttribute('data-y'));
                                 console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
-                                // TODO: 여기에 녹색 사각형으로 추가하는 로직을 넣을 수 있습니다.
+                                // 임시 노란색 사각형으로 설정 (F9로 확정)
+                                tempYellowRect = {
+                                    x: x,
+                                    y: y,
+                                    size: cornerSize
+                                };
+                                console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
+                                scaleCanvas(); // 화면 갱신
                             };
                         }
                     });
@@ -789,6 +831,31 @@ function countWhitePixels(ctx, x, y, size) {
                         ctx2.fillRect(rect.x * scale, rect.y * scale, rect.size * scale, rect.size * scale);
                         ctx2.strokeRect(rect.x * scale+0.5, rect.y * scale+0.5, rect.size * scale-1, rect.size * scale-1);
                     }
+                }
+                
+                // F9로 확정된 노란색 사각형들 그리기
+                if (yellowRects.length > 0) {
+                    ctx2.fillStyle = 'rgba(255, 255, 0, 0.3)'; // 반투명 노란색
+                    ctx2.strokeStyle = 'rgba(200, 200, 0, 0.8)';
+                    ctx2.lineWidth = Math.max(1, scale/8);
+                    ctx2.setLineDash([]);
+                    
+                    for (const rect of yellowRects) {
+                        ctx2.fillRect(rect.x * scale, rect.y * scale, rect.size * scale, rect.size * scale);
+                        ctx2.strokeRect(rect.x * scale+0.5, rect.y * scale+0.5, rect.size * scale-1, rect.size * scale-1);
+                    }
+                }
+                
+                // 임시 노란색 사각형 그리기 (F9로 확정 전, 점선 테두리)
+                if (tempYellowRect) {
+                    ctx2.fillStyle = 'rgba(255, 200, 0, 0.4)'; // 조금 더 진한 노란색
+                    ctx2.strokeStyle = 'rgba(255, 150, 0, 1.0)';
+                    ctx2.lineWidth = Math.max(2, scale/6);
+                    ctx2.setLineDash([5, 5]); // 점선
+                    
+                    ctx2.fillRect(tempYellowRect.x * scale, tempYellowRect.y * scale, tempYellowRect.size * scale, tempYellowRect.size * scale);
+                    ctx2.strokeRect(tempYellowRect.x * scale+0.5, tempYellowRect.y * scale+0.5, tempYellowRect.size * scale-1, tempYellowRect.size * scale-1);
+                    ctx2.setLineDash([]); // 점선 해제
                 }
                 
                 ctx2.restore();
