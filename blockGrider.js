@@ -334,8 +334,9 @@ function countWhitePixels(ctx, x, y, size) {
                 if(showCorners && selectedPixel) {
                     const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
                     const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
+                    
+                    // 로깅용 귀퉁이 정보 출력
                     cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
-                    // 귀퉁이 사각형 정보 출력
                     console.log(`=== 귀퉁이 사각형 정보 (원래:${rectSize}x${rectSize}, 귀퉁이:${cornerSize}x${cornerSize}) ===`);
                     const pixelCounts = [];
                     cornerRects.forEach((r, idx) => {
@@ -344,104 +345,19 @@ function countWhitePixels(ctx, x, y, size) {
                         pixelCounts.push(pixelCount);
                         console.log(`${labels[idx]}: 원래좌표(${r.x},${r.y}) 크기${r.w}x${r.h} | 보이는영역(${r.visibleX},${r.visibleY}) 크기${r.visibleW}x${r.visibleH} | 유효픽셀: ${pixelCount}`);
                     });
-                    // 귀퉁이 유효 픽셀수 표시 업데이트
-                    const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
-                    if(cornerPixelsDisplay) {
-                        cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
-                    }
                     
-                    // 기준 사각형의 흰색점 개수 계산 및 표시
                     const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
-                    const baseRectWhite = document.getElementById('baseRectWhite');
-                    if(baseRectWhite) {
-                        const baseMaxPixels = rectSize * rectSize;
-                        baseRectWhite.textContent = baseWhiteCount;
-                        baseRectWhite.style.color = (baseWhiteCount === baseMaxPixels) ? '#006600' : '#cc0000';
-                    }
                     console.log(`기준 사각형 (${selectedPixel.x},${selectedPixel.y}) 크기${rectSize}x${rectSize}: 흰색점 ${baseWhiteCount}개`);
                     
-                    // 4가지 경로 모두 계산
-                    pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
-                    pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
-                    pathRects02 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [];
-                    pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
+                    // 공통 업데이트 함수 호출
+                    updateCornerAndPathInfo();
                     
+                    // 로깅용 경로 정보 출력
                     console.log(`경로 계산 (원래:${rectSize}x${rectSize}, 귀퉁이:${cornerSize}x${cornerSize}):`);
                     console.log(`  0→1 (상단 수평): ${pathRects01.length}개`);
                     console.log(`  2→3 (하단 수평): ${pathRects23.length}개`);
                     console.log(`  0→2 (좌측 수직): ${pathRects02.length}개`);
                     console.log(`  1→3 (우측 수직): ${pathRects13.length}개`);
-                    
-                    const maxPixels = cornerSize * cornerSize;
-                    
-                    // 각 경로별 흰색 픽셀 개수 계산 및 버튼 생성
-                    const calculateWhiteCounts = (rects, pathName) => {
-                        return rects.map((pt, idx) => {
-                            const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                            const isAllWhite = (count === maxPixels);
-                            
-                            // 버튼 생성
-                            const btnStyle = isAllWhite 
-                                ? 'background:#e6ffe6; color:#006600; font-weight:bold; border:1px solid #00aa00; cursor:pointer;'
-                                : 'background:#f0f0f0; color:#999; border:1px solid #ccc; cursor:not-allowed;';
-                            
-                            const disabled = isAllWhite ? '' : ' disabled';
-                            const btnId = `btn_${pathName}_${idx}`;
-                            
-                            return `<button id="${btnId}" data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" ${disabled} style="padding:2px 6px; margin:1px; font-size:0.85em; ${btnStyle}">[${idx}] ${count}</button>`;
-                        });
-                    };
-                    
-                    const whiteCounts01 = calculateWhiteCounts(pathRects01, 'path01');
-                    const whiteCounts23 = calculateWhiteCounts(pathRects23, 'path23');
-                    const whiteCounts02 = calculateWhiteCounts(pathRects02, 'path02');
-                    const whiteCounts13 = calculateWhiteCounts(pathRects13, 'path13');
-                    
-                    // 개수 표시 업데이트
-                    if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01.length;
-                    if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = pathRects23.length;
-                    if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02.length;
-                    if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13.length;
-                    
-                    // 흰색점 개수 버튼 표시 업데이트
-                    if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(' ') || '-';
-                    if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(' ') || '-';
-                    if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(' ') || '-';
-                    if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(' ') || '-';
-                    
-                    // 버튼 클릭 이벤트 추가
-                    const addButtonClickEvents = (pathName) => {
-                        document.querySelectorAll(`button[data-path="${pathName}"]`).forEach(btn => {
-                            if (!btn.disabled) {
-                                btn.onclick = () => {
-                                    const idx = btn.getAttribute('data-idx');
-                                    const x = parseInt(btn.getAttribute('data-x'));
-                                    const y = parseInt(btn.getAttribute('data-y'));
-                                    console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
-                                    // 임시 노란색 사각형으로 설정 (F9로 확정)
-                                    tempYellowRect = {
-                                        x: x,
-                                        y: y,
-                                        size: cornerSize
-                                    };
-                                    
-                                    // 각도 계산 및 표시
-                                    const angle = updateTempYellowAngle();
-                                    if (angle !== null) {
-                                        console.log(`   각도: ${angle}° (기준 사각형 중심으로부터)`);
-                                    }
-                                    
-                                    console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
-                                    scaleCanvas(); // 화면 갱신
-                                };
-                            }
-                        });
-                    };
-                    
-                    addButtonClickEvents('path01');
-                    addButtonClickEvents('path23');
-                    addButtonClickEvents('path02');
-                    addButtonClickEvents('path13');
                 } else {
                     cornerRects = [];
                     pathRects01 = [];
@@ -489,100 +405,7 @@ function countWhitePixels(ctx, x, y, size) {
                 if(colorBox) colorBox.style.background = `rgb(${r},${g},${b})`;
                 // 귀퉁이 갱신
                 if(showCorners && selectedPixel) {
-                    const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
-                    const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
-                    cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
-                    
-                    // 귀퉁이 유효 픽셀수 업데이트
-                    const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
-                    const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
-                    if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
-                    
-                    // 기준 사각형의 흰색점 개수 계산 및 표시
-                    const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
-                    const baseRectWhite = document.getElementById('baseRectWhite');
-                    if(baseRectWhite) {
-                        const baseMaxPixels = rectSize * rectSize;
-                        baseRectWhite.textContent = baseWhiteCount;
-                        baseRectWhite.style.color = (baseWhiteCount === baseMaxPixels) ? '#006600' : '#cc0000';
-                    }
-                    
-                    // 4가지 경로 모두 계산
-                    pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
-                    pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
-                    pathRects02 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [];
-                    pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
-                    
-                    const maxPixels = cornerSize * cornerSize;
-                    
-                    // 각 경로별 흰색 픽셀 개수 계산 및 버튼 생성
-                    const calculateWhiteCounts = (rects, pathName) => {
-                        return rects.map((pt, idx) => {
-                            const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                            const isAllWhite = (count === maxPixels);
-                            
-                            // 버튼 생성
-                            const btnStyle = isAllWhite 
-                                ? 'background:#e6ffe6; color:#006600; font-weight:bold; border:1px solid #00aa00; cursor:pointer;'
-                                : 'background:#f0f0f0; color:#999; border:1px solid #ccc; cursor:not-allowed;';
-                            
-                            const disabled = isAllWhite ? '' : ' disabled';
-                            const btnId = `btn_${pathName}_${idx}`;
-                            
-                            return `<button id="${btnId}" data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" ${disabled} style="padding:2px 6px; margin:1px; font-size:0.85em; ${btnStyle}">[${idx}] ${count}</button>`;
-                        });
-                    };
-                    
-                    const whiteCounts01 = calculateWhiteCounts(pathRects01, 'path01');
-                    const whiteCounts23 = calculateWhiteCounts(pathRects23, 'path23');
-                    const whiteCounts02 = calculateWhiteCounts(pathRects02, 'path02');
-                    const whiteCounts13 = calculateWhiteCounts(pathRects13, 'path13');
-                    
-                    // 개수 표시 업데이트
-                    if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01.length;
-                    if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = pathRects23.length;
-                    if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02.length;
-                    if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13.length;
-                    
-                    // 흰색점 개수 버튼 표시 업데이트
-                    if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(' ') || '-';
-                    if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(' ') || '-';
-                    if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(' ') || '-';
-                    if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(' ') || '-';
-                    
-                    // 버튼 클릭 이벤트 추가
-                    const addButtonClickEvents = (pathName) => {
-                        document.querySelectorAll(`button[data-path="${pathName}"]`).forEach(btn => {
-                            if (!btn.disabled) {
-                                btn.onclick = () => {
-                                    const idx = btn.getAttribute('data-idx');
-                                    const x = parseInt(btn.getAttribute('data-x'));
-                                    const y = parseInt(btn.getAttribute('data-y'));
-                                    console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
-                                    // 임시 노란색 사각형으로 설정 (F9로 확정)
-                                    tempYellowRect = {
-                                        x: x,
-                                        y: y,
-                                        size: cornerSize
-                                    };
-                                    
-                                    // 각도 계산 및 표시
-                                    const angle = updateTempYellowAngle();
-                                    if (angle !== null) {
-                                        console.log(`   각도: ${angle}° (기준 사각형 중심으로부터)`);
-                                    }
-                                    
-                                    console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
-                                    scaleCanvas(); // 화면 갱신
-                                };
-                            }
-                        });
-                    };
-                    
-                    addButtonClickEvents('path01');
-                    addButtonClickEvents('path23');
-                    addButtonClickEvents('path02');
-                    addButtonClickEvents('path13');
+                    updateCornerAndPathInfo();
                 } else {
                     cornerRects = [];
                     pathRects01 = [];
@@ -663,6 +486,101 @@ function countWhitePixels(ctx, x, y, size) {
         let yellowRects = []; // {x: number, y: number, size: number}[]
         let currentYellowIndex = -1; // 현재 선택된 노란색 사각형 인덱스 (-1은 선택 안 됨)
 
+        // 공통 함수: 귀퉁이 및 경로 정보 업데이트
+        function updateCornerAndPathInfo() {
+            if (!selectedPixel) return;
+            
+            const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+            const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
+            
+            cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
+            
+            // 귀퉁이 유효 픽셀수 업데이트
+            const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
+            const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
+            if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
+            
+            // 기준 사각형의 흰색점 개수 계산 및 표시
+            const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
+            const baseRectWhite = document.getElementById('baseRectWhite');
+            if(baseRectWhite) {
+                const baseMaxPixels = rectSize * rectSize;
+                baseRectWhite.textContent = baseWhiteCount;
+                baseRectWhite.style.color = (baseWhiteCount === baseMaxPixels) ? '#006600' : '#cc0000';
+            }
+            
+            // 4가지 경로 모두 계산
+            pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
+            pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
+            pathRects02 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [];
+            pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
+            
+            // 경로별 개수 표시 업데이트
+            if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01.length;
+            if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = pathRects23.length;
+            if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02.length;
+            if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13.length;
+            
+            const maxPixels = cornerSize * cornerSize;
+            
+            // 경로별 흰색점 개수 계산 및 버튼 생성
+            const calculateWhiteCounts = (rects, pathName) => {
+                return rects.map((pt, idx) => {
+                    const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
+                    const isAllWhite = (whiteCount === maxPixels);
+                    const buttonStyle = isAllWhite 
+                        ? 'background:#4CAF50; color:white; border:1px solid #45a049; cursor:pointer;'
+                        : 'background:#ccc; color:#666; border:1px solid #999; cursor:not-allowed;';
+                    return `<button data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" 
+                                    style="padding:2px 6px; margin:2px; border-radius:3px; ${buttonStyle}" 
+                                    ${isAllWhite ? '' : 'disabled'}>${whiteCount}</button>`;
+                });
+            };
+            
+            const whiteCounts01 = calculateWhiteCounts(pathRects01, 'path01');
+            const whiteCounts23 = calculateWhiteCounts(pathRects23, 'path23');
+            const whiteCounts02 = calculateWhiteCounts(pathRects02, 'path02');
+            const whiteCounts13 = calculateWhiteCounts(pathRects13, 'path13');
+            
+            // 흰색점 개수 버튼 표시 업데이트
+            if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(' ') || '-';
+            if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(' ') || '-';
+            if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(' ') || '-';
+            if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(' ') || '-';
+            
+            // 버튼 클릭 이벤트 추가
+            const addButtonClickEvents = (pathName) => {
+                document.querySelectorAll(`button[data-path="${pathName}"]`).forEach(btn => {
+                    if (!btn.disabled) {
+                        btn.onclick = () => {
+                            const idx = btn.getAttribute('data-idx');
+                            const x = parseInt(btn.getAttribute('data-x'));
+                            const y = parseInt(btn.getAttribute('data-y'));
+                            console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
+                            tempYellowRect = {
+                                x: x,
+                                y: y,
+                                size: cornerSize
+                            };
+                            
+                            const angle = updateTempYellowAngle();
+                            if (angle !== null) {
+                                console.log(`   각도: ${angle}° (기준 사각형 중심으로부터)`);
+                            }
+                            
+                            console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
+                            scaleCanvas();
+                        };
+                    }
+                });
+            };
+            
+            addButtonClickEvents('path01');
+            addButtonClickEvents('path23');
+            addButtonClickEvents('path02');
+            addButtonClickEvents('path13');
+        }
+
         // 노란색 사각형 탐색 기능
         function updateYellowIndexDisplay() {
             const display = document.getElementById('yellowIndexDisplay');
@@ -728,101 +646,7 @@ function countWhitePixels(ctx, x, y, size) {
             
             // 귀퉁이 정보 업데이트
             if(showCorners && selectedPixel) {
-                const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
-                const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
-                cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
-                
-                // 귀퉁이 유효 픽셀수 업데이트
-                const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
-                const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
-                if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
-                
-                // 기준 사각형의 흰색점 개수 계산 및 표시
-                const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
-                const baseRectWhite = document.getElementById('baseRectWhite');
-                if(baseRectWhite) {
-                    const baseMaxPixels = rectSize * rectSize;
-                    baseRectWhite.textContent = baseWhiteCount;
-                    baseRectWhite.style.color = (baseWhiteCount === baseMaxPixels) ? '#006600' : '#cc0000';
-                }
-                
-                // 4가지 경로 모두 계산
-                pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
-                pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
-                pathRects02 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [];
-                pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
-                
-                // 경로별 개수 갱신
-                const pathCount01El = document.getElementById('pathCount01');
-                const pathCount23El = document.getElementById('pathCount23');
-                const pathCount02El = document.getElementById('pathCount02');
-                const pathCount13El = document.getElementById('pathCount13');
-                if(pathCount01El) pathCount01El.textContent = pathRects01.length;
-                if(pathCount23El) pathCount23El.textContent = pathRects23.length;
-                if(pathCount02El) pathCount02El.textContent = pathRects02.length;
-                if(pathCount13El) pathCount13El.textContent = pathRects13.length;
-                
-                // 경로별 흰색점 개수 계산
-                const calculateWhiteCounts = (rects) => {
-                    return rects.map(rect => countWhitePixels(ctx1, rect.x, rect.y, cornerSize));
-                };
-                
-                const whiteCounts01 = calculateWhiteCounts(pathRects01);
-                const whiteCounts23 = calculateWhiteCounts(pathRects23);
-                const whiteCounts02 = calculateWhiteCounts(pathRects02);
-                const whiteCounts13 = calculateWhiteCounts(pathRects13);
-                
-                // 버튼 생성 함수
-                const createButtons = (counts, rects, pathName) => {
-                    return counts.map((count, idx) => {
-                        const rect = rects[idx];
-                        const maxPixels = cornerSize * cornerSize;
-                        const isAllWhite = (count === maxPixels);
-                        const buttonStyle = isAllWhite 
-                            ? 'background:#4CAF50; color:white; border:1px solid #45a049; cursor:pointer;'
-                            : 'background:#ccc; color:#666; border:1px solid #999; cursor:not-allowed;';
-                        return `<button data-path="${pathName}" data-idx="${idx}" data-x="${rect.x}" data-y="${rect.y}" 
-                                        style="padding:2px 6px; margin:2px; border-radius:3px; ${buttonStyle}" 
-                                        ${isAllWhite ? '' : 'disabled'}>${count}</button>`;
-                    }).join('');
-                };
-                
-                if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = createButtons(whiteCounts01, pathRects01, 'path01');
-                if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = createButtons(whiteCounts23, pathRects23, 'path23');
-                if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = createButtons(whiteCounts02, pathRects02, 'path02');
-                if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = createButtons(whiteCounts13, pathRects13, 'path13');
-                
-                // 버튼 클릭 이벤트 추가
-                const addButtonClickEvents = (pathName) => {
-                    document.querySelectorAll(`button[data-path="${pathName}"]`).forEach(btn => {
-                        if (!btn.disabled) {
-                            btn.onclick = () => {
-                                const idx = btn.getAttribute('data-idx');
-                                const x = parseInt(btn.getAttribute('data-x'));
-                                const y = parseInt(btn.getAttribute('data-y'));
-                                console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
-                                tempYellowRect = {
-                                    x: x,
-                                    y: y,
-                                    size: cornerSize
-                                };
-                                
-                                const angle = updateTempYellowAngle();
-                                if (angle !== null) {
-                                    console.log(`   각도: ${angle}° (기준 사각형 중심으로부터)`);
-                                }
-                                
-                                console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
-                                scaleCanvas();
-                            };
-                        }
-                    });
-                };
-                
-                addButtonClickEvents('path01');
-                addButtonClickEvents('path23');
-                addButtonClickEvents('path02');
-                addButtonClickEvents('path13');
+                updateCornerAndPathInfo();
             }
             
             console.log(`✅ 노란색 사각형 [${currentYellowIndex + 1}]번 위치로 이동: (${ox}, ${oy})`);
@@ -859,100 +683,7 @@ function countWhitePixels(ctx, x, y, size) {
             if(colorBox) colorBox.style.background = `rgb(${r},${g},${b})`;
             // 귀퉁이 반영
             if(showCorners && selectedPixel) {
-                const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
-                const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
-                cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
-                
-                // 귀퉁이 유효 픽셀수 업데이트
-                const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
-                const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
-                if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
-                
-                // 기준 사각형의 흰색점 개수 계산 및 표시
-                const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
-                const baseRectWhite = document.getElementById('baseRectWhite');
-                if(baseRectWhite) {
-                    const baseMaxPixels = rectSize * rectSize;
-                    baseRectWhite.textContent = baseWhiteCount;
-                    baseRectWhite.style.color = (baseWhiteCount === baseMaxPixels) ? '#006600' : '#cc0000';
-                }
-                
-                // 4가지 경로 모두 계산
-                pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
-                pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
-                pathRects02 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [];
-                pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
-                
-                const maxPixels = cornerSize * cornerSize;
-                
-                // 각 경로별 흰색 픽셀 개수 계산 및 버튼 생성
-                const calculateWhiteCounts = (rects, pathName) => {
-                    return rects.map((pt, idx) => {
-                        const count = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
-                        const isAllWhite = (count === maxPixels);
-                        
-                        // 버튼 생성
-                        const btnStyle = isAllWhite 
-                            ? 'background:#e6ffe6; color:#006600; font-weight:bold; border:1px solid #00aa00; cursor:pointer;'
-                            : 'background:#f0f0f0; color:#999; border:1px solid #ccc; cursor:not-allowed;';
-                        
-                        const disabled = isAllWhite ? '' : ' disabled';
-                        const btnId = `btn_${pathName}_${idx}`;
-                        
-                        return `<button id="${btnId}" data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" ${disabled} style="padding:2px 6px; margin:1px; font-size:0.85em; ${btnStyle}">[${idx}] ${count}</button>`;
-                    });
-                };
-                
-                const whiteCounts01 = calculateWhiteCounts(pathRects01, 'path01');
-                const whiteCounts23 = calculateWhiteCounts(pathRects23, 'path23');
-                const whiteCounts02 = calculateWhiteCounts(pathRects02, 'path02');
-                const whiteCounts13 = calculateWhiteCounts(pathRects13, 'path13');
-                
-                // 개수 표시 업데이트
-                if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01.length;
-                if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = pathRects23.length;
-                if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02.length;
-                if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13.length;
-                
-                // 흰색점 개수 버튼 표시 업데이트
-                if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = whiteCounts01.join(' ') || '-';
-                if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = whiteCounts23.join(' ') || '-';
-                if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = whiteCounts02.join(' ') || '-';
-                if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = whiteCounts13.join(' ') || '-';
-                
-                // 버튼 클릭 이벤트 추가
-                const addButtonClickEvents = (pathName) => {
-                    document.querySelectorAll(`button[data-path="${pathName}"]`).forEach(btn => {
-                        if (!btn.disabled) {
-                            btn.onclick = () => {
-                                const idx = btn.getAttribute('data-idx');
-                                const x = parseInt(btn.getAttribute('data-x'));
-                                const y = parseInt(btn.getAttribute('data-y'));
-                                console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
-                                // 임시 노란색 사각형으로 설정 (F9로 확정)
-                                tempYellowRect = {
-                                    x: x,
-                                    y: y,
-                                    size: cornerSize
-                                };
-                                
-                                // 각도 계산 및 표시
-                                const angle = updateTempYellowAngle();
-                                if (angle !== null) {
-                                    console.log(`   각도: ${angle}° (기준 사각형 중심으로부터)`);
-                                }
-                                
-                                console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
-                                scaleCanvas(); // 화면 갱신
-                            };
-                        }
-                    });
-                };
-                
-                addButtonClickEvents('path01');
-                addButtonClickEvents('path23');
-                addButtonClickEvents('path02');
-                addButtonClickEvents('path13');
+                updateCornerAndPathInfo();
             } else {
                 cornerRects = [];
                 pathRects01 = [];
