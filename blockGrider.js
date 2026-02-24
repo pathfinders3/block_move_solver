@@ -233,6 +233,15 @@ function countWhitePixels(ctx, x, y, size) {
             scaleDisplay.textContent = `${scale}x`;
         });
         
+        // 데카르트 좌표계 기준으로 dx, dy로부터 각도(0~359도) 계산
+        function calculateCartesianAngle(dx, dy) {
+            // 데카르트 좌표계로 변환 (Y축 반전: 캔버스는 Y가 아래로 증가, 데카르트는 위로 증가)
+            // atan2는 -180~180 범위를 반환, 0~359로 변환
+            let angle = Math.atan2(-dy, dx) * 180 / Math.PI;
+            if (angle < 0) angle += 360;
+            return Math.round(angle);
+        }
+        
         // 각도 계산 및 표시 함수
         function updateTempYellowAngle() {
             if (tempYellowRect && selectedPixel) {
@@ -245,11 +254,7 @@ function countWhitePixels(ctx, x, y, size) {
                 const dx = targetX - baseX;
                 const dy = targetY - baseY;
                 
-                // 데카르트 좌표계로 변환 (Y축 반전)
-                // atan2는 -180~180 범위를 반환, 0~359로 변환
-                let angle = Math.atan2(-dy, dx) * 180 / Math.PI;
-                if (angle < 0) angle += 360;
-                angle = Math.round(angle);
+                const angle = calculateCartesianAngle(dx, dy);
                 
                 const angleDisplay = document.getElementById('tempYellowAngleDisplay');
                 if (angleDisplay) {
@@ -647,11 +652,7 @@ function countWhitePixels(ctx, x, y, size) {
             const dx = currX - prevX;
             const dy = currY - prevY;
             
-            // 데카르트 좌표계로 변환 (Y축 반전: 캔버스는 Y가 아래로 증가, 데카르트는 위로 증가)
-            // atan2는 -180~180 범위를 반환, 0~359로 변환
-            let angle = Math.atan2(-dy, dx) * 180 / Math.PI;
-            if (angle < 0) angle += 360;
-            angle = Math.round(angle);
+            const angle = calculateCartesianAngle(dx, dy);
             
             angleDisplay.innerHTML = `| 각도: <span style="font-weight:bold;color:#ff6600;">${angle}°</span> <span style="font-size:0.9em;color:#999;">(이전→현재)</span>`;
         }
