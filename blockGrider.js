@@ -281,14 +281,20 @@ function countWhitePixels(ctx, x, y, size) {
                     const baseMaxPixels = rectSize * rectSize;
                     
                     if (baseWhiteCount === baseMaxPixels) {
-                        // 모두 흰색이면 녹색 사각형으로 저장
-                        greenRects.push({
+                        // 모두 흰색이면 노란색 사각형으로 저장
+                        yellowRects.push({
                             x: selectedPixel.x,
                             y: selectedPixel.y,
                             size: rectSize
                         });
-                        console.log(`✅ 녹색 사각형 추가: (${selectedPixel.x}, ${selectedPixel.y}), 크기: ${rectSize}x${rectSize}`);
-                        console.log(`   총 ${greenRects.length}개의 녹색 사각형 저장됨`);
+                        console.log(`✅ 노란색 사각형 추가: (${selectedPixel.x}, ${selectedPixel.y}), 크기: ${rectSize}x${rectSize}`);
+                        console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
+                        
+                        // 방금 추가된 사각형을 현재 선택으로 설정
+                        currentYellowIndex = yellowRects.length - 1;
+                        updateYellowIndexDisplay();
+                        updateYellowAngleDisplay();
+                        
                         scaleCanvas(); // 화면 갱신
                     } else {
                         console.log(`❌ 사각형이 모두 흰색이 아닙니다. (흰색: ${baseWhiteCount}/${baseMaxPixels})`);
@@ -852,20 +858,7 @@ function countWhitePixels(ctx, x, y, size) {
                 }
                 ctx2.setLineDash([]);
                 
-                // F8로 저장된 녹색 사각형들 그리기
-                if (greenRects.length > 0) {
-                    ctx2.fillStyle = 'rgba(0, 255, 0, 0.3)'; // 반투명 녹색
-                    ctx2.strokeStyle = 'rgba(0, 200, 0, 0.8)';
-                    ctx2.lineWidth = Math.max(1, scale/8);
-                    ctx2.setLineDash([]);
-                    
-                    for (const rect of greenRects) {
-                        ctx2.fillRect(rect.x * scale, rect.y * scale, rect.size * scale, rect.size * scale);
-                        ctx2.strokeRect(rect.x * scale+0.5, rect.y * scale+0.5, rect.size * scale-1, rect.size * scale-1);
-                    }
-                }
-                
-                // F9로 확정된 노란색 사각형들 그리기
+                // F8/F9로 확정된 노란색 사각형들 그리기
                 if (yellowRects.length > 0) {
                     for (let i = 0; i < yellowRects.length; i++) {
                         const rect = yellowRects[i];
