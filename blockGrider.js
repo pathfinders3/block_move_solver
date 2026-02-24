@@ -696,6 +696,139 @@ function countWhitePixels(ctx, x, y, size) {
             scaleCanvas();
         });
         
+        // Go 버튼: 현재 선택된 노란색 사각형 위치로 이동
+        document.getElementById('btnGoToYellow').addEventListener('click', () => {
+            if (currentYellowIndex === -1 || yellowRects.length === 0) {
+                console.log('❌ 이동할 노란색 사각형이 선택되지 않았습니다.');
+                return;
+            }
+            
+            const yellowRect = yellowRects[currentYellowIndex];
+            const ox = yellowRect.x;
+            const oy = yellowRect.y;
+            
+            selectedPixel = { x: ox, y: oy };
+            
+            // 색상 구하기 (canvas1 기준)
+            let rgbText = '';
+            let r=0,g=0,b=0;
+            try {
+                const pixel = ctx1.getImageData(ox, oy, 1, 1).data;
+                r = pixel[0]; g = pixel[1]; b = pixel[2];
+                rgbText = ` - RGB(${r},${g},${b})`;
+            } catch (ex) { rgbText = '' }
+            
+            // 좌표+색상 표시
+            const coordDisp = document.getElementById('coordDisplay');
+            if(coordDisp) coordDisp.textContent = `${ox}, ${oy}${rgbText}`;
+            
+            // 색 박스 표시
+            const colorBox = document.getElementById('colorBox');
+            if(colorBox) colorBox.style.background = `rgb(${r},${g},${b})`;
+            
+            // 귀퉁이 정보 업데이트
+            if(showCorners && selectedPixel) {
+                const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+                const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
+                cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
+                
+                // 귀퉁이 유효 픽셀수 업데이트
+                const pixelCounts = cornerRects.map(r => r.visibleW * r.visibleH);
+                const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
+                if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = `[${pixelCounts.join(', ')}]`;
+                
+                // 기준 사각형의 흰색점 개수 계산 및 표시
+                const baseWhiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, rectSize);
+                const baseRectWhite = document.getElementById('baseRectWhite');
+                if(baseRectWhite) {
+                    const baseMaxPixels = rectSize * rectSize;
+                    baseRectWhite.textContent = baseWhiteCount;
+                    baseRectWhite.style.color = (baseWhiteCount === baseMaxPixels) ? '#006600' : '#cc0000';
+                }
+                
+                // 4가지 경로 모두 계산
+                pathRects01 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
+                pathRects23 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
+                pathRects02 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [];
+                pathRects13 = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
+                
+                // 경로별 개수 갱신
+                const pathCount01El = document.getElementById('pathCount01');
+                const pathCount23El = document.getElementById('pathCount23');
+                const pathCount02El = document.getElementById('pathCount02');
+                const pathCount13El = document.getElementById('pathCount13');
+                if(pathCount01El) pathCount01El.textContent = pathRects01.length;
+                if(pathCount23El) pathCount23El.textContent = pathRects23.length;
+                if(pathCount02El) pathCount02El.textContent = pathRects02.length;
+                if(pathCount13El) pathCount13El.textContent = pathRects13.length;
+                
+                // 경로별 흰색점 개수 계산
+                const calculateWhiteCounts = (rects) => {
+                    return rects.map(rect => countWhitePixels(ctx1, rect.x, rect.y, cornerSize));
+                };
+                
+                const whiteCounts01 = calculateWhiteCounts(pathRects01);
+                const whiteCounts23 = calculateWhiteCounts(pathRects23);
+                const whiteCounts02 = calculateWhiteCounts(pathRects02);
+                const whiteCounts13 = calculateWhiteCounts(pathRects13);
+                
+                // 버튼 생성 함수
+                const createButtons = (counts, rects, pathName) => {
+                    return counts.map((count, idx) => {
+                        const rect = rects[idx];
+                        const maxPixels = cornerSize * cornerSize;
+                        const isAllWhite = (count === maxPixels);
+                        const buttonStyle = isAllWhite 
+                            ? 'background:#4CAF50; color:white; border:1px solid #45a049; cursor:pointer;'
+                            : 'background:#ccc; color:#666; border:1px solid #999; cursor:not-allowed;';
+                        return `<button data-path="${pathName}" data-idx="${idx}" data-x="${rect.x}" data-y="${rect.y}" 
+                                        style="padding:2px 6px; margin:2px; border-radius:3px; ${buttonStyle}" 
+                                        ${isAllWhite ? '' : 'disabled'}>${count}</button>`;
+                    }).join('');
+                };
+                
+                if(document.getElementById('pathWhite01')) document.getElementById('pathWhite01').innerHTML = createButtons(whiteCounts01, pathRects01, 'path01');
+                if(document.getElementById('pathWhite23')) document.getElementById('pathWhite23').innerHTML = createButtons(whiteCounts23, pathRects23, 'path23');
+                if(document.getElementById('pathWhite02')) document.getElementById('pathWhite02').innerHTML = createButtons(whiteCounts02, pathRects02, 'path02');
+                if(document.getElementById('pathWhite13')) document.getElementById('pathWhite13').innerHTML = createButtons(whiteCounts13, pathRects13, 'path13');
+                
+                // 버튼 클릭 이벤트 추가
+                const addButtonClickEvents = (pathName) => {
+                    document.querySelectorAll(`button[data-path="${pathName}"]`).forEach(btn => {
+                        if (!btn.disabled) {
+                            btn.onclick = () => {
+                                const idx = btn.getAttribute('data-idx');
+                                const x = parseInt(btn.getAttribute('data-x'));
+                                const y = parseInt(btn.getAttribute('data-y'));
+                                console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
+                                tempYellowRect = {
+                                    x: x,
+                                    y: y,
+                                    size: cornerSize
+                                };
+                                
+                                const angle = updateTempYellowAngle();
+                                if (angle !== null) {
+                                    console.log(`   각도: ${angle}° (기준 사각형 중심으로부터)`);
+                                }
+                                
+                                console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
+                                scaleCanvas();
+                            };
+                        }
+                    });
+                };
+                
+                addButtonClickEvents('path01');
+                addButtonClickEvents('path23');
+                addButtonClickEvents('path02');
+                addButtonClickEvents('path13');
+            }
+            
+            console.log(`✅ 노란색 사각형 [${currentYellowIndex + 1}]번 위치로 이동: (${ox}, ${oy})`);
+            scaleCanvas();
+        });
+        
         // 초기 디스플레이 설정
         updateYellowIndexDisplay();
 
