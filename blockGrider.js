@@ -286,13 +286,27 @@ function countWhitePixels(ctx, x, y, size) {
                     const baseMaxPixels = rectSize * rectSize;
                     
                     if (baseWhiteCount === baseMaxPixels) {
+                        // 이전 사각형으로부터의 각도 계산
+                        let angle = null;
+                        if (yellowRects.length > 0) {
+                            const prevRect = yellowRects[yellowRects.length - 1];
+                            const prevX = prevRect.x + prevRect.size / 2;
+                            const prevY = prevRect.y + prevRect.size / 2;
+                            const currX = selectedPixel.x + rectSize / 2;
+                            const currY = selectedPixel.y + rectSize / 2;
+                            const dx = currX - prevX;
+                            const dy = currY - prevY;
+                            angle = calculateCartesianAngle(dx, dy);
+                        }
+                        
                         // 모두 흰색이면 노란색 사각형으로 저장
                         yellowRects.push({
                             x: selectedPixel.x,
                             y: selectedPixel.y,
-                            size: rectSize
+                            size: rectSize,
+                            angle: angle
                         });
-                        console.log(`✅ 노란색 사각형 추가: (${selectedPixel.x}, ${selectedPixel.y}), 크기: ${rectSize}x${rectSize}`);
+                        console.log(`✅ 노란색 사각형 추가: (${selectedPixel.x}, ${selectedPixel.y}), 크기: ${rectSize}x${rectSize}, 각도: ${angle !== null ? angle + '°' : 'N/A'}`);
                         console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
                         
                         // 방금 추가된 사각형을 현재 선택으로 설정
@@ -310,12 +324,26 @@ function countWhitePixels(ctx, x, y, size) {
             if (e.key === 'F9') {
                 // 임시 노란색 사각형이 있으면 확정하여 배열에 추가
                 if (tempYellowRect) {
+                    // 이전 사각형으로부터의 각도 계산
+                    let angle = null;
+                    if (yellowRects.length > 0) {
+                        const prevRect = yellowRects[yellowRects.length - 1];
+                        const prevX = prevRect.x + prevRect.size / 2;
+                        const prevY = prevRect.y + prevRect.size / 2;
+                        const currX = tempYellowRect.x + tempYellowRect.size / 2;
+                        const currY = tempYellowRect.y + tempYellowRect.size / 2;
+                        const dx = currX - prevX;
+                        const dy = currY - prevY;
+                        angle = calculateCartesianAngle(dx, dy);
+                    }
+                    
                     yellowRects.push({
                         x: tempYellowRect.x,
                         y: tempYellowRect.y,
-                        size: tempYellowRect.size
+                        size: tempYellowRect.size,
+                        angle: angle
                     });
-                    console.log(`✅ 노란색 사각형 확정: (${tempYellowRect.x}, ${tempYellowRect.y}), 크기: ${tempYellowRect.size}x${tempYellowRect.size}`);
+                    console.log(`✅ 노란색 사각형 확정: (${tempYellowRect.x}, ${tempYellowRect.y}), 크기: ${tempYellowRect.size}x${tempYellowRect.size}, 각도: ${angle !== null ? angle + '°' : 'N/A'}`);
                     console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
                     
                     // 방금 추가된 사각형을 현재 선택으로 설정
@@ -631,7 +659,7 @@ function countWhitePixels(ctx, x, y, size) {
             }
         }
         
-        // 노란색 사각형 간 각도 계산 및 표시
+        // 노란색 사각형 간 각도 표시 (저장된 angle 속성 사용)
         function updateYellowAngleDisplay() {
             const angleDisplay = document.getElementById('yellowAngleDisplay');
             if (!angleDisplay) return;
@@ -641,20 +669,14 @@ function countWhitePixels(ctx, x, y, size) {
                 return;
             }
             
-            const prevRect = yellowRects[currentYellowIndex - 1];
             const currRect = yellowRects[currentYellowIndex];
+            const angle = currRect.angle;
             
-            const prevX = prevRect.x + prevRect.size / 2;
-            const prevY = prevRect.y + prevRect.size / 2;
-            const currX = currRect.x + currRect.size / 2;
-            const currY = currRect.y + currRect.size / 2;
-            
-            const dx = currX - prevX;
-            const dy = currY - prevY;
-            
-            const angle = calculateCartesianAngle(dx, dy);
-            
-            angleDisplay.innerHTML = `| 각도: <span style="font-weight:bold;color:#ff6600;">${angle}°</span> <span style="font-size:0.9em;color:#999;">(이전→현재)</span>`;
+            if (angle !== null && angle !== undefined) {
+                angleDisplay.innerHTML = `| 각도: <span style="font-weight:bold;color:#ff6600;">${angle}°</span> <span style="font-size:0.9em;color:#999;">(이전→현재)</span>`;
+            } else {
+                angleDisplay.innerHTML = '';
+            }
         }
         
         document.getElementById('btnPrevYellow').addEventListener('click', () => {
