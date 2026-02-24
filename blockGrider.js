@@ -245,8 +245,9 @@ function countWhitePixels(ctx, x, y, size) {
                 const dx = targetX - baseX;
                 const dy = targetY - baseY;
                 
+                // 데카르트 좌표계로 변환 (Y축 반전)
                 // atan2는 -180~180 범위를 반환, 0~359로 변환
-                let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                let angle = Math.atan2(-dy, dx) * 180 / Math.PI;
                 if (angle < 0) angle += 360;
                 angle = Math.round(angle);
                 
@@ -309,6 +310,7 @@ function countWhitePixels(ctx, x, y, size) {
                     // 방금 추가된 사각형을 현재 선택으로 설정
                     currentYellowIndex = yellowRects.length - 1;
                     updateYellowIndexDisplay();
+                    updateYellowAngleDisplay();
                     
                     tempYellowRect = null; // 임시 사각형 초기화
                     
@@ -523,17 +525,43 @@ function countWhitePixels(ctx, x, y, size) {
             
             const maxPixels = cornerSize * cornerSize;
             
+            // 두 사각형이 겹치는지 확인하는 함수
+            const rectsOverlap = (rect1X, rect1Y, rect1Size, rect2) => {
+                return rect1X < rect2.x + rect2.size &&
+                       rect1X + rect1Size > rect2.x &&
+                       rect1Y < rect2.y + rect2.size &&
+                       rect1Y + rect1Size > rect2.y;
+            };
+            
             // 경로별 흰색점 개수 계산 및 버튼 생성
             const calculateWhiteCounts = (rects, pathName) => {
                 return rects.map((pt, idx) => {
                     const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
                     const isAllWhite = (whiteCount === maxPixels);
-                    const buttonStyle = isAllWhite 
-                        ? 'background:#4CAF50; color:white; border:1px solid #45a049; cursor:pointer;'
-                        : 'background:#ccc; color:#666; border:1px solid #999; cursor:not-allowed;';
+                    
+                    // yellowRects와 겹치는지 확인
+                    const overlapsYellow = yellowRects.some(yellowRect => 
+                        rectsOverlap(pt.x, pt.y, cornerSize, yellowRect)
+                    );
+                    
+                    let buttonStyle, disabled;
+                    if (isAllWhite && overlapsYellow) {
+                        // 노란색 사각형과 겹치면서 모두 흰색 → 노란색 버튼
+                        buttonStyle = 'background:#FFD700; color:#000; border:1px solid #FFA500; cursor:pointer; font-weight:bold;';
+                        disabled = '';
+                    } else if (isAllWhite) {
+                        // 모두 흰색 → 녹색 버튼
+                        buttonStyle = 'background:#4CAF50; color:white; border:1px solid #45a049; cursor:pointer;';
+                        disabled = '';
+                    } else {
+                        // 일부만 흰색 → 회색 비활성 버튼
+                        buttonStyle = 'background:#ccc; color:#666; border:1px solid #999; cursor:not-allowed;';
+                        disabled = ' disabled';
+                    }
+                    
                     return `<button data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" 
                                     style="padding:2px 6px; margin:2px; border-radius:3px; ${buttonStyle}" 
-                                    ${isAllWhite ? '' : 'disabled'}>${whiteCount}</button>`;
+                                    ${disabled}>${whiteCount}</button>`;
                 });
             };
             
@@ -592,6 +620,36 @@ function countWhitePixels(ctx, x, y, size) {
             }
         }
         
+        // 노란색 사각형 간 각도 계산 및 표시
+        function updateYellowAngleDisplay() {
+            const angleDisplay = document.getElementById('yellowAngleDisplay');
+            if (!angleDisplay) return;
+            
+            if (currentYellowIndex <= 0 || yellowRects.length < 2) {
+                angleDisplay.innerHTML = '';
+                return;
+            }
+            
+            const prevRect = yellowRects[currentYellowIndex - 1];
+            const currRect = yellowRects[currentYellowIndex];
+            
+            const prevX = prevRect.x + prevRect.size / 2;
+            const prevY = prevRect.y + prevRect.size / 2;
+            const currX = currRect.x + currRect.size / 2;
+            const currY = currRect.y + currRect.size / 2;
+            
+            const dx = currX - prevX;
+            const dy = currY - prevY;
+            
+            // 데카르트 좌표계로 변환 (Y축 반전: 캔버스는 Y가 아래로 증가, 데카르트는 위로 증가)
+            // atan2는 -180~180 범위를 반환, 0~359로 변환
+            let angle = Math.atan2(-dy, dx) * 180 / Math.PI;
+            if (angle < 0) angle += 360;
+            angle = Math.round(angle);
+            
+            angleDisplay.innerHTML = `| 각도: <span style="font-weight:bold;color:#ff6600;">${angle}°</span> <span style="font-size:0.9em;color:#999;">(이전→현재)</span>`;
+        }
+        
         document.getElementById('btnPrevYellow').addEventListener('click', () => {
             if (yellowRects.length === 0) return;
             if (currentYellowIndex === -1) {
@@ -600,6 +658,7 @@ function countWhitePixels(ctx, x, y, size) {
                 currentYellowIndex = (currentYellowIndex - 1 + yellowRects.length) % yellowRects.length;
             }
             updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
             scaleCanvas();
         });
         
@@ -611,6 +670,7 @@ function countWhitePixels(ctx, x, y, size) {
                 currentYellowIndex = (currentYellowIndex + 1) % yellowRects.length;
             }
             updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
             scaleCanvas();
         });
         
@@ -655,6 +715,7 @@ function countWhitePixels(ctx, x, y, size) {
         
         // 초기 디스플레이 설정
         updateYellowIndexDisplay();
+        updateYellowAngleDisplay();
 
         canvas2.addEventListener('click', function(e) {
             const index = parseInt(scaleRange.value);
