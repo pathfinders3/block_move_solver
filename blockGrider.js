@@ -242,6 +242,34 @@ function countWhitePixels(ctx, x, y, size) {
             return Math.round(angle);
         }
         
+        // 원형 각도 차이 계산 (기본 함수)
+        function getCircularAngleDiff(angle1, angle2, signed = true) {
+            let diff = angle1 - angle2;
+            if (signed) {
+                // 방향 포함 (-180 ~ +180)
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+            } else {
+                // 절대값만 (0 ~ 180)
+                diff = Math.abs(diff);
+                if (diff > 180) diff = 360 - diff;
+            }
+            return diff;
+        }
+        
+        // 각도 차이와 스타일 정보 계산 (표시용)
+        function calculateAngleDiffWithStyle(angle1, angle2) {
+            const diff = getCircularAngleDiff(angle1, angle2, true);
+            const absDiff = Math.abs(diff);
+            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+            
+            const bgStyle = absDiff <= tolerance ? 'background-color:#ccaa00;padding:2px 4px;border-radius:3px;' : '';
+            const sign = diff >= 0 ? '+' : '';
+            const diffText = ` <span style="font-size:0.9em;color:#999;">(${sign}${diff})</span>`;
+            
+            return { bgStyle, diffText, diff, absDiff };
+        }
+        
         // 각도 계산 및 표시 함수
         function updateTempYellowAngle() {
             if (tempYellowRect && selectedPixel) {
@@ -265,21 +293,9 @@ function countWhitePixels(ctx, x, y, size) {
                     if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
                         const currentRect = yellowRects[currentYellowIndex];
                         if (currentRect.angle !== null && currentRect.angle !== undefined) {
-                            // 원형 각도 차이 계산 (방향 포함)
-                            let diff = angle - currentRect.angle;
-                            // -180 ~ +180 범위로 정규화
-                            if (diff > 180) diff -= 360;
-                            if (diff < -180) diff += 360;
-                            
-                            const absDiff = Math.abs(diff);
-                            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
-                            
-                            if (absDiff <= tolerance) {
-                                bgStyle = 'background-color:#ccaa00;padding:2px 4px;border-radius:3px;';
-                            }
-                            
-                            const sign = diff >= 0 ? '+' : '';
-                            diffText = ` <span style="font-size:0.9em;color:#999;">(${sign}${diff})</span>`;
+                            const result = calculateAngleDiffWithStyle(angle, currentRect.angle);
+                            bgStyle = result.bgStyle;
+                            diffText = result.diffText;
                         }
                     }
                     
@@ -705,21 +721,9 @@ function countWhitePixels(ctx, x, y, size) {
                 if (currentYellowIndex > 1) {
                     const prevRect = yellowRects[currentYellowIndex - 1];
                     if (prevRect.angle !== null && prevRect.angle !== undefined) {
-                        // 원형 각도 차이 계산 (방향 포함)
-                        let diff = angle - prevRect.angle;
-                        // -180 ~ +180 범위로 정규화
-                        if (diff > 180) diff -= 360;
-                        if (diff < -180) diff += 360;
-                        
-                        const absDiff = Math.abs(diff);
-                        const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
-                        
-                        if (absDiff <= tolerance) {
-                            bgStyle = 'background-color:#ccaa00;padding:2px 4px;border-radius:3px;';
-                        }
-                        
-                        const sign = diff >= 0 ? '+' : '';
-                        diffText = ` <span style="font-size:0.9em;color:#999;">(${sign}${diff})</span>`;
+                        const result = calculateAngleDiffWithStyle(angle, prevRect.angle);
+                        bgStyle = result.bgStyle;
+                        diffText = result.diffText;
                     }
                 }
                 
@@ -829,8 +833,7 @@ function countWhitePixels(ctx, x, y, size) {
                 } else {
                     // 현재 그룹의 각도와 비교
                     const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
-                    let diff = Math.abs(angle - currentGroupAngle);
-                    if (diff > 180) diff = 360 - diff;
+                    const diff = Math.abs(getCircularAngleDiff(angle, currentGroupAngle, false));
                     
                     if (diff <= tolerance) {
                         // 비슷한 각도 -> 같은 그룹
