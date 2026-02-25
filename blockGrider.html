@@ -21,6 +21,10 @@
             <input type="text" id="yellowIndexDisplay" value="-" readonly style="width:50px; text-align:center; margin:0 5px;">
             <button id="btnNextYellow" style="padding:2px 8px; cursor:pointer;">--&gt;</button>
             <button id="btnGoToYellow" style="margin-left:8px; padding:2px 12px; cursor:pointer; background:#4CAF50; color:white; border:1px solid #45a049; border-radius:3px;">Go</button>
+            <label style="margin-left:15px;">각도 허용오차:</label>
+            <input type="number" id="angleTolerance" min="0" max="180" value="30" style="width:50px; text-align:center; margin-left:5px;">
+            <span style="margin-left:2px;">도</span>
+            <button id="btnAngleCheck" style="margin-left:8px; padding:2px 12px; cursor:pointer; background:#FF8C00; color:white; border:1px solid #E67E00; border-radius:3px;">Angle 검사</button>
             <span style="margin-left:10px;" id="yellowAngleDisplay"></span>
         </div>
         <div class="info">
@@ -44,6 +48,7 @@
               <div>↓ 우측 수직 (1→3): <span id="pathWhite13" style="color:#666;">-</span></div>
             </div>
           </div>
+          <div id="angleGroupsContainer" style="margin-top:8px;"></div>
             💡 <kbd>F2</kbd>: 확대 복사 | <kbd>F4</kbd>: 귀퉁이 경로 표시 토글 | <kbd>F8</kbd>: 기준 사각형 저장 | <kbd>F9</kbd>: 임시 노란색 확정
         </div>
     </div>

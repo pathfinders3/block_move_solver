@@ -258,7 +258,32 @@ function countWhitePixels(ctx, x, y, size) {
                 
                 const angleDisplay = document.getElementById('tempYellowAngleDisplay');
                 if (angleDisplay) {
-                    angleDisplay.innerHTML = `| 각도: <span style="font-weight:bold;color:#cc6600;">${angle}°</span>`;
+                    // yellowAngleDisplay의 각도와 비교 (현재 선택된 노란색 사각형의 각도)
+                    let bgStyle = '';
+                    let diffText = '';
+                    
+                    if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
+                        const currentRect = yellowRects[currentYellowIndex];
+                        if (currentRect.angle !== null && currentRect.angle !== undefined) {
+                            // 원형 각도 차이 계산 (방향 포함)
+                            let diff = angle - currentRect.angle;
+                            // -180 ~ +180 범위로 정규화
+                            if (diff > 180) diff -= 360;
+                            if (diff < -180) diff += 360;
+                            
+                            const absDiff = Math.abs(diff);
+                            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+                            
+                            if (absDiff <= tolerance) {
+                                bgStyle = 'background-color:#ccaa00;padding:2px 4px;border-radius:3px;';
+                            }
+                            
+                            const sign = diff >= 0 ? '+' : '';
+                            diffText = ` <span style="font-size:0.9em;color:#999;">(${sign}${diff})</span>`;
+                        }
+                    }
+                    
+                    angleDisplay.innerHTML = `| 각도: <span style="font-weight:bold;color:#cc6600;${bgStyle}">${angle}°</span>${diffText}`;
                 }
                 
                 // 좌표 표시
@@ -673,7 +698,32 @@ function countWhitePixels(ctx, x, y, size) {
             const angle = currRect.angle;
             
             if (angle !== null && angle !== undefined) {
-                angleDisplay.innerHTML = `| 각도: <span style="font-weight:bold;color:#ff6600;">${angle}°</span> <span style="font-size:0.9em;color:#999;">(이전→현재)</span>`;
+                // 이전 인덱스의 각도와 비교
+                let bgStyle = '';
+                let diffText = '';
+                
+                if (currentYellowIndex > 1) {
+                    const prevRect = yellowRects[currentYellowIndex - 1];
+                    if (prevRect.angle !== null && prevRect.angle !== undefined) {
+                        // 원형 각도 차이 계산 (방향 포함)
+                        let diff = angle - prevRect.angle;
+                        // -180 ~ +180 범위로 정규화
+                        if (diff > 180) diff -= 360;
+                        if (diff < -180) diff += 360;
+                        
+                        const absDiff = Math.abs(diff);
+                        const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+                        
+                        if (absDiff <= tolerance) {
+                            bgStyle = 'background-color:#ccaa00;padding:2px 4px;border-radius:3px;';
+                        }
+                        
+                        const sign = diff >= 0 ? '+' : '';
+                        diffText = ` <span style="font-size:0.9em;color:#999;">(${sign}${diff})</span>`;
+                    }
+                }
+                
+                angleDisplay.innerHTML = `| 각도: <span style="font-weight:bold;color:#ff6600;${bgStyle}">${angle}°</span>${diffText}`;
             } else {
                 angleDisplay.innerHTML = '';
             }
@@ -740,6 +790,93 @@ function countWhitePixels(ctx, x, y, size) {
             
             console.log(`✅ 노란색 사각형 [${currentYellowIndex + 1}]번 위치로 이동: (${ox}, ${oy})`);
             scaleCanvas();
+        });
+        
+        // Angle 검사 버튼: 각도별 그룹화
+        document.getElementById('btnAngleCheck').addEventListener('click', () => {
+            if (yellowRects.length === 0) {
+                console.log('❌ 노란색 사각형이 없습니다.');
+                return;
+            }
+            
+            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+            console.log(`🔍 Angle 검사 시작... (허용 오차: ±${tolerance}°)`);
+            
+            // 각도 그룹화 로직
+            const groups = [];
+            let currentGroup = [];
+            let currentGroupAngle = null;
+            
+            for (let i = 0; i < yellowRects.length; i++) {
+                const rect = yellowRects[i];
+                const angle = rect.angle;
+                
+                if (angle === null || angle === undefined) {
+                    // 첫 번째 사각형 (각도 없음)
+                    if (currentGroup.length > 0) {
+                        groups.push([...currentGroup]);
+                        currentGroup = [];
+                        currentGroupAngle = null;
+                    }
+                    currentGroup.push(i);
+                    continue;
+                }
+                
+                if (currentGroupAngle === null) {
+                    // 새 그룹 시작
+                    currentGroup.push(i);
+                    currentGroupAngle = angle;
+                } else {
+                    // 현재 그룹의 각도와 비교
+                    const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+                    let diff = Math.abs(angle - currentGroupAngle);
+                    if (diff > 180) diff = 360 - diff;
+                    
+                    if (diff <= tolerance) {
+                        // 비슷한 각도 -> 같은 그룹
+                        currentGroup.push(i);
+                    } else {
+                        // 급격히 꺾임 -> 새 그룹 시작
+                        groups.push([...currentGroup]);
+                        currentGroup = [i];
+                        currentGroupAngle = angle;
+                    }
+                }
+            }
+            
+            // 마지막 그룹 추가
+            if (currentGroup.length > 0) {
+                groups.push(currentGroup);
+            }
+            
+            console.log(`✅ ${groups.length}개 그룹 발견:`, groups);
+            
+            // 결과를 HTML에 표시
+            const container = document.getElementById('angleGroupsContainer');
+            if (container) {
+                let html = `<div style="margin-top:8px;"><strong>📊 Angle 그룹 분석 결과 (허용오차: ±${tolerance}°):</strong></div>`;
+                
+                groups.forEach((group, groupIndex) => {
+                    const groupNumber = groupIndex + 1;
+                    const indices = group.map(i => i).join(', ');
+                    
+                    // 그룹의 평균 각도 계산 (첫 번째 제외)
+                    let avgAngle = '-';
+                    const anglesInGroup = group.map(i => yellowRects[i].angle).filter(a => a !== null && a !== undefined);
+                    if (anglesInGroup.length > 0) {
+                        const sum = anglesInGroup.reduce((a, b) => a + b, 0);
+                        avgAngle = Math.round(sum / anglesInGroup.length) + '°';
+                    }
+                    
+                    html += `<div style="margin:5px 0 5px 20px;">`;
+                    html += `<strong style="color:#0066cc;">그룹 ${groupNumber}:</strong> `;
+                    html += `<input type="text" value="인덱스 [${indices}] - 평균각도: ${avgAngle}" readonly `;
+                    html += `style="width:400px; padding:3px 6px; border:1px solid #ccc; background:#f9f9f9; font-size:0.9em;">`;
+                    html += `</div>`;
+                });
+                
+                container.innerHTML = html;
+            }
         });
         
         // 초기 디스플레이 설정
