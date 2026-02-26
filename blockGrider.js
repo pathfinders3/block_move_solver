@@ -919,6 +919,19 @@ function countWhitePixels(ctx, x, y, size) {
             }
         });
         
+        // 경로별 흰색점 개수 토글 함수
+        function togglePathWhite() {
+            const content = document.getElementById('pathWhiteContent');
+            const header = document.getElementById('pathWhiteHeader');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                header.innerHTML = '⭕ 경로별 흰색점 개수: <span style="font-size:0.8em;">[▼]</span>';
+            } else {
+                content.style.display = 'none';
+                header.innerHTML = '⭕ 경로별 흰색점 개수: <span style="font-size:0.8em;">[▶]</span>';
+            }
+        }
+        
         // 초기 디스플레이 설정
         updateYellowIndexDisplay();
         updateYellowAngleDisplay();
