@@ -270,19 +270,27 @@ function countWhitePixels(ctx, x, y, size) {
             return { bgStyle, diffText, diff, absDiff };
         }
         
-        // 각도 계산 및 표시 함수
-        function updateTempYellowAngle() {
+        // 각도 표시 함수 (미리 계산된 각도 사용)
+        function updateTempYellowAngle(preCalculatedAngle = null) {
             if (tempYellowRect && selectedPixel) {
-                const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
-                const baseX = selectedPixel.x + rectSize / 2;
-                const baseY = selectedPixel.y + rectSize / 2;
-                const targetX = tempYellowRect.x + tempYellowRect.size / 2;
-                const targetY = tempYellowRect.y + tempYellowRect.size / 2;
+                let angle;
                 
-                const dx = targetX - baseX;
-                const dy = targetY - baseY;
-                
-                const angle = calculateCartesianAngle(dx, dy);
+                if (preCalculatedAngle !== null) {
+                    // 미리 계산된 각도 사용
+                    angle = preCalculatedAngle;
+                } else {
+                    // 실시간 계산 (예: IJKL 키 사용 시)
+                    const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+                    const baseX = selectedPixel.x + rectSize / 2;
+                    const baseY = selectedPixel.y + rectSize / 2;
+                    const targetX = tempYellowRect.x + tempYellowRect.size / 2;
+                    const targetY = tempYellowRect.y + tempYellowRect.size / 2;
+                    
+                    const dx = targetX - baseX;
+                    const dy = targetY - baseY;
+                    
+                    angle = calculateCartesianAngle(dx, dy);
+                }
                 
                 const angleDisplay = document.getElementById('tempYellowAngleDisplay');
                 if (angleDisplay) {
@@ -615,6 +623,14 @@ function countWhitePixels(ctx, x, y, size) {
             
             // 경로별 흰색점 개수 계산 및 버튼 생성
             const calculateWhiteCounts = (rects, pathName) => {
+                // 기대 각도: 현재 선택된 노란색 사각형의 각도 (또는 마지막 사각형)
+                let expectedAngle = null;
+                if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
+                    expectedAngle = yellowRects[currentYellowIndex].angle;
+                } else if (yellowRects.length > 0) {
+                    expectedAngle = yellowRects[yellowRects.length - 1].angle;
+                }
+                
                 return rects.map((pt, idx) => {
                     const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
                     const isAllWhite = (whiteCount === maxPixels);
@@ -624,14 +640,36 @@ function countWhitePixels(ctx, x, y, size) {
                         rectsOverlap(pt.x, pt.y, cornerSize, yellowRect)
                     );
                     
+                    // 기준 사각형으로부터 이 위치까지의 각도 계산
+                    const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+                    const baseX = selectedPixel.x + rectSize / 2;
+                    const baseY = selectedPixel.y + rectSize / 2;
+                    const targetX = pt.x + cornerSize / 2;
+                    const targetY = pt.y + cornerSize / 2;
+                    const dx = targetX - baseX;
+                    const dy = targetY - baseY;
+                    const angle = calculateCartesianAngle(dx, dy);
+                    
+                    // 기대 각도와 비교하여 테두리 색상 결정
+                    let borderColor = '';
+                    if (expectedAngle !== null && expectedAngle !== undefined) {
+                        const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+                        const diff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
+                        if (diff <= tolerance) {
+                            borderColor = '#FF8C00'; // Dark Orange
+                        }
+                    }
+                    
                     let buttonStyle, disabled;
                     if (isAllWhite && overlapsYellow) {
                         // 노란색 사각형과 겹치면서 모두 흰색 → 노란색 버튼
-                        buttonStyle = 'background:#FFD700; color:#000; border:1px solid #FFA500; cursor:pointer; font-weight:bold;';
+                        const border = borderColor || '#000000';
+                        buttonStyle = `background:#FFD700; color:#000; border:3px solid ${border}; cursor:pointer; font-weight:bold;`;
                         disabled = '';
                     } else if (isAllWhite) {
                         // 모두 흰색 → 녹색 버튼
-                        buttonStyle = 'background:#4CAF50; color:white; border:1px solid #45a049; cursor:pointer;';
+                        const border = borderColor || '#45a049';
+                        buttonStyle = `background:#4CAF50; color:white; border:3px solid ${border}; cursor:pointer;`;
                         disabled = '';
                     } else {
                         // 일부만 흰색 → 회색 비활성 버튼
@@ -639,7 +677,7 @@ function countWhitePixels(ctx, x, y, size) {
                         disabled = ' disabled';
                     }
                     
-                    return `<button data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" 
+                    return `<button data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" data-angle="${angle}"
                                     style="padding:2px 6px; margin:2px; border-radius:3px; ${buttonStyle}" 
                                     ${disabled}>${whiteCount}</button>`;
                 });
@@ -664,17 +702,16 @@ function countWhitePixels(ctx, x, y, size) {
                             const idx = btn.getAttribute('data-idx');
                             const x = parseInt(btn.getAttribute('data-x'));
                             const y = parseInt(btn.getAttribute('data-y'));
-                            console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}`);
+                            const angle = parseInt(btn.getAttribute('data-angle')); // 미리 계산된 각도
+                            
+                            console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}, 각도: ${angle}°`);
                             tempYellowRect = {
                                 x: x,
                                 y: y,
                                 size: cornerSize
                             };
                             
-                            const angle = updateTempYellowAngle();
-                            if (angle !== null) {
-                                console.log(`   각도: ${angle}° (기준 사각형 중심으로부터)`);
-                            }
+                            updateTempYellowAngle(angle); // 미리 계산된 각도 전달
                             
                             console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
                             scaleCanvas();
