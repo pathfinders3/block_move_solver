@@ -670,6 +670,19 @@ function countWhitePixels(ctx, x, y, size) {
                         const angle = parseInt(btn.getAttribute('data-angle')); // 미리 계산된 각도
                         
                         console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}, 각도: ${angle}°`);
+                        
+                        // 원래 사각형 크기를 클릭한 버튼의 크기로 변경
+                        const rectSizeInput = document.getElementById('rectSize');
+                        const currentRectSize = parseInt(rectSizeInput.value) || 4;
+                        if (currentRectSize !== cornerSize) {
+                            rectSizeInput.value = cornerSize;
+                            console.log(`   원래 사각형 크기 변경: ${currentRectSize} → ${cornerSize}`);
+                        }
+                        
+                        // 항상 새 기준점으로 이동하고 경로 재계산
+                        selectedPixel = { x: x, y: y };
+                        updateCornerAndPathInfo();
+                        
                         tempYellowRect = {
                             x: x,
                             y: y,
