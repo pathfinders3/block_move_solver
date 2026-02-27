@@ -346,6 +346,40 @@ function countWhitePixels(ctx, x, y, size) {
                             const dx = currX - prevX;
                             const dy = currY - prevY;
                             angle = calculateCartesianAngle(dx, dy);
+                            
+                            // 각도 허용오차 검사 (이전 사각형의 각도와 비교)
+                            if (yellowRects.length > 0 && prevRect.angle !== null && prevRect.angle !== undefined) {
+                                const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+                                const angleDiff = Math.abs(getCircularAngleDiff(angle, prevRect.angle, false));
+                                
+                                const warningContainer = document.getElementById('angleWarningContainer');
+                                if (angleDiff > tolerance) {
+                                    // 경고 메시지 표시
+                                    const sign = getCircularAngleDiff(angle, prevRect.angle, true) >= 0 ? '+' : '';
+                                    const signedDiff = getCircularAngleDiff(angle, prevRect.angle, true);
+                                    if (warningContainer) {
+                                        warningContainer.innerHTML = `<div style="background:#ffebcc; border:2px solid #ff8800; border-radius:5px; padding:8px; margin-top:5px; color:#333;">` +
+                                            `<strong style="color:#cc0000;">⚠️ 각도 허용오차 초과!</strong><br>` +
+                                            `<span style="margin-left:20px; color:#333;">이전 각도: <strong style="color:#333;">${prevRect.angle}°</strong></span><br>` +
+                                            `<span style="margin-left:20px; color:#333;">현재 각도: <strong style="color:#333;">${angle}°</strong></span><br>` +
+                                            `<span style="margin-left:20px; color:#333;">각도 차이: <strong style="color:#cc0000;">${sign}${signedDiff}° (절대값: ${angleDiff}°)</strong></span><br>` +
+                                            `<span style="margin-left:20px; color:#333;">허용오차: <strong style="color:#333;">±${tolerance}°</strong></span>` +
+                                            `</div>`;
+                                    }
+                                    console.log(`⚠️ 각도 허용오차 초과: ${angleDiff}° > ${tolerance}°`);
+                                } else {
+                                    // 정상 범위 - 경고 제거
+                                    if (warningContainer) {
+                                        warningContainer.innerHTML = '';
+                                    }
+                                }
+                            }
+                        } else {
+                            // 첫 번째 사각형 - 경고 제거
+                            const warningContainer = document.getElementById('angleWarningContainer');
+                            if (warningContainer) {
+                                warningContainer.innerHTML = '';
+                            }
                         }
                         
                         // 모두 흰색이면 노란색 사각형으로 저장
@@ -400,6 +434,46 @@ function countWhitePixels(ctx, x, y, size) {
                         const dx = currX - prevX;
                         const dy = currY - prevY;
                         angle = calculateCartesianAngle(dx, dy);
+                        
+                        // 각도 허용오차 검사 (이전 사각형의 각도와 비교)
+                        if (yellowRects.length > 1 && prevRect.angle !== null && prevRect.angle !== undefined) {
+                            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+                            const angleDiff = Math.abs(getCircularAngleDiff(angle, prevRect.angle, false));
+                            
+                            const warningContainer = document.getElementById('angleWarningContainer');
+                            if (angleDiff > tolerance) {
+                                // 경고 메시지 표시
+                                const sign = getCircularAngleDiff(angle, prevRect.angle, true) >= 0 ? '+' : '';
+                                const signedDiff = getCircularAngleDiff(angle, prevRect.angle, true);
+                                if (warningContainer) {
+                                    warningContainer.innerHTML = `<div style="background:#ffebcc; border:2px solid #ff8800; border-radius:5px; padding:8px; margin-top:5px; color:#333;">` +
+                                        `<strong style="color:#cc0000;">⚠️ 각도 허용오차 초과!</strong><br>` +
+                                        `<span style="margin-left:20px; color:#333;">이전 각도: <strong style="color:#333;">${prevRect.angle}°</strong></span><br>` +
+                                        `<span style="margin-left:20px; color:#333;">현재 각도: <strong style="color:#333;">${angle}°</strong></span><br>` +
+                                        `<span style="margin-left:20px; color:#333;">각도 차이: <strong style="color:#cc0000;">${sign}${signedDiff}° (절대값: ${angleDiff}°)</strong></span><br>` +
+                                        `<span style="margin-left:20px; color:#333;">허용오차: <strong style="color:#333;">±${tolerance}°</strong></span>` +
+                                        `</div>`;
+                                }
+                                console.log(`⚠️ 각도 허용오차 초과: ${angleDiff}° > ${tolerance}°`);
+                            } else {
+                                // 정상 범위 - 경고 제거
+                                if (warningContainer) {
+                                    warningContainer.innerHTML = '';
+                                }
+                            }
+                        } else {
+                            // 첫 번째 또는 두 번째 사각형 - 경고 제거
+                            const warningContainer = document.getElementById('angleWarningContainer');
+                            if (warningContainer) {
+                                warningContainer.innerHTML = '';
+                            }
+                        }
+                    } else {
+                        // 첫 번째 사각형 - 경고 제거
+                        const warningContainer = document.getElementById('angleWarningContainer');
+                        if (warningContainer) {
+                            warningContainer.innerHTML = '';
+                        }
                     }
                     
                     yellowRects.push({
