@@ -645,7 +645,7 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         // 경로별 흰색점 개수 계산 및 버튼 HTML 생성
-        function calculatePathWhiteCounts(rects, pathName, cornerSize, maxPixels) {
+        function calculatePathWhiteCounts(rects, pathName, cornerSize, maxPixels, minAngleDiff = null) {
             // 기대 각도: 현재 선택된 노란색 사각형의 각도 (또는 마지막 사각형)
             let expectedAngle = null;
             if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
@@ -675,11 +675,17 @@ function countWhitePixels(ctx, x, y, size) {
                 
                 // 기대 각도와 비교하여 테두리 색상 결정
                 let borderColor = '';
+                let angleDiff = null;
                 if (expectedAngle !== null && expectedAngle !== undefined) {
                     const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
-                    const diff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
-                    if (diff <= tolerance) {
-                        borderColor = '#FF8C00'; // Dark Orange
+                    angleDiff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
+                    if (angleDiff <= tolerance) {
+                        // 최소 각도 차이와 일치하면 빨간색, 그 외는 오렌지색
+                        if (minAngleDiff !== null && Math.abs(angleDiff - minAngleDiff) < 0.001) {
+                            borderColor = '#FF0000'; // Red (최고 추천)
+                        } else {
+                            borderColor = '#FF8C00'; // Dark Orange (추천)
+                        }
                     }
                 }
                 
@@ -706,6 +712,58 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
+        // 모든 경로에서 허용오차 내 최소 각도 차이 찾기
+        function findMinAngleDiff(allPathRects, cornerSize, maxPixels) {
+            // 기대 각도
+            let expectedAngle = null;
+            if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
+                expectedAngle = yellowRects[currentYellowIndex].angle;
+            } else if (yellowRects.length > 0) {
+                expectedAngle = yellowRects[yellowRects.length - 1].angle;
+            }
+            
+            if (expectedAngle === null || expectedAngle === undefined) {
+                return null;
+            }
+            
+            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+            const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+            const baseX = selectedPixel.x + rectSize / 2;
+            const baseY = selectedPixel.y + rectSize / 2;
+            
+            let minDiff = null;
+            
+            // 모든 경로를 순회
+            allPathRects.forEach(pathRects => {
+                if (!pathRects) return;
+                
+                pathRects.forEach(pt => {
+                    // 모두 흰색인 것만 고려
+                    const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
+                    if (whiteCount !== maxPixels) return;
+                    
+                    // 각도 계산
+                    const targetX = pt.x + cornerSize / 2;
+                    const targetY = pt.y + cornerSize / 2;
+                    const dx = targetX - baseX;
+                    const dy = targetY - baseY;
+                    const angle = calculateCartesianAngle(dx, dy);
+                    
+                    // 각도 차이 계산
+                    const diff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
+                    
+                    // 허용오차 내에 있고 최소값이면 업데이트
+                    if (diff <= tolerance) {
+                        if (minDiff === null || diff < minDiff) {
+                            minDiff = diff;
+                        }
+                    }
+                });
+            });
+            
+            return minDiff;
+        }
+        
         // 경로 버튼 클릭 이벤트 추가
         function addPathButtonClickEvents(pathName, cornerSize) {
             document.querySelectorAll(`button[data-path="${pathName}"]`).forEach(btn => {
@@ -779,17 +837,21 @@ function countWhitePixels(ctx, x, y, size) {
             const maxPixels_n = cornerSize * cornerSize;
             const maxPixels_n1 = cornerSize_n1 * cornerSize_n1;
             
+            // 모든 경로에서 최소 각도 차이 찾기 (허용오차 내에서만)
+            let minAngleDiff_n = findMinAngleDiff([pathRects01_n, pathRects23_n, pathRects02_n, pathRects13_n], cornerSize, maxPixels_n);
+            let minAngleDiff_n1 = (cornerSize_n1 > 0) ? findMinAngleDiff([pathRects01_n1, pathRects23_n1, pathRects02_n1, pathRects13_n1], cornerSize_n1, maxPixels_n1) : null;
+            
             // 경로별 흰색점 개수 계산 (n 크기)
-            const whiteCounts01_n = calculatePathWhiteCounts(pathRects01_n, 'path01_n', cornerSize, maxPixels_n);
-            const whiteCounts23_n = calculatePathWhiteCounts(pathRects23_n, 'path23_n', cornerSize, maxPixels_n);
-            const whiteCounts02_n = calculatePathWhiteCounts(pathRects02_n, 'path02_n', cornerSize, maxPixels_n);
-            const whiteCounts13_n = calculatePathWhiteCounts(pathRects13_n, 'path13_n', cornerSize, maxPixels_n);
+            const whiteCounts01_n = calculatePathWhiteCounts(pathRects01_n, 'path01_n', cornerSize, maxPixels_n, minAngleDiff_n);
+            const whiteCounts23_n = calculatePathWhiteCounts(pathRects23_n, 'path23_n', cornerSize, maxPixels_n, minAngleDiff_n);
+            const whiteCounts02_n = calculatePathWhiteCounts(pathRects02_n, 'path02_n', cornerSize, maxPixels_n, minAngleDiff_n);
+            const whiteCounts13_n = calculatePathWhiteCounts(pathRects13_n, 'path13_n', cornerSize, maxPixels_n, minAngleDiff_n);
             
             // 경로별 흰색점 개수 계산 (n-1 크기)
-            const whiteCounts01_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects01_n1, 'path01_n1', cornerSize_n1, maxPixels_n1) : [];
-            const whiteCounts23_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects23_n1, 'path23_n1', cornerSize_n1, maxPixels_n1) : [];
-            const whiteCounts02_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects02_n1, 'path02_n1', cornerSize_n1, maxPixels_n1) : [];
-            const whiteCounts13_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects13_n1, 'path13_n1', cornerSize_n1, maxPixels_n1) : [];
+            const whiteCounts01_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects01_n1, 'path01_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1) : [];
+            const whiteCounts23_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects23_n1, 'path23_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1) : [];
+            const whiteCounts02_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects02_n1, 'path02_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1) : [];
+            const whiteCounts13_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects13_n1, 'path13_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1) : [];
             
             // 흰색점 개수 버튼 표시 업데이트 (n 크기)
             if(document.getElementById('pathWhite01_n')) document.getElementById('pathWhite01_n').innerHTML = whiteCounts01_n.join(' ') || '-';
