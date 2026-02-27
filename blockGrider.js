@@ -373,6 +373,22 @@ function countWhitePixels(ctx, x, y, size) {
             if (e.key === 'F9') {
                 // 임시 노란색 사각형이 있으면 확정하여 배열에 추가
                 if (tempYellowRect) {
+                    // 원래 사각형 크기를 임시 사각형의 크기로 변경
+                    const rectSizeInput = document.getElementById('rectSize');
+                    const currentRectSize = parseInt(rectSizeInput.value) || 4;
+                    if (currentRectSize !== tempYellowRect.size) {
+                        rectSizeInput.value = tempYellowRect.size;
+                        console.log(`   원래 사각형 크기 변경: ${currentRectSize} → ${tempYellowRect.size}`);
+                    }
+                    
+                    // selectedPixel을 임시 사각형 위치로 이동
+                    selectedPixel = { x: tempYellowRect.x, y: tempYellowRect.y };
+                    
+                    // 경로 재계산
+                    if (showCorners) {
+                        updateCornerAndPathInfo();
+                    }
+                    
                     // 이전 사각형으로부터의 각도 계산
                     let angle = null;
                     if (yellowRects.length > 0) {
@@ -671,18 +687,7 @@ function countWhitePixels(ctx, x, y, size) {
                         
                         console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}, 각도: ${angle}°`);
                         
-                        // 원래 사각형 크기를 클릭한 버튼의 크기로 변경
-                        const rectSizeInput = document.getElementById('rectSize');
-                        const currentRectSize = parseInt(rectSizeInput.value) || 4;
-                        if (currentRectSize !== cornerSize) {
-                            rectSizeInput.value = cornerSize;
-                            console.log(`   원래 사각형 크기 변경: ${currentRectSize} → ${cornerSize}`);
-                        }
-                        
-                        // 항상 새 기준점으로 이동하고 경로 재계산
-                        selectedPixel = { x: x, y: y };
-                        updateCornerAndPathInfo();
-                        
+                        // 임시 노란색 사각형만 설정 (F9로 확정 전까지는 이동 안 함)
                         tempYellowRect = {
                             x: x,
                             y: y,
