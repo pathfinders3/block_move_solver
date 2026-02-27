@@ -792,14 +792,8 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
-        // 공통 함수: 귀퉁이 및 경로 정보 업데이트
-        function updateCornerAndPathInfo() {
-            if (!selectedPixel) return;
-            
-            const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
-            const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
-            const cornerSize_n1 = cornerSize - 1;
-            
+        // 기준 사각형과 귀퉁이 정보 업데이트
+        function updateBaseAndCornerInfo(rectSize, cornerSize) {
             cornerRects = getCornerRects(selectedPixel.x, selectedPixel.y, rectSize, cornerSize);
             
             // 귀퉁이 유효 픽셀수 업데이트
@@ -815,55 +809,89 @@ function countWhitePixels(ctx, x, y, size) {
                 baseRectWhite.textContent = baseWhiteCount;
                 baseRectWhite.style.color = (baseWhiteCount === baseMaxPixels) ? '#006600' : '#cc0000';
             }
-            
+        }
+        
+        // 모든 경로 데이터 계산 (순수 계산 로직)
+        function calculateAllPathsData(rectSize, cornerSize, cornerSize_n1) {
             // 4가지 경로 모두 계산 (n 크기)
-            pathRects01_n = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [];
-            pathRects23_n = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [];
-            pathRects02_n = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [];
-            pathRects13_n = getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || [];
+            const paths_n = {
+                path01: getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 1) || [],
+                path23: getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 2, 3) || [],
+                path02: getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 0, 2) || [],
+                path13: getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize, 1, 3) || []
+            };
             
             // 4가지 경로 모두 계산 (n-1 크기)
-            pathRects01_n1 = (cornerSize_n1 > 0) ? (getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize_n1, 0, 1) || []) : [];
-            pathRects23_n1 = (cornerSize_n1 > 0) ? (getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize_n1, 2, 3) || []) : [];
-            pathRects02_n1 = (cornerSize_n1 > 0) ? (getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize_n1, 0, 2) || []) : [];
-            pathRects13_n1 = (cornerSize_n1 > 0) ? (getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize_n1, 1, 3) || []) : [];
-            
-            // 경로별 개수 표시 업데이트 (n 크기만 표시)
-            if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01_n.length;
-            if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = pathRects23_n.length;
-            if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02_n.length;
-            if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13_n.length;
+            const paths_n1 = (cornerSize_n1 > 0) ? {
+                path01: getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize_n1, 0, 1) || [],
+                path23: getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize_n1, 2, 3) || [],
+                path02: getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize_n1, 0, 2) || [],
+                path13: getPathRectsOverlap(selectedPixel.x, selectedPixel.y, rectSize, cornerSize_n1, 1, 3) || []
+            } : { path01: [], path23: [], path02: [], path13: [] };
             
             const maxPixels_n = cornerSize * cornerSize;
             const maxPixels_n1 = cornerSize_n1 * cornerSize_n1;
             
-            // 모든 경로에서 최소 각도 차이 찾기 (허용오차 내에서만)
-            let minAngleDiff_n = findMinAngleDiff([pathRects01_n, pathRects23_n, pathRects02_n, pathRects13_n], cornerSize, maxPixels_n);
-            let minAngleDiff_n1 = (cornerSize_n1 > 0) ? findMinAngleDiff([pathRects01_n1, pathRects23_n1, pathRects02_n1, pathRects13_n1], cornerSize_n1, maxPixels_n1) : null;
+            // 모든 경로에서 최소 각도 차이 찾기
+            const minAngleDiff_n = findMinAngleDiff(
+                [paths_n.path01, paths_n.path23, paths_n.path02, paths_n.path13], 
+                cornerSize, maxPixels_n
+            );
+            const minAngleDiff_n1 = (cornerSize_n1 > 0) ? findMinAngleDiff(
+                [paths_n1.path01, paths_n1.path23, paths_n1.path02, paths_n1.path13],
+                cornerSize_n1, maxPixels_n1
+            ) : null;
             
             // 경로별 흰색점 개수 계산 (n 크기)
-            const whiteCounts01_n = calculatePathWhiteCounts(pathRects01_n, 'path01_n', cornerSize, maxPixels_n, minAngleDiff_n);
-            const whiteCounts23_n = calculatePathWhiteCounts(pathRects23_n, 'path23_n', cornerSize, maxPixels_n, minAngleDiff_n);
-            const whiteCounts02_n = calculatePathWhiteCounts(pathRects02_n, 'path02_n', cornerSize, maxPixels_n, minAngleDiff_n);
-            const whiteCounts13_n = calculatePathWhiteCounts(pathRects13_n, 'path13_n', cornerSize, maxPixels_n, minAngleDiff_n);
+            const whiteCounts_n = {
+                path01: calculatePathWhiteCounts(paths_n.path01, 'path01_n', cornerSize, maxPixels_n, minAngleDiff_n),
+                path23: calculatePathWhiteCounts(paths_n.path23, 'path23_n', cornerSize, maxPixels_n, minAngleDiff_n),
+                path02: calculatePathWhiteCounts(paths_n.path02, 'path02_n', cornerSize, maxPixels_n, minAngleDiff_n),
+                path13: calculatePathWhiteCounts(paths_n.path13, 'path13_n', cornerSize, maxPixels_n, minAngleDiff_n)
+            };
             
             // 경로별 흰색점 개수 계산 (n-1 크기)
-            const whiteCounts01_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects01_n1, 'path01_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1) : [];
-            const whiteCounts23_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects23_n1, 'path23_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1) : [];
-            const whiteCounts02_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects02_n1, 'path02_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1) : [];
-            const whiteCounts13_n1 = (cornerSize_n1 > 0) ? calculatePathWhiteCounts(pathRects13_n1, 'path13_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1) : [];
+            const whiteCounts_n1 = (cornerSize_n1 > 0) ? {
+                path01: calculatePathWhiteCounts(paths_n1.path01, 'path01_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1),
+                path23: calculatePathWhiteCounts(paths_n1.path23, 'path23_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1),
+                path02: calculatePathWhiteCounts(paths_n1.path02, 'path02_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1),
+                path13: calculatePathWhiteCounts(paths_n1.path13, 'path13_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1)
+            } : { path01: [], path23: [], path02: [], path13: [] };
+            
+            return { paths_n, paths_n1, whiteCounts_n, whiteCounts_n1 };
+        }
+        
+        // 경로 UI 업데이트 및 이벤트 핸들러 추가
+        function updatePathUI(pathsData, cornerSize, cornerSize_n1) {
+            const { paths_n, paths_n1, whiteCounts_n, whiteCounts_n1 } = pathsData;
+            
+            // 전역 변수에 경로 저장 (렌더링에서 사용)
+            pathRects01_n = paths_n.path01;
+            pathRects23_n = paths_n.path23;
+            pathRects02_n = paths_n.path02;
+            pathRects13_n = paths_n.path13;
+            pathRects01_n1 = paths_n1.path01;
+            pathRects23_n1 = paths_n1.path23;
+            pathRects02_n1 = paths_n1.path02;
+            pathRects13_n1 = paths_n1.path13;
+            
+            // 경로별 개수 표시 업데이트 (n 크기만 표시)
+            if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = paths_n.path01.length;
+            if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = paths_n.path23.length;
+            if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = paths_n.path02.length;
+            if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = paths_n.path13.length;
             
             // 흰색점 개수 버튼 표시 업데이트 (n 크기)
-            if(document.getElementById('pathWhite01_n')) document.getElementById('pathWhite01_n').innerHTML = whiteCounts01_n.join(' ') || '-';
-            if(document.getElementById('pathWhite23_n')) document.getElementById('pathWhite23_n').innerHTML = whiteCounts23_n.join(' ') || '-';
-            if(document.getElementById('pathWhite02_n')) document.getElementById('pathWhite02_n').innerHTML = whiteCounts02_n.join(' ') || '-';
-            if(document.getElementById('pathWhite13_n')) document.getElementById('pathWhite13_n').innerHTML = whiteCounts13_n.join(' ') || '-';
+            if(document.getElementById('pathWhite01_n')) document.getElementById('pathWhite01_n').innerHTML = whiteCounts_n.path01.join(' ') || '-';
+            if(document.getElementById('pathWhite23_n')) document.getElementById('pathWhite23_n').innerHTML = whiteCounts_n.path23.join(' ') || '-';
+            if(document.getElementById('pathWhite02_n')) document.getElementById('pathWhite02_n').innerHTML = whiteCounts_n.path02.join(' ') || '-';
+            if(document.getElementById('pathWhite13_n')) document.getElementById('pathWhite13_n').innerHTML = whiteCounts_n.path13.join(' ') || '-';
             
             // 흰색점 개수 버튼 표시 업데이트 (n-1 크기)
-            if(document.getElementById('pathWhite01_n1')) document.getElementById('pathWhite01_n1').innerHTML = whiteCounts01_n1.join(' ') || '-';
-            if(document.getElementById('pathWhite23_n1')) document.getElementById('pathWhite23_n1').innerHTML = whiteCounts23_n1.join(' ') || '-';
-            if(document.getElementById('pathWhite02_n1')) document.getElementById('pathWhite02_n1').innerHTML = whiteCounts02_n1.join(' ') || '-';
-            if(document.getElementById('pathWhite13_n1')) document.getElementById('pathWhite13_n1').innerHTML = whiteCounts13_n1.join(' ') || '-';
+            if(document.getElementById('pathWhite01_n1')) document.getElementById('pathWhite01_n1').innerHTML = whiteCounts_n1.path01.join(' ') || '-';
+            if(document.getElementById('pathWhite23_n1')) document.getElementById('pathWhite23_n1').innerHTML = whiteCounts_n1.path23.join(' ') || '-';
+            if(document.getElementById('pathWhite02_n1')) document.getElementById('pathWhite02_n1').innerHTML = whiteCounts_n1.path02.join(' ') || '-';
+            if(document.getElementById('pathWhite13_n1')) document.getElementById('pathWhite13_n1').innerHTML = whiteCounts_n1.path13.join(' ') || '-';
             
             // 버튼 클릭 이벤트 추가 (n 크기)
             addPathButtonClickEvents('path01_n', cornerSize);
@@ -878,6 +906,24 @@ function countWhitePixels(ctx, x, y, size) {
                 addPathButtonClickEvents('path02_n1', cornerSize_n1);
                 addPathButtonClickEvents('path13_n1', cornerSize_n1);
             }
+        }
+        
+        // 공통 함수: 귀퉁이 및 경로 정보 업데이트 (메인 함수)
+        function updateCornerAndPathInfo() {
+            if (!selectedPixel) return;
+            
+            const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+            const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
+            const cornerSize_n1 = cornerSize - 1;
+            
+            // 1. 기준 정보 업데이트
+            updateBaseAndCornerInfo(rectSize, cornerSize);
+            
+            // 2. 경로 데이터 계산
+            const pathsData = calculateAllPathsData(rectSize, cornerSize, cornerSize_n1);
+            
+            // 3. UI 업데이트
+            updatePathUI(pathsData, cornerSize, cornerSize_n1);
         }
 
         // 노란색 사각형 탐색 기능
