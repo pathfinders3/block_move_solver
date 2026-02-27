@@ -337,22 +337,29 @@ function countWhitePixels(ctx, x, y, size) {
                     if (baseWhiteCount === baseMaxPixels) {
                         // 이전 사각형으로부터의 각도 계산
                         let angle = null;
-                        if (yellowRects.length > 0) {
-                            const prevRect = yellowRects[yellowRects.length - 1];
-                            const prevX = prevRect.x + prevRect.size / 2;
-                            const prevY = prevRect.y + prevRect.size / 2;
-                            const currX = selectedPixel.x + rectSize / 2;
-                            const currY = selectedPixel.y + rectSize / 2;
-                            const dx = currX - prevX;
-                            const dy = currY - prevY;
-                            angle = calculateCartesianAngle(dx, dy);
+                    let angleExceeded = false;
+                    let angleDiffValue = null;
+                    let expectedAngle = null;
+                    
+                    if (yellowRects.length > 0) {
+                        const prevRect = yellowRects[yellowRects.length - 1];
+                        const prevX = prevRect.x + prevRect.size / 2;
+                        const prevY = prevRect.y + prevRect.size / 2;
+                        const currX = selectedPixel.x + rectSize / 2;
+                        const currY = selectedPixel.y + rectSize / 2;
+                        const dx = currX - prevX;
+                        const dy = currY - prevY;
+                        angle = calculateCartesianAngle(dx, dy);
+                        
+                        // 각도 허용오차 검사 (이전 사각형의 각도와 비교)
+                        if (yellowRects.length > 0 && prevRect.angle !== null && prevRect.angle !== undefined) {
+                            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+                            const angleDiff = Math.abs(getCircularAngleDiff(angle, prevRect.angle, false));
                             
-                            // 각도 허용오차 검사 (이전 사각형의 각도와 비교)
-                            if (yellowRects.length > 0 && prevRect.angle !== null && prevRect.angle !== undefined) {
-                                const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
-                                const angleDiff = Math.abs(getCircularAngleDiff(angle, prevRect.angle, false));
-                                
-                                const warningContainer = document.getElementById('angleWarningContainer');
+                            // 속성 저장용 변수 설정
+                            expectedAngle = prevRect.angle;
+                            angleDiffValue = angleDiff;
+                            angleExceeded = (angleDiff > tolerance);
                                 if (angleDiff > tolerance) {
                                     // 경고 메시지 표시
                                     const sign = getCircularAngleDiff(angle, prevRect.angle, true) >= 0 ? '+' : '';
@@ -387,10 +394,15 @@ function countWhitePixels(ctx, x, y, size) {
                             x: selectedPixel.x,
                             y: selectedPixel.y,
                             size: rectSize,
-                            angle: angle
+                            angle: angle,
+                            angleExceeded: angleExceeded,
+                            angleDiff: angleDiffValue,
+                            expectedAngle: expectedAngle
                         });
                         console.log(`✅ 노란색 사각형 추가: (${selectedPixel.x}, ${selectedPixel.y}), 크기: ${rectSize}x${rectSize}, 각도: ${angle !== null ? angle + '°' : 'N/A'}`);
-                        console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
+                    if (angleExceeded) {
+                        console.log(`   ⚠️ 각도 허용오차 초과: ${angleDiffValue}° (기대: ${expectedAngle}°)`);
+                    }
                         
                         // 방금 추가된 사각형을 현재 선택으로 설정
                         currentYellowIndex = yellowRects.length - 1;
@@ -425,6 +437,10 @@ function countWhitePixels(ctx, x, y, size) {
                     
                     // 이전 사각형으로부터의 각도 계산
                     let angle = null;
+                    let angleExceeded = false;
+                    let angleDiffValue = null;
+                    let expectedAngle = null;
+                    
                     if (yellowRects.length > 0) {
                         const prevRect = yellowRects[yellowRects.length - 1];
                         const prevX = prevRect.x + prevRect.size / 2;
@@ -439,6 +455,11 @@ function countWhitePixels(ctx, x, y, size) {
                         if (yellowRects.length > 1 && prevRect.angle !== null && prevRect.angle !== undefined) {
                             const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
                             const angleDiff = Math.abs(getCircularAngleDiff(angle, prevRect.angle, false));
+                            
+                            // 속성 저장용 변수 설정
+                            expectedAngle = prevRect.angle;
+                            angleDiffValue = angleDiff;
+                            angleExceeded = (angleDiff > tolerance);
                             
                             const warningContainer = document.getElementById('angleWarningContainer');
                             if (angleDiff > tolerance) {
@@ -480,9 +501,15 @@ function countWhitePixels(ctx, x, y, size) {
                         x: tempYellowRect.x,
                         y: tempYellowRect.y,
                         size: tempYellowRect.size,
-                        angle: angle
+                        angle: angle,
+                        angleExceeded: angleExceeded,
+                        angleDiff: angleDiffValue,
+                        expectedAngle: expectedAngle
                     });
                     console.log(`✅ 노란색 사각형 확정: (${tempYellowRect.x}, ${tempYellowRect.y}), 크기: ${tempYellowRect.size}x${tempYellowRect.size}, 각도: ${angle !== null ? angle + '°' : 'N/A'}`);
+                    if (angleExceeded) {
+                        console.log(`   ⚠️ 각도 허용오차 초과: ${angleDiffValue}° (기대: ${expectedAngle}°)`);
+                    }
                     console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
                     
                     // 방금 추가된 사각형을 현재 선택으로 설정
