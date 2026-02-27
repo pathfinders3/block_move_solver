@@ -1281,6 +1281,11 @@ function countWhitePixels(ctx, x, y, size) {
                             ctx2.fillStyle = 'rgba(255, 100, 100, 0.4)';
                             ctx2.strokeStyle = 'rgba(255, 0, 0, 1.0)';
                             ctx2.lineWidth = Math.max(3, scale/4);
+                        } else if (rect.angleExceeded) {
+                            // 각도 허용오차 초과: 주황색
+                            ctx2.fillStyle = 'rgba(34, 61, 212, 0.4)';
+                            ctx2.strokeStyle = 'rgba(189, 116, 8, 0.9)';
+                            ctx2.lineWidth = Math.max(1, scale/8);
                         } else {
                             // 일반 노란색 사각형
                             ctx2.fillStyle = 'rgba(255, 255, 0, 0.3)';
