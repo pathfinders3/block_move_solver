@@ -645,7 +645,7 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         // 경로별 흰색점 개수 계산 및 버튼 HTML 생성
-        function calculatePathWhiteCounts(rects, pathName, cornerSize, maxPixels, minAngleDiff = null) {
+        function calculatePathWhiteCounts(rects, pathName, cornerSize, maxPixels, bestMatch = null) {
             // 기대 각도: 현재 선택된 노란색 사각형의 각도 (또는 마지막 사각형)
             let expectedAngle = null;
             if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
@@ -680,9 +680,28 @@ function countWhitePixels(ctx, x, y, size) {
                     const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
                     angleDiff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
                     if (angleDiff <= tolerance) {
-                        // 최소 각도 차이와 일치하면 빨간색, 그 외는 오렌지색
-                        if (minAngleDiff !== null && Math.abs(angleDiff - minAngleDiff) < 0.001) {
-                            borderColor = '#FF0000'; // Red (최고 추천)
+                        // 최소 각도 + 최대 크기와 모두 일치하면 빨간색, 그 외는 오렌지색
+                        if (bestMatch !== null && 
+                            Math.abs(angleDiff - bestMatch.minDiff) < 0.001 && 
+                            cornerSize === bestMatch.maxSize) {
+                            
+                            // 더 큰 사각형에 완전히 포함되는지 확인
+                            const isContainedInLarger = bestMatch.bestRects.some(largerRect => {
+                                // 같거나 작은 크기는 무시
+                                if (largerRect.size <= cornerSize) return false;
+                                
+                                // 완전히 포함되는지 확인
+                                return pt.x >= largerRect.x && 
+                                       pt.y >= largerRect.y && 
+                                       pt.x + cornerSize <= largerRect.x + largerRect.size && 
+                                       pt.y + cornerSize <= largerRect.y + largerRect.size;
+                            });
+                            
+                            if (!isContainedInLarger) {
+                                borderColor = '#FF0000'; // Red (최고 추천: 최소 각도 + 최대 크기, 포함되지 않음)
+                            } else {
+                                borderColor = '#FF8C00'; // Dark Orange (더 큰 사각형에 포함됨)
+                            }
                         } else {
                             borderColor = '#FF8C00'; // Dark Orange (추천)
                         }
@@ -712,8 +731,9 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
-        // 모든 경로에서 허용오차 내 최소 각도 차이 찾기
-        function findMinAngleDiff(allPathRects, cornerSize, maxPixels) {
+        // 모든 경로에서 허용오차 내 최소 각도 차이와 최대 크기 찾기
+        function findMinAngleDiffAndMaxSize(allPathRectsWithSize) {
+            // allPathRectsWithSize: [{ rects, size }, ...]
             // 기대 각도
             let expectedAngle = null;
             if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
@@ -733,18 +753,19 @@ function countWhitePixels(ctx, x, y, size) {
             
             let minDiff = null;
             
-            // 모든 경로를 순회
-            allPathRects.forEach(pathRects => {
-                if (!pathRects) return;
+            // 1단계: 최소 각도 차이 찾기
+            allPathRectsWithSize.forEach(({ rects, size }) => {
+                if (!rects) return;
+                const maxPixels = size * size;
                 
-                pathRects.forEach(pt => {
+                rects.forEach(pt => {
                     // 모두 흰색인 것만 고려
-                    const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
+                    const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, size);
                     if (whiteCount !== maxPixels) return;
                     
                     // 각도 계산
-                    const targetX = pt.x + cornerSize / 2;
-                    const targetY = pt.y + cornerSize / 2;
+                    const targetX = pt.x + size / 2;
+                    const targetY = pt.y + size / 2;
                     const dx = targetX - baseX;
                     const dy = targetY - baseY;
                     const angle = calculateCartesianAngle(dx, dy);
@@ -761,7 +782,61 @@ function countWhitePixels(ctx, x, y, size) {
                 });
             });
             
-            return minDiff;
+            if (minDiff === null) return null;
+            
+            // 2단계: 최소 각도를 가진 것들 중 최대 크기 찾기
+            let maxSize = null;
+            
+            allPathRectsWithSize.forEach(({ rects, size }) => {
+                if (!rects) return;
+                const maxPixels = size * size;
+                
+                rects.forEach(pt => {
+                    const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, size);
+                    if (whiteCount !== maxPixels) return;
+                    
+                    const targetX = pt.x + size / 2;
+                    const targetY = pt.y + size / 2;
+                    const dx = targetX - baseX;
+                    const dy = targetY - baseY;
+                    const angle = calculateCartesianAngle(dx, dy);
+                    const diff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
+                    
+                    // 최소 각도 차이와 일치하면 최대 크기 업데이트
+                    if (Math.abs(diff - minDiff) < 0.001) {
+                        if (maxSize === null || size > maxSize) {
+                            maxSize = size;
+                        }
+                    }
+                });
+            });
+            
+            // 3단계: 최소 각도 + 최대 크기를 가진 사각형들의 좌표 수집
+            const bestRects = [];
+            
+            allPathRectsWithSize.forEach(({ rects, size }) => {
+                if (!rects) return;
+                const maxPixels = size * size;
+                
+                rects.forEach(pt => {
+                    const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, size);
+                    if (whiteCount !== maxPixels) return;
+                    
+                    const targetX = pt.x + size / 2;
+                    const targetY = pt.y + size / 2;
+                    const dx = targetX - baseX;
+                    const dy = targetY - baseY;
+                    const angle = calculateCartesianAngle(dx, dy);
+                    const diff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
+                    
+                    // 최소 각도 + 최대 크기와 일치하면 리스트에 추가
+                    if (Math.abs(diff - minDiff) < 0.001 && size === maxSize) {
+                        bestRects.push({ x: pt.x, y: pt.y, size: size });
+                    }
+                });
+            });
+            
+            return { minDiff, maxSize, bestRects };
         }
         
         // 경로 버튼 클릭 이벤트 추가
@@ -832,30 +907,39 @@ function countWhitePixels(ctx, x, y, size) {
             const maxPixels_n = cornerSize * cornerSize;
             const maxPixels_n1 = cornerSize_n1 * cornerSize_n1;
             
-            // 모든 경로에서 최소 각도 차이 찾기
-            const minAngleDiff_n = findMinAngleDiff(
-                [paths_n.path01, paths_n.path23, paths_n.path02, paths_n.path13], 
-                cornerSize, maxPixels_n
-            );
-            const minAngleDiff_n1 = (cornerSize_n1 > 0) ? findMinAngleDiff(
-                [paths_n1.path01, paths_n1.path23, paths_n1.path02, paths_n1.path13],
-                cornerSize_n1, maxPixels_n1
-            ) : null;
+            // 모든 경로(n과 n-1 크기 모두)에서 최소 각도 차이와 최대 크기 찾기
+            const allPathsWithSize = [
+                { rects: paths_n.path01, size: cornerSize },
+                { rects: paths_n.path23, size: cornerSize },
+                { rects: paths_n.path02, size: cornerSize },
+                { rects: paths_n.path13, size: cornerSize }
+            ];
+            
+            if (cornerSize_n1 > 0) {
+                allPathsWithSize.push(
+                    { rects: paths_n1.path01, size: cornerSize_n1 },
+                    { rects: paths_n1.path23, size: cornerSize_n1 },
+                    { rects: paths_n1.path02, size: cornerSize_n1 },
+                    { rects: paths_n1.path13, size: cornerSize_n1 }
+                );
+            }
+            
+            const bestMatch = findMinAngleDiffAndMaxSize(allPathsWithSize);
             
             // 경로별 흰색점 개수 계산 (n 크기)
             const whiteCounts_n = {
-                path01: calculatePathWhiteCounts(paths_n.path01, 'path01_n', cornerSize, maxPixels_n, minAngleDiff_n),
-                path23: calculatePathWhiteCounts(paths_n.path23, 'path23_n', cornerSize, maxPixels_n, minAngleDiff_n),
-                path02: calculatePathWhiteCounts(paths_n.path02, 'path02_n', cornerSize, maxPixels_n, minAngleDiff_n),
-                path13: calculatePathWhiteCounts(paths_n.path13, 'path13_n', cornerSize, maxPixels_n, minAngleDiff_n)
+                path01: calculatePathWhiteCounts(paths_n.path01, 'path01_n', cornerSize, maxPixels_n, bestMatch),
+                path23: calculatePathWhiteCounts(paths_n.path23, 'path23_n', cornerSize, maxPixels_n, bestMatch),
+                path02: calculatePathWhiteCounts(paths_n.path02, 'path02_n', cornerSize, maxPixels_n, bestMatch),
+                path13: calculatePathWhiteCounts(paths_n.path13, 'path13_n', cornerSize, maxPixels_n, bestMatch)
             };
             
             // 경로별 흰색점 개수 계산 (n-1 크기)
             const whiteCounts_n1 = (cornerSize_n1 > 0) ? {
-                path01: calculatePathWhiteCounts(paths_n1.path01, 'path01_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1),
-                path23: calculatePathWhiteCounts(paths_n1.path23, 'path23_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1),
-                path02: calculatePathWhiteCounts(paths_n1.path02, 'path02_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1),
-                path13: calculatePathWhiteCounts(paths_n1.path13, 'path13_n1', cornerSize_n1, maxPixels_n1, minAngleDiff_n1)
+                path01: calculatePathWhiteCounts(paths_n1.path01, 'path01_n1', cornerSize_n1, maxPixels_n1, bestMatch),
+                path23: calculatePathWhiteCounts(paths_n1.path23, 'path23_n1', cornerSize_n1, maxPixels_n1, bestMatch),
+                path02: calculatePathWhiteCounts(paths_n1.path02, 'path02_n1', cornerSize_n1, maxPixels_n1, bestMatch),
+                path13: calculatePathWhiteCounts(paths_n1.path13, 'path13_n1', cornerSize_n1, maxPixels_n1, bestMatch)
             } : { path01: [], path23: [], path02: [], path13: [] };
             
             return { paths_n, paths_n1, whiteCounts_n, whiteCounts_n1 };
