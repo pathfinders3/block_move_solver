@@ -731,6 +731,26 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
+        // 헬퍼 함수: 사각형의 각도 차이 계산 (공통 로직)
+        function calculateRectAngleDiff(pt, size, baseX, baseY, expectedAngle) {
+            // 흰색 픽셀 확인
+            const maxPixels = size * size;
+            const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, size);
+            if (whiteCount !== maxPixels) return null;
+            
+            // 각도 계산
+            const targetX = pt.x + size / 2;
+            const targetY = pt.y + size / 2;
+            const dx = targetX - baseX;
+            const dy = targetY - baseY;
+            const angle = calculateCartesianAngle(dx, dy);
+            
+            // 각도 차이 계산
+            const diff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
+            
+            return diff;
+        }
+
         // 모든 경로에서 허용오차 내 최소 각도 차이와 최대 크기 찾기
         function findMinAngleDiffAndMaxSize(allPathRectsWithSize) {
             // allPathRectsWithSize: [{ rects, size }, ...]
@@ -756,22 +776,10 @@ function countWhitePixels(ctx, x, y, size) {
             // 1단계: 최소 각도 차이 찾기
             allPathRectsWithSize.forEach(({ rects, size }) => {
                 if (!rects) return;
-                const maxPixels = size * size;
                 
                 rects.forEach(pt => {
-                    // 모두 흰색인 것만 고려
-                    const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, size);
-                    if (whiteCount !== maxPixels) return;
-                    
-                    // 각도 계산
-                    const targetX = pt.x + size / 2;
-                    const targetY = pt.y + size / 2;
-                    const dx = targetX - baseX;
-                    const dy = targetY - baseY;
-                    const angle = calculateCartesianAngle(dx, dy);
-                    
-                    // 각도 차이 계산
-                    const diff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
+                    const diff = calculateRectAngleDiff(pt, size, baseX, baseY, expectedAngle);
+                    if (diff === null) return;
                     
                     // 허용오차 내에 있고 최소값이면 업데이트
                     if (diff <= tolerance) {
@@ -789,18 +797,10 @@ function countWhitePixels(ctx, x, y, size) {
             
             allPathRectsWithSize.forEach(({ rects, size }) => {
                 if (!rects) return;
-                const maxPixels = size * size;
                 
                 rects.forEach(pt => {
-                    const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, size);
-                    if (whiteCount !== maxPixels) return;
-                    
-                    const targetX = pt.x + size / 2;
-                    const targetY = pt.y + size / 2;
-                    const dx = targetX - baseX;
-                    const dy = targetY - baseY;
-                    const angle = calculateCartesianAngle(dx, dy);
-                    const diff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
+                    const diff = calculateRectAngleDiff(pt, size, baseX, baseY, expectedAngle);
+                    if (diff === null) return;
                     
                     // 최소 각도 차이와 일치하면 최대 크기 업데이트
                     if (Math.abs(diff - minDiff) < 0.001) {
@@ -816,18 +816,10 @@ function countWhitePixels(ctx, x, y, size) {
             
             allPathRectsWithSize.forEach(({ rects, size }) => {
                 if (!rects) return;
-                const maxPixels = size * size;
                 
                 rects.forEach(pt => {
-                    const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, size);
-                    if (whiteCount !== maxPixels) return;
-                    
-                    const targetX = pt.x + size / 2;
-                    const targetY = pt.y + size / 2;
-                    const dx = targetX - baseX;
-                    const dy = targetY - baseY;
-                    const angle = calculateCartesianAngle(dx, dy);
-                    const diff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
+                    const diff = calculateRectAngleDiff(pt, size, baseX, baseY, expectedAngle);
+                    if (diff === null) return;
                     
                     // 최소 각도 + 최대 크기와 일치하면 리스트에 추가
                     if (Math.abs(diff - minDiff) < 0.001 && size === maxSize) {
