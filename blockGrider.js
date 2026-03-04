@@ -437,14 +437,15 @@ function countWhitePixels(ctx, x, y, size) {
                     
                     // selectedPixel을 임시 사각형 위치로 이동
                     selectedPixel = { x: tempYellowRect.x, y: tempYellowRect.y };
-                    
-                    // 경로 재계산
+
+                    // 공통 함수로 노란색 사각형 추가
+                    addYellowRectWithAngleCheck(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
+
+                    // 경로 재계산 (새로 확정된 각도를 기준으로)
                     if (showCorners) {
                         updateCornerAndPathInfo();
                     }
-                    
-                    // 공통 함수로 노란색 사각형 추가
-                    addYellowRectWithAngleCheck(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
+
                     console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
                     
                     tempYellowRect = null; // 임시 사각형 초기화
@@ -646,11 +647,9 @@ function countWhitePixels(ctx, x, y, size) {
 
         // 경로별 흰색점 개수 계산 및 버튼 HTML 생성
         function calculatePathWhiteCounts(rects, pathName, cornerSize, maxPixels, bestMatch = null) {
-            // 기대 각도: 현재 선택된 노란색 사각형의 각도 (또는 마지막 사각형)
+            // 기대 각도: 항상 마지막으로 확정된 노란색 사각형의 각도
             let expectedAngle = null;
-            if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
-                expectedAngle = yellowRects[currentYellowIndex].angle;
-            } else if (yellowRects.length > 0) {
+            if (yellowRects.length > 0) {
                 expectedAngle = yellowRects[yellowRects.length - 1].angle;
             }
             
@@ -754,11 +753,9 @@ function countWhitePixels(ctx, x, y, size) {
         // 모든 경로에서 허용오차 내 최소 각도 차이와 최대 크기 찾기
         function findMinAngleDiffAndMaxSize(allPathRectsWithSize) {
             // allPathRectsWithSize: [{ rects, size }, ...]
-            // 기대 각도
+            // 기대 각도: 항상 마지막으로 확정된 노란색 사각형의 각도
             let expectedAngle = null;
-            if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
-                expectedAngle = yellowRects[currentYellowIndex].angle;
-            } else if (yellowRects.length > 0) {
+            if (yellowRects.length > 0) {
                 expectedAngle = yellowRects[yellowRects.length - 1].angle;
             }
             
