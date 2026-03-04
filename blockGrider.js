@@ -723,10 +723,15 @@ function countWhitePixels(ctx, x, y, size) {
                     buttonStyle = 'background:#ccc; color:#666; border:1px solid #999; cursor:not-allowed;';
                     disabled = ' disabled';
                 }
+
+                const angleDiffLabel = (angleDiff !== null) ? ` · Δ${angleDiff}°` : '';
+                const angleTooltip = (angleDiff !== null && expectedAngle !== null && expectedAngle !== undefined)
+                    ? ` title="각도:${angle}°, 기준:${expectedAngle}°, 차이:${angleDiff}°"`
+                    : '';
                 
                 return `<button data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" data-angle="${angle}"
                                 style="padding:2px 6px; margin:2px; border-radius:3px; ${buttonStyle}" 
-                                ${disabled}>${whiteCount}</button>`;
+                                ${angleTooltip}${disabled}>${whiteCount}${angleDiffLabel}</button>`;
             });
         }
 
