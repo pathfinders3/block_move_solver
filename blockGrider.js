@@ -792,8 +792,8 @@ function countWhitePixels(ctx, x, y, size) {
             
             if (minDiff === null) return null;
             
-            // 2단계: 최소 각도를 가진 것들 중 최대 크기 찾기
-            let maxSize = null;
+            // 2단계: 최소 각도를 가진 모든 후보 수집
+            const candidates = [];
             
             allPathRectsWithSize.forEach(({ rects, size }) => {
                 if (!rects) return;
@@ -802,31 +802,38 @@ function countWhitePixels(ctx, x, y, size) {
                     const diff = calculateRectAngleDiff(pt, size, baseX, baseY, expectedAngle);
                     if (diff === null) return;
                     
-                    // 최소 각도 차이와 일치하면 최대 크기 업데이트
+                    // 최소 각도 차이와 일치하면 후보에 추가
                     if (Math.abs(diff - minDiff) < 0.001) {
-                        if (maxSize === null || size > maxSize) {
-                            maxSize = size;
-                        }
+                        candidates.push({ x: pt.x, y: pt.y, size: size });
                     }
                 });
             });
             
-            // 3단계: 최소 각도 + 최대 크기를 가진 사각형들의 좌표 수집
-            const bestRects = [];
-            
-            allPathRectsWithSize.forEach(({ rects, size }) => {
-                if (!rects) return;
-                
-                rects.forEach(pt => {
-                    const diff = calculateRectAngleDiff(pt, size, baseX, baseY, expectedAngle);
-                    if (diff === null) return;
+            // 2.5단계: 포함 관계 확인 - 포함되는 작은 사각형 제외
+            const filteredCandidates = candidates.filter(smallRect => {
+                // 자신보다 큰 사각형에 완전히 포함되면 제외
+                const isContained = candidates.some(largeRect => {
+                    if (largeRect.size <= smallRect.size) return false;
                     
-                    // 최소 각도 + 최대 크기와 일치하면 리스트에 추가
-                    if (Math.abs(diff - minDiff) < 0.001 && size === maxSize) {
-                        bestRects.push({ x: pt.x, y: pt.y, size: size });
-                    }
+                    return smallRect.x >= largeRect.x &&
+                           smallRect.y >= largeRect.y &&
+                           smallRect.x + smallRect.size <= largeRect.x + largeRect.size &&
+                           smallRect.y + smallRect.size <= largeRect.y + largeRect.size;
                 });
+                
+                return !isContained;  // 포함되지 않은 것만 유지
             });
+            
+            // 3단계: 필터링된 후보들 중 최대 크기 찾기
+            let maxSize = null;
+            filteredCandidates.forEach(candidate => {
+                if (maxSize === null || candidate.size > maxSize) {
+                    maxSize = candidate.size;
+                }
+            });
+            
+            // 4단계: 최대 크기를 가진 사각형들 수집
+            const bestRects = filteredCandidates.filter(candidate => candidate.size === maxSize);
             
             return { minDiff, maxSize, bestRects };
         }
