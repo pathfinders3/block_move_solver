@@ -629,8 +629,6 @@ function countWhitePixels(ctx, x, y, size) {
         let pathRects23_n1 = []; // 하단 수평 (2→3) n-1크기
         let pathRects02_n1 = []; // 좌측 수직 (0→2) n-1크기
         let pathRects13_n1 = []; // 우측 수직 (1→3) n-1크기
-        // F8: 녹색으로 칠한 사각형들을 저장하는 배열
-        let greenRects = []; // {x: number, y: number, size: number}[]
         // 경로 버튼 클릭: 임시 노란색 사각형 (F9로 확정 전)
         let tempYellowRect = null; // {x: number, y: number, size: number} | null
         // F9: 확정된 노란색 사각형들을 저장하는 배열
@@ -1154,7 +1152,6 @@ function countWhitePixels(ctx, x, y, size) {
                     currentGroupAngle = angle;
                 } else {
                     // 현재 그룹의 각도와 비교
-                    const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
                     const diff = Math.abs(getCircularAngleDiff(angle, currentGroupAngle, false));
                     
                     if (diff <= tolerance) {
@@ -1251,10 +1248,6 @@ function countWhitePixels(ctx, x, y, size) {
                 updateCornerAndPathInfo();
             } else {
                 cornerRects = [];
-                pathRects01 = [];
-                pathRects23 = [];
-                pathRects02 = [];
-                pathRects13 = [];
                 // 귀퉁이 픽셀수 초기화
                 const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                 if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
