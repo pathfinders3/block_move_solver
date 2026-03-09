@@ -87,7 +87,7 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
 }
 
 /**
- * 특정 사각형 영역에서 흰색 픽셀(RGB 255,255,255) 개수를 셉니다.
+ * 특정 사각형 영역에서 흰색 픽셀(RGB가 임계값 이상) 개수를 셉니다.
  * @param {CanvasRenderingContext2D} ctx - 캔버스 컨텍스트
  * @param {number} x - 사각형 시작 x 좌표
  * @param {number} y - 사각형 시작 y 좌표
@@ -95,6 +95,12 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
  * @returns {number} 흰색 픽셀 개수
  */
 function countWhitePixels(ctx, x, y, size) {
+    const thresholdInput = document.getElementById('whiteThreshold');
+    const thresholdValue = thresholdInput ? parseInt(thresholdInput.value, 10) : 245;
+    const whiteThreshold = Number.isNaN(thresholdValue)
+        ? 245
+        : Math.min(255, Math.max(0, thresholdValue));
+
     // 경계 밖을 범위는 0을 반환
     if (x < 0 || y < 0 || x + size > 64 || y + size > 64) {
         // 부분적으로 경계 안에 있는 경우 처리
@@ -112,7 +118,7 @@ function countWhitePixels(ctx, x, y, size) {
         let count = 0;
         
         for (let i = 0; i < data.length; i += 4) {
-            if (data[i] === 255 && data[i+1] === 255 && data[i+2] === 255) {
+            if (data[i] >= whiteThreshold && data[i+1] >= whiteThreshold && data[i+2] >= whiteThreshold) {
                 count++;
             }
         }
@@ -130,7 +136,7 @@ function countWhitePixels(ctx, x, y, size) {
             const g = data[i + 1];
             const b = data[i + 2];
             // 흰색 픽셀 확인
-            if (r === 255 && g === 255 && b === 255) {
+            if (r >= whiteThreshold && g >= whiteThreshold && b >= whiteThreshold) {
                 count++;
             }
         }
