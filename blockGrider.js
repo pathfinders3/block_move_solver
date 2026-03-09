@@ -649,6 +649,74 @@ function countWhitePixels(ctx, x, y, size) {
                    rect1Y + rect1Size > rect2.y;
         }
 
+        // 경로 후보 사각형의 각도 및 각도차 계산
+        function getPathRectAngleInfo(pt, cornerSize, baseX, baseY, expectedAngle) {
+            const targetX = pt.x + cornerSize / 2;
+            const targetY = pt.y + cornerSize / 2;
+            const dx = targetX - baseX;
+            const dy = targetY - baseY;
+            const angle = calculateCartesianAngle(dx, dy);
+
+            let angleDiff = null;
+            if (expectedAngle !== null && expectedAngle !== undefined) {
+                angleDiff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
+            }
+
+            return { angle, angleDiff };
+        }
+
+        // 각도/추천 규칙에 따라 버튼 테두리 색상 결정
+        function resolvePathButtonBorderColor(pt, cornerSize, angleDiff, tolerance, bestMatch) {
+            if (angleDiff === null || angleDiff > tolerance) return '';
+
+            if (
+                bestMatch !== null &&
+                Math.abs(angleDiff - bestMatch.minDiff) < 0.001 &&
+                cornerSize === bestMatch.maxSize
+            ) {
+                const isContainedInLarger = bestMatch.bestRects.some(largerRect => {
+                    if (largerRect.size <= cornerSize) return false;
+
+                    return pt.x >= largerRect.x &&
+                           pt.y >= largerRect.y &&
+                           pt.x + cornerSize <= largerRect.x + largerRect.size &&
+                           pt.y + cornerSize <= largerRect.y + largerRect.size;
+                });
+
+                return isContainedInLarger ? '#FF8C00' : '#FF0000';
+            }
+
+            return '#FF8C00';
+        }
+
+        // 계산된 상태를 기반으로 버튼 HTML 생성
+        function renderPathButtonHTML(pt, idx, pathName, angle, whiteCount, isAllWhite, overlapsYellow, borderColor, angleDiff, expectedAngle) {
+            let buttonStyle;
+            let disabled;
+
+            if (isAllWhite && overlapsYellow) {
+                const border = borderColor || '#000000';
+                buttonStyle = `background:#FFD700; color:#000; border:3px solid ${border}; cursor:pointer; font-weight:bold;`;
+                disabled = '';
+            } else if (isAllWhite) {
+                const border = borderColor || '#45a049';
+                buttonStyle = `background:#4CAF50; color:white; border:3px solid ${border}; cursor:pointer;`;
+                disabled = '';
+            } else {
+                buttonStyle = 'background:#ccc; color:#666; border:1px solid #999; cursor:not-allowed;';
+                disabled = ' disabled';
+            }
+
+            const angleDiffLabel = (angleDiff !== null) ? ` · Δ${angleDiff}°` : '';
+            const angleTooltip = (angleDiff !== null && expectedAngle !== null && expectedAngle !== undefined)
+                ? ` title="각도:${angle}°, 기준:${expectedAngle}°, 차이:${angleDiff}°"`
+                : '';
+
+            return `<button data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" data-angle="${angle}"
+                                style="padding:2px 6px; margin:2px; border-radius:3px; ${buttonStyle}" 
+                                ${angleTooltip}${disabled}>${whiteCount}${angleDiffLabel}</button>`;
+        }
+
         // 경로별 흰색점 개수 계산 및 버튼 HTML 생성
         function calculatePathWhiteCounts(rects, pathName, cornerSize, maxPixels, bestMatch = null) {
             // 기대 각도: 항상 마지막으로 확정된 노란색 사각형의 각도
@@ -656,6 +724,11 @@ function countWhitePixels(ctx, x, y, size) {
             if (yellowRects.length > 0) {
                 expectedAngle = yellowRects[yellowRects.length - 1].angle;
             }
+
+            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+            const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+            const baseX = selectedPixel.x + rectSize / 2;
+            const baseY = selectedPixel.y + rectSize / 2;
             
             return rects.map((pt, idx) => {
                 const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
@@ -665,77 +738,22 @@ function countWhitePixels(ctx, x, y, size) {
                 const overlapsYellow = yellowRects.some(yellowRect => 
                     rectsOverlap(pt.x, pt.y, cornerSize, yellowRect)
                 );
-                
-                // 기준 사각형으로부터 이 위치까지의 각도 계산
-                const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
-                const baseX = selectedPixel.x + rectSize / 2;
-                const baseY = selectedPixel.y + rectSize / 2;
-                const targetX = pt.x + cornerSize / 2;
-                const targetY = pt.y + cornerSize / 2;
-                const dx = targetX - baseX;
-                const dy = targetY - baseY;
-                const angle = calculateCartesianAngle(dx, dy);
-                
-                // 기대 각도와 비교하여 테두리 색상 결정
-                let borderColor = '';
-                let angleDiff = null;
-                if (expectedAngle !== null && expectedAngle !== undefined) {
-                    const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
-                    angleDiff = Math.abs(getCircularAngleDiff(angle, expectedAngle, false));
-                    if (angleDiff <= tolerance) {
-                        // 최소 각도 + 최대 크기와 모두 일치하면 빨간색, 그 외는 오렌지색
-                        if (bestMatch !== null && 
-                            Math.abs(angleDiff - bestMatch.minDiff) < 0.001 && 
-                            cornerSize === bestMatch.maxSize) {
-                            
-                            // 더 큰 사각형에 완전히 포함되는지 확인
-                            const isContainedInLarger = bestMatch.bestRects.some(largerRect => {
-                                // 같거나 작은 크기는 무시
-                                if (largerRect.size <= cornerSize) return false;
-                                
-                                // 완전히 포함되는지 확인
-                                return pt.x >= largerRect.x && 
-                                       pt.y >= largerRect.y && 
-                                       pt.x + cornerSize <= largerRect.x + largerRect.size && 
-                                       pt.y + cornerSize <= largerRect.y + largerRect.size;
-                            });
-                            
-                            if (!isContainedInLarger) {
-                                borderColor = '#FF0000'; // Red (최고 추천: 최소 각도 + 최대 크기, 포함되지 않음)
-                            } else {
-                                borderColor = '#FF8C00'; // Dark Orange (더 큰 사각형에 포함됨)
-                            }
-                        } else {
-                            borderColor = '#FF8C00'; // Dark Orange (추천)
-                        }
-                    }
-                }
-                
-                let buttonStyle, disabled;
-                if (isAllWhite && overlapsYellow) {
-                    // 노란색 사각형과 겹치면서 모두 흰색 → 노란색 버튼
-                    const border = borderColor || '#000000';
-                    buttonStyle = `background:#FFD700; color:#000; border:3px solid ${border}; cursor:pointer; font-weight:bold;`;
-                    disabled = '';
-                } else if (isAllWhite) {
-                    // 모두 흰색 → 녹색 버튼
-                    const border = borderColor || '#45a049';
-                    buttonStyle = `background:#4CAF50; color:white; border:3px solid ${border}; cursor:pointer;`;
-                    disabled = '';
-                } else {
-                    // 일부만 흰색 → 회색 비활성 버튼
-                    buttonStyle = 'background:#ccc; color:#666; border:1px solid #999; cursor:not-allowed;';
-                    disabled = ' disabled';
-                }
 
-                const angleDiffLabel = (angleDiff !== null) ? ` · Δ${angleDiff}°` : '';
-                const angleTooltip = (angleDiff !== null && expectedAngle !== null && expectedAngle !== undefined)
-                    ? ` title="각도:${angle}°, 기준:${expectedAngle}°, 차이:${angleDiff}°"`
-                    : '';
-                
-                return `<button data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" data-angle="${angle}"
-                                style="padding:2px 6px; margin:2px; border-radius:3px; ${buttonStyle}" 
-                                ${angleTooltip}${disabled}>${whiteCount}${angleDiffLabel}</button>`;
+                const { angle, angleDiff } = getPathRectAngleInfo(pt, cornerSize, baseX, baseY, expectedAngle);
+                const borderColor = resolvePathButtonBorderColor(pt, cornerSize, angleDiff, tolerance, bestMatch);
+
+                return renderPathButtonHTML(
+                    pt,
+                    idx,
+                    pathName,
+                    angle,
+                    whiteCount,
+                    isAllWhite,
+                    overlapsYellow,
+                    borderColor,
+                    angleDiff,
+                    expectedAngle
+                );
             });
         }
 
