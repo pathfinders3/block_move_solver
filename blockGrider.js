@@ -1143,6 +1143,39 @@ function countWhitePixels(ctx, x, y, size) {
             console.log(`✅ 노란색 사각형 [${currentYellowIndex + 1}]번 위치로 이동: (${ox}, ${oy})`);
             scaleCanvas();
         });
+
+        // Del 버튼: 현재 선택된 인덱스 다음 사각형들을 모두 삭제
+        document.getElementById('btnDelAfterYellow').addEventListener('click', () => {
+            if (currentYellowIndex === -1 || yellowRects.length === 0) {
+                console.log('❌ 삭제할 노란색 사각형이 선택되지 않았습니다.');
+                return;
+            }
+
+            const deleteStart = currentYellowIndex + 1;
+            const deleteCount = yellowRects.length - deleteStart;
+
+            if (deleteCount <= 0) {
+                console.log('ℹ️ 선택된 사각형 뒤에 삭제할 항목이 없습니다.');
+                return;
+            }
+
+            yellowRects.splice(deleteStart, deleteCount);
+
+            // 삭제 후 현재 인덱스가 범위를 벗어나지 않도록 보정
+            if (currentYellowIndex >= yellowRects.length) {
+                currentYellowIndex = yellowRects.length - 1;
+            }
+
+            updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
+
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+
+            console.log(`✅ 노란색 사각형 ${deleteCount}개 삭제됨 (선택 인덱스 이후).`);
+            scaleCanvas();
+        });
         
         // Angle 검사 버튼: 각도별 그룹화
         document.getElementById('btnAngleCheck').addEventListener('click', () => {
