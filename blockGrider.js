@@ -275,6 +275,17 @@ function countWhitePixels(ctx, x, y, size) {
             
             return { bgStyle, diffText, diff, absDiff };
         }
+
+        // 두 사각형 중심점을 기준으로 각도 계산
+        function calculateRectToRectAngle(fromX, fromY, fromSize, toX, toY, toSize) {
+            const fromCenterX = fromX + fromSize / 2;
+            const fromCenterY = fromY + fromSize / 2;
+            const toCenterX = toX + toSize / 2;
+            const toCenterY = toY + toSize / 2;
+            const dx = toCenterX - fromCenterX;
+            const dy = toCenterY - fromCenterY;
+            return calculateCartesianAngle(dx, dy);
+        }
         
         // 노란색 사각형을 yellowRects 배열에 추가하고 각도 검사 수행
         function addYellowRectWithAngleCheck(x, y, size) {
@@ -286,13 +297,7 @@ function countWhitePixels(ctx, x, y, size) {
             
             if (yellowRects.length > 0) {
                 const prevRect = yellowRects[yellowRects.length - 1];
-                const prevX = prevRect.x + prevRect.size / 2;
-                const prevY = prevRect.y + prevRect.size / 2;
-                const currX = x + size / 2;
-                const currY = y + size / 2;
-                const dx = currX - prevX;
-                const dy = currY - prevY;
-                angle = calculateCartesianAngle(dx, dy);
+                angle = calculateRectToRectAngle(prevRect.x, prevRect.y, prevRect.size, x, y, size);
                 
                 // 각도 허용오차 검사 (이전 사각형의 각도와 비교)
                 if (prevRect.angle !== null && prevRect.angle !== undefined) {
@@ -367,15 +372,14 @@ function countWhitePixels(ctx, x, y, size) {
                 } else {
                     // 실시간 계산 (예: IJKL 키 사용 시)
                     const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
-                    const baseX = selectedPixel.x + rectSize / 2;
-                    const baseY = selectedPixel.y + rectSize / 2;
-                    const targetX = tempYellowRect.x + tempYellowRect.size / 2;
-                    const targetY = tempYellowRect.y + tempYellowRect.size / 2;
-                    
-                    const dx = targetX - baseX;
-                    const dy = targetY - baseY;
-                    
-                    angle = calculateCartesianAngle(dx, dy);
+                    angle = calculateRectToRectAngle(
+                        selectedPixel.x,
+                        selectedPixel.y,
+                        rectSize,
+                        tempYellowRect.x,
+                        tempYellowRect.y,
+                        tempYellowRect.size
+                    );
                 }
                 
                 const angleDisplay = document.getElementById('tempYellowAngleDisplay');
