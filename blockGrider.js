@@ -1228,27 +1228,16 @@ function countWhitePixels(ctx, x, y, size) {
             console.log(`✅ 급격 꺾임 지점으로 점프: [${foundIndex + 1}] / ${yellowRects.length}`);
         });
         
-        // Angle 검사 버튼: 각도별 그룹화
-        document.getElementById('btnAngleCheck').addEventListener('click', () => {
-            if (yellowRects.length === 0) {
-                console.log('❌ 노란색 사각형이 없습니다.');
-                return;
-            }
-            
-            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
-            console.log(`🔍 Angle 검사 시작... (허용 오차: ±${tolerance}°)`);
-            
-            // 각도 그룹화 로직
+        // Angle 그룹 계산
+        function buildAngleGroups(rects, tolerance) {
             const groups = [];
             let currentGroup = [];
             let currentGroupAngle = null;
-            
-            for (let i = 0; i < yellowRects.length; i++) {
-                const rect = yellowRects[i];
-                const angle = rect.angle;
-                
+
+            for (let i = 0; i < rects.length; i++) {
+                const angle = rects[i].angle;
+
                 if (angle === null || angle === undefined) {
-                    // 첫 번째 사각형 (각도 없음)
                     if (currentGroup.length > 0) {
                         groups.push([...currentGroup]);
                         currentGroup = [];
@@ -1257,60 +1246,80 @@ function countWhitePixels(ctx, x, y, size) {
                     currentGroup.push(i);
                     continue;
                 }
-                
+
                 if (currentGroupAngle === null) {
-                    // 새 그룹 시작
                     currentGroup.push(i);
                     currentGroupAngle = angle;
                 } else {
-                    // 현재 그룹의 각도와 비교
                     const diff = Math.abs(getCircularAngleDiff(angle, currentGroupAngle, false));
-                    
                     if (diff <= tolerance) {
-                        // 비슷한 각도 -> 같은 그룹
                         currentGroup.push(i);
                     } else {
-                        // 급격히 꺾임 -> 새 그룹 시작
                         groups.push([...currentGroup]);
                         currentGroup = [i];
                         currentGroupAngle = angle;
                     }
                 }
             }
-            
-            // 마지막 그룹 추가
+
             if (currentGroup.length > 0) {
                 groups.push(currentGroup);
             }
-            
-            console.log(`✅ ${groups.length}개 그룹 발견:`, groups);
-            
-            // 결과를 HTML에 표시
+
+            return groups;
+        }
+
+        // 그룹 평균 각도 계산
+        function getGroupAverageAngle(group, rects) {
+            const angles = group.map(i => rects[i].angle).filter(a => a !== null && a !== undefined);
+            if (angles.length === 0) return '-';
+
+            const sum = angles.reduce((a, b) => a + b, 0);
+            return Math.round(sum / angles.length) + '°';
+        }
+
+        // Angle 그룹 HTML 생성
+        function buildAngleGroupsHTML(groups, rects, tolerance) {
+            let html = `<div style="margin-top:8px;"><strong>📊 Angle 그룹 분석 결과 (허용오차: ±${tolerance}°):</strong></div>`;
+
+            groups.forEach((group, groupIndex) => {
+                const groupNumber = groupIndex + 1;
+                const indices = group.map(i => i).join(', ');
+                const avgAngle = getGroupAverageAngle(group, rects);
+
+                html += `<div style="margin:5px 0 5px 20px;">`;
+                html += `<strong style="color:#0066cc;">그룹 ${groupNumber}:</strong> `;
+                html += `<input type="text" value="인덱스 [${indices}] - 평균각도: ${avgAngle}" readonly `;
+                html += `style="width:400px; padding:3px 6px; border:1px solid #ccc; background:#f9f9f9; font-size:0.9em;">`;
+                html += `</div>`;
+            });
+
+            return html;
+        }
+
+        // Angle 그룹 결과 표시
+        function renderAngleGroups(html) {
             const container = document.getElementById('angleGroupsContainer');
             if (container) {
-                let html = `<div style="margin-top:8px;"><strong>📊 Angle 그룹 분석 결과 (허용오차: ±${tolerance}°):</strong></div>`;
-                
-                groups.forEach((group, groupIndex) => {
-                    const groupNumber = groupIndex + 1;
-                    const indices = group.map(i => i).join(', ');
-                    
-                    // 그룹의 평균 각도 계산 (첫 번째 제외)
-                    let avgAngle = '-';
-                    const anglesInGroup = group.map(i => yellowRects[i].angle).filter(a => a !== null && a !== undefined);
-                    if (anglesInGroup.length > 0) {
-                        const sum = anglesInGroup.reduce((a, b) => a + b, 0);
-                        avgAngle = Math.round(sum / anglesInGroup.length) + '°';
-                    }
-                    
-                    html += `<div style="margin:5px 0 5px 20px;">`;
-                    html += `<strong style="color:#0066cc;">그룹 ${groupNumber}:</strong> `;
-                    html += `<input type="text" value="인덱스 [${indices}] - 평균각도: ${avgAngle}" readonly `;
-                    html += `style="width:400px; padding:3px 6px; border:1px solid #ccc; background:#f9f9f9; font-size:0.9em;">`;
-                    html += `</div>`;
-                });
-                
                 container.innerHTML = html;
             }
+        }
+
+        // Angle 검사 버튼: 각도별 그룹화
+        document.getElementById('btnAngleCheck').addEventListener('click', () => {
+            if (yellowRects.length === 0) {
+                console.log('❌ 노란색 사각형이 없습니다.');
+                return;
+            }
+
+            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+            console.log(`🔍 Angle 검사 시작... (허용 오차: ±${tolerance}°)`);
+
+            const groups = buildAngleGroups(yellowRects, tolerance);
+            console.log(`✅ ${groups.length}개 그룹 발견:`, groups);
+
+            const html = buildAngleGroupsHTML(groups, yellowRects, tolerance);
+            renderAngleGroups(html);
         });
 
         // Copy Rects 버튼: 노란색 사각형 정보를 JSON으로 클립보드에 복사
