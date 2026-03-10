@@ -1184,7 +1184,8 @@ function countWhitePixels(ctx, x, y, size) {
             if (currentYellowIndex === -1 || yellowRects.length < 3) {
                 console.log('❌ 점프할 노란색 사각형이 충분하지 않습니다.');
                 if (jumpStatusDisplay) {
-                    jumpStatusDisplay.textContent = '점프할 노란색 사각형이 충분하지 않습니다.';
+                    jumpStatusDisplay.textContent = '🟠';
+                    jumpStatusDisplay.title = '점프할 노란색 사각형이 충분하지 않습니다.';
                 }
                 return;
             }
@@ -1210,7 +1211,8 @@ function countWhitePixels(ctx, x, y, size) {
 
             if (foundIndex === -1) {
                 if (jumpStatusDisplay) {
-                    jumpStatusDisplay.textContent = '현재 인덱스 이후에 급격한 꺾임이 없습니다.';
+                    jumpStatusDisplay.textContent = '🟠';
+                    jumpStatusDisplay.title = '현재 인덱스 이후에 급격한 꺾임이 없습니다.';
                 }
                 return;
             }
@@ -1220,7 +1222,8 @@ function countWhitePixels(ctx, x, y, size) {
             updateYellowAngleDisplay();
             scaleCanvas();
             if (jumpStatusDisplay) {
-                jumpStatusDisplay.textContent = `급격 꺾임 인덱스로 이동: ${foundIndex + 1}/${yellowRects.length}`;
+                jumpStatusDisplay.textContent = '🟢';
+                jumpStatusDisplay.title = `급격 꺾임 인덱스로 이동: ${foundIndex + 1}/${yellowRects.length}`;
             }
             console.log(`✅ 급격 꺾임 지점으로 점프: [${foundIndex + 1}] / ${yellowRects.length}`);
         });
