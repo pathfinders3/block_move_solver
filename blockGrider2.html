@@ -58,6 +58,59 @@
       margin-bottom: 12px;
     }
 
+    .viewer-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .viewer {
+      display: grid;
+      grid-template-columns: 64px minmax(220px, 1fr);
+      gap: 14px;
+      align-items: start;
+      margin: 12px 0 16px;
+    }
+
+    .viewer-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .viewer-title {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    canvas {
+      border: 1px solid var(--border);
+      background: #0b1117;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border-radius: 8px;
+    }
+
+    .zoom-scroll {
+      width: 100%;
+      max-width: 100%;
+      max-height: 520px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0b1117;
+      padding: 6px;
+    }
+
+    #zoomCanvas {
+      display: block;
+      border: 0;
+      border-radius: 0;
+    }
+
     button {
       background: var(--accent);
       color: #0f2b1f;
@@ -108,6 +161,25 @@
     </div>
 
     <div id="status" class="status"></div>
+    <div class="viewer-controls">
+      <label for="scaleRange">확대 배율:</label>
+      <input type="range" id="scaleRange" min="0" max="5" value="3" step="1">
+      <span id="scaleDisplay">16x</span>
+    </div>
+
+    <div class="viewer">
+      <div class="viewer-block">
+        <div class="viewer-title">원본 64x64</div>
+        <canvas id="baseCanvas" width="64" height="64"></canvas>
+      </div>
+      <div class="viewer-block">
+        <div class="viewer-title">확대 보기</div>
+        <div class="zoom-scroll">
+          <canvas id="zoomCanvas" width="1024" height="1024"></canvas>
+        </div>
+      </div>
+    </div>
+
     <textarea id="jsonOutput" placeholder="여기에 JSON이 표시됩니다."></textarea>
   </div>
 
