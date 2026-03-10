@@ -20,10 +20,12 @@
             <button id="btnPrevYellow" style="margin-left:5px; padding:2px 8px; cursor:pointer;">←</button>
             <input type="text" id="yellowIndexDisplay" value="-" readonly style="width:50px; text-align:center; margin:0 5px;">
             <button id="btnNextYellow" style="padding:2px 8px; cursor:pointer;">→</button>
-            <button id="btnGoToYellow" style="margin-left:8px; padding:2px 12px; cursor:pointer; background:#4CAF50; color:white; border:1px solid #45a049; border-radius:3px;">Go</button>
-            <button id="btnDelAfterYellow" style="margin-left:6px; padding:2px 12px; cursor:pointer; background:#d9534f; color:white; border:1px solid #c9302c; border-radius:3px;">Del</button>
-            <button id="btnJumpSharpTurn" style="margin-left:6px; padding:2px 12px; cursor:pointer; background:#337ab7; color:white; border:1px solid #2e6da4; border-radius:3px;">Jmp</button>
-            <span id="jumpStatusDisplay" style="margin-left:8px; font-size:1.1em; cursor:help;" title="Jmp 상태"></span>
+              <span style="display:inline-flex; align-items:center; gap:3px; margin-left:8px; vertical-align:middle;">
+                <button id="btnGoToYellow" style="padding:2px 12px; cursor:pointer; background:#4CAF50; color:white; border:1px solid #45a049; border-radius:3px;">Go</button>
+                <button id="btnDelAfterYellow" style="padding:2px 12px; cursor:pointer; background:#d9534f; color:white; border:1px solid #c9302c; border-radius:3px;">Del</button>
+                <button id="btnJumpSharpTurn" style="padding:2px 12px; cursor:pointer; background:#337ab7; color:white; border:1px solid #2e6da4; border-radius:3px;">Jmp</button>
+              </span>
+              <span id="jumpStatusDisplay" style="margin-left:6px; font-size:1.1em; cursor:help;" title="Jmp 상태"></span>
             <label style="margin-left:15px;">각도 허용오차:</label>
             <input type="number" id="angleTolerance" min="0" max="180" value="30" style="width:50px; text-align:center; margin-left:5px;">
             <span style="margin-left:2px;">도</span>
