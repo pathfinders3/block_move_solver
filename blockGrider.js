@@ -1312,6 +1312,31 @@ function countWhitePixels(ctx, x, y, size) {
                 container.innerHTML = html;
             }
         });
+
+        // Copy Rects 버튼: 노란색 사각형 정보를 JSON으로 클립보드에 복사
+        document.getElementById('btnCopyRects').addEventListener('click', async () => {
+            if (yellowRects.length === 0) {
+                console.log('❌ 복사할 노란색 사각형이 없습니다.');
+                return;
+            }
+
+            const rectsForCopy = yellowRects.map(rect => ({
+                x: rect.x,
+                y: rect.y,
+                size: rect.size,
+                angle: rect.angle,
+                sharpTurn: !!rect.angleExceeded
+            }));
+
+            const jsonText = JSON.stringify(rectsForCopy, null, 2);
+
+            try {
+                await navigator.clipboard.writeText(jsonText);
+                console.log(`✅ Copy Rects 완료: ${rectsForCopy.length}개 사각형이 클립보드에 복사되었습니다.`);
+            } catch (err) {
+                console.error('❌ 클립보드 복사 실패:', err);
+            }
+        });
         
         // 경로별 흰색점 개수 토글 함수
         function togglePathWhite() {
