@@ -1144,14 +1144,14 @@ function countWhitePixels(ctx, x, y, size) {
             scaleCanvas();
         });
 
-        // Del 버튼: 현재 선택된 인덱스 다음 사각형들을 모두 삭제
+        // Del 버튼: 현재 선택된 인덱스 이하 사각형들을 모두 삭제
         document.getElementById('btnDelAfterYellow').addEventListener('click', () => {
             if (currentYellowIndex === -1 || yellowRects.length === 0) {
                 console.log('❌ 삭제할 노란색 사각형이 선택되지 않았습니다.');
                 return;
             }
 
-            const deleteStart = currentYellowIndex + 1;
+            const deleteStart = currentYellowIndex;
             const deleteCount = yellowRects.length - deleteStart;
 
             if (deleteCount <= 0) {
@@ -1175,6 +1175,44 @@ function countWhitePixels(ctx, x, y, size) {
 
             console.log(`✅ 노란색 사각형 ${deleteCount}개 삭제됨 (선택 인덱스 이후).`);
             scaleCanvas();
+        });
+
+        // Jmp 버튼: 현재 인덱스 이후에서 첫 급격 꺾임 지점으로 이동
+        document.getElementById('btnJumpSharpTurn').addEventListener('click', () => {
+            if (currentYellowIndex === -1 || yellowRects.length < 3) {
+                console.log('❌ 점프할 노란색 사각형이 충분하지 않습니다.');
+                return;
+            }
+
+            const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+            let foundIndex = -1;
+
+            // 현재 선택 다음 인덱스부터 앞으로 탐색
+            for (let i = Math.max(1, currentYellowIndex + 1); i < yellowRects.length; i++) {
+                const currAngle = yellowRects[i].angle;
+                const prevAngle = yellowRects[i - 1].angle;
+
+                if (currAngle === null || currAngle === undefined || prevAngle === null || prevAngle === undefined) {
+                    continue;
+                }
+
+                const diff = Math.abs(getCircularAngleDiff(currAngle, prevAngle, false));
+                if (diff > tolerance) {
+                    foundIndex = i;
+                    break;
+                }
+            }
+
+            if (foundIndex === -1) {
+                console.log('ℹ️ 현재 인덱스 이후에 급격한 꺾임이 없습니다.');
+                return;
+            }
+
+            currentYellowIndex = foundIndex;
+            updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
+            scaleCanvas();
+            console.log(`✅ 급격 꺾임 지점으로 점프: [${foundIndex + 1}] / ${yellowRects.length}`);
         });
         
         // Angle 검사 버튼: 각도별 그룹화
