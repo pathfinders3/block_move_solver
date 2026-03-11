@@ -3,35 +3,67 @@
   const jsonOutput = document.getElementById('jsonOutput');
   const status = document.getElementById('status');
   const baseCanvas = document.getElementById('baseCanvas');
+  const baseCanvasTitle = document.getElementById('baseCanvasTitle');
   const zoomCanvas = document.getElementById('zoomCanvas');
   const baseCtx = baseCanvas.getContext('2d', { willReadFrequently: true });
   const zoomCtx = zoomCanvas.getContext('2d', { willReadFrequently: true });
   const scaleRange = document.getElementById('scaleRange');
   const scaleDisplay = document.getElementById('scaleDisplay');
   const scaleValues = [2, 4, 8, 16, 32, 64];
+  const MIN_CANVAS_SIZE = 64;
+  const MAX_CANVAS_SIZE = 512;
 
-  let currentRects = [];
+  let currentRectGroups = [];
 
   function setStatus(message, isError) {
     status.textContent = message;
     status.classList.toggle('error', !!isError);
   }
 
-  function drawBaseCanvas(rects) {
+  function calculateCanvasSize(rects) {
+    if (!rects || rects.length === 0) return MIN_CANVAS_SIZE;
+
+    let maxRight = MIN_CANVAS_SIZE;
+    let maxBottom = MIN_CANVAS_SIZE;
+
+    rects.forEach(rect => {
+      maxRight = Math.max(maxRight, rect.x + rect.size);
+      maxBottom = Math.max(maxBottom, rect.y + rect.size);
+    });
+
+    const required = Math.max(MIN_CANVAS_SIZE, maxRight, maxBottom);
+    return Math.min(MAX_CANVAS_SIZE, required);
+  }
+
+  function getTotalRectCount(rectGroups) {
+    return rectGroups.reduce((sum, group) => sum + group.length, 0);
+  }
+
+  function drawBaseCanvas(rectGroups) {
+    const mergedRects = rectGroups.flat();
+    const canvasSize = calculateCanvasSize(mergedRects);
+    baseCanvas.width = canvasSize;
+    baseCanvas.height = canvasSize;
+    if (baseCanvasTitle) {
+      baseCanvasTitle.textContent = `원본 ${canvasSize}x${canvasSize}`;
+    }
+
     baseCtx.fillStyle = '#ffffff';
-    baseCtx.fillRect(0, 0, 64, 64);
+    baseCtx.fillRect(0, 0, baseCanvas.width, baseCanvas.height);
 
-    rects.forEach((rect, idx) => {
-      const hue = (idx * 47) % 360;
-      const fill = `hsla(${hue}, 80%, 42%, 0.75)`;
-      const stroke = `hsl(${hue}, 85%, 62%)`;
+    rectGroups.forEach((group, groupIndex) => {
+      const groupHue = (groupIndex * 67) % 360;
+      const fill = `hsla(${groupHue}, 80%, 42%, 0.55)`;
+      const stroke = `hsl(${groupHue}, 85%, 62%)`;
 
-      baseCtx.fillStyle = fill;
-      baseCtx.fillRect(rect.x, rect.y, rect.size, rect.size);
+      group.forEach(rect => {
+        baseCtx.fillStyle = fill;
+        baseCtx.fillRect(rect.x, rect.y, rect.size, rect.size);
 
-      baseCtx.strokeStyle = stroke;
-      baseCtx.lineWidth = 1;
-      baseCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.size - 1, rect.size - 1);
+        baseCtx.strokeStyle = stroke;
+        baseCtx.lineWidth = 1;
+        baseCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.size - 1, rect.size - 1);
+      });
     });
   }
 
@@ -39,15 +71,18 @@
     const scale = scaleValues[parseInt(scaleRange.value, 10) || 0];
     scaleDisplay.textContent = `${scale}x`;
 
-    zoomCanvas.width = 64 * scale;
-    zoomCanvas.height = 64 * scale;
+    const baseW = baseCanvas.width;
+    const baseH = baseCanvas.height;
 
-    const imageData = baseCtx.getImageData(0, 0, 64, 64);
+    zoomCanvas.width = baseW * scale;
+    zoomCanvas.height = baseH * scale;
+
+    const imageData = baseCtx.getImageData(0, 0, baseW, baseH);
     const data = imageData.data;
 
-    for (let y = 0; y < 64; y++) {
-      for (let x = 0; x < 64; x++) {
-        const i = (y * 64 + x) * 4;
+    for (let y = 0; y < baseH; y++) {
+      for (let x = 0; x < baseW; x++) {
+        const i = (y * baseW + x) * 4;
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
@@ -86,9 +121,9 @@
     return normalized;
   }
 
-  function renderRects(rects) {
-    currentRects = rects;
-    drawBaseCanvas(currentRects);
+  function renderGroups(rectGroups) {
+    currentRectGroups = rectGroups;
+    drawBaseCanvas(currentRectGroups);
     drawZoomCanvas();
   }
 
@@ -116,10 +151,15 @@
         return;
       }
 
-      renderRects(rects);
+      const nextGroups = currentRectGroups.concat([rects]);
+      renderGroups(nextGroups);
+      console.log(`🖼️ 실제 해상도: ${baseCanvas.width}x${baseCanvas.height}`);
 
       jsonOutput.value = JSON.stringify(parsed, null, 2);
-      setStatus(`JSON을 불러왔습니다. 사각형 ${rects.length}개 렌더링 완료.`, false);
+      setStatus(
+        `JSON을 불러왔습니다. 그룹 ${currentRectGroups.length}개, 누적 ${getTotalRectCount(currentRectGroups)}개 렌더링 완료.`,
+        false
+      );
     } catch (error) {
       setStatus('클립보드 접근에 실패했습니다. 브라우저 권한을 확인해주세요.', true);
     }
@@ -128,5 +168,5 @@
   scaleRange.addEventListener('input', drawZoomCanvas);
   btnLoadJson.addEventListener('click', loadJsonFromClipboard);
 
-  renderRects([]);
+  renderGroups([]);
 })();
