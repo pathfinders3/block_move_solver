@@ -13,6 +13,7 @@
   const scaleValues = [2, 4, 8, 16, 32, 64];
   const MIN_CANVAS_SIZE = 64;
   const MAX_CANVAS_SIZE = 512;
+  const MOVE_STEP = 5;
 
   let currentRectGroups = [];
   let selectedRect = null;
@@ -77,6 +78,85 @@
     updateClickInfo(x, y, hit);
     drawBaseCanvas(currentRectGroups);
     drawZoomCanvas();
+  }
+
+  function getGroupBounds(group) {
+    if (!group || group.length === 0) {
+      return { minX: 0, minY: 0, maxRight: 0, maxBottom: 0 };
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxRight = -Infinity;
+    let maxBottom = -Infinity;
+
+    group.forEach(rect => {
+      minX = Math.min(minX, rect.x);
+      minY = Math.min(minY, rect.y);
+      maxRight = Math.max(maxRight, rect.x + rect.size);
+      maxBottom = Math.max(maxBottom, rect.y + rect.size);
+    });
+
+    return { minX, minY, maxRight, maxBottom };
+  }
+
+  function moveSelectedGroupBy(dx, dy) {
+    if (!selectedRect) {
+      setStatus('먼저 이동할 그룹의 도형을 클릭해 선택해주세요.', true);
+      return;
+    }
+
+    const group = currentRectGroups[selectedRect.groupIndex];
+    if (!group || group.length === 0) {
+      setStatus('선택된 그룹을 찾을 수 없습니다.', true);
+      return;
+    }
+
+    const bounds = getGroupBounds(group);
+    const clampedDx = Math.max(-bounds.minX, Math.min(dx, MAX_CANVAS_SIZE - bounds.maxRight));
+    const clampedDy = Math.max(-bounds.minY, Math.min(dy, MAX_CANVAS_SIZE - bounds.maxBottom));
+
+    group.forEach(rect => {
+      rect.x += clampedDx;
+      rect.y += clampedDy;
+    });
+
+    const selectedMovedRect = group[selectedRect.rectIndex];
+    if (selectedMovedRect) {
+      updateClickInfo(selectedMovedRect.x, selectedMovedRect.y, {
+        groupIndex: selectedRect.groupIndex,
+        rectIndex: selectedRect.rectIndex,
+        rect: selectedMovedRect
+      });
+    }
+
+    renderGroups(currentRectGroups);
+    setStatus(
+      `그룹 ${selectedRect.groupIndex + 1} 이동: Δx=${clampedDx}, Δy=${clampedDy} (요청 5px 단위).`,
+      false
+    );
+  }
+
+  function handleMoveKey(event) {
+    const target = event.target;
+    const isTypingTarget =
+      target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable);
+    if (isTypingTarget) return;
+
+    const key = event.key.toLowerCase();
+    if (key === 'i') {
+      event.preventDefault();
+      moveSelectedGroupBy(0, -MOVE_STEP);
+    } else if (key === 'k') {
+      event.preventDefault();
+      moveSelectedGroupBy(0, MOVE_STEP);
+    } else if (key === 'j') {
+      event.preventDefault();
+      moveSelectedGroupBy(-MOVE_STEP, 0);
+    } else if (key === 'l') {
+      event.preventDefault();
+      moveSelectedGroupBy(MOVE_STEP, 0);
+    }
   }
 
   function getCanvasCoordsFromEvent(event, canvas, scale) {
@@ -242,6 +322,8 @@
     const point = getCanvasCoordsFromEvent(event, zoomCanvas, getCurrentScale());
     handleCanvasClick(point.x, point.y);
   });
+
+  document.addEventListener('keydown', handleMoveKey);
 
   btnLoadJson.addEventListener('click', loadJsonFromClipboard);
 
