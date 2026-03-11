@@ -67,6 +67,12 @@
       font-size: 14px;
     }
 
+    .click-info {
+      margin-bottom: 10px;
+      color: #cdd9e5;
+      font-size: 13px;
+    }
+
     .viewer {
       display: grid;
       grid-template-columns: max-content minmax(220px, 1fr);
@@ -92,6 +98,7 @@
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       border-radius: 8px;
+      cursor: crosshair;
     }
 
     .zoom-scroll {
@@ -166,6 +173,7 @@
       <input type="range" id="scaleRange" min="0" max="5" value="3" step="1">
       <span id="scaleDisplay">16x</span>
     </div>
+    <div id="clickInfo" class="click-info">클릭 좌표: -</div>
 
     <div class="viewer">
       <div class="viewer-block">

@@ -2,6 +2,7 @@
   const btnLoadJson = document.getElementById('btnLoadJson');
   const jsonOutput = document.getElementById('jsonOutput');
   const status = document.getElementById('status');
+  const clickInfo = document.getElementById('clickInfo');
   const baseCanvas = document.getElementById('baseCanvas');
   const baseCanvasTitle = document.getElementById('baseCanvasTitle');
   const zoomCanvas = document.getElementById('zoomCanvas');
@@ -14,6 +15,7 @@
   const MAX_CANVAS_SIZE = 512;
 
   let currentRectGroups = [];
+  let selectedRect = null;
 
   function setStatus(message, isError) {
     status.textContent = message;
@@ -33,6 +35,57 @@
 
     const required = Math.max(MIN_CANVAS_SIZE, maxRight, maxBottom);
     return Math.min(MAX_CANVAS_SIZE, required);
+  }
+
+  function getCurrentScale() {
+    return scaleValues[parseInt(scaleRange.value, 10) || 0];
+  }
+
+  function isPointInRect(x, y, rect) {
+    return x >= rect.x && x < rect.x + rect.size && y >= rect.y && y < rect.y + rect.size;
+  }
+
+  function findRectAtPoint(x, y) {
+    for (let g = currentRectGroups.length - 1; g >= 0; g--) {
+      const group = currentRectGroups[g];
+      for (let r = group.length - 1; r >= 0; r--) {
+        const rect = group[r];
+        if (isPointInRect(x, y, rect)) {
+          return { groupIndex: g, rectIndex: r, rect };
+        }
+      }
+    }
+    return null;
+  }
+
+  function updateClickInfo(x, y, hit) {
+    if (!clickInfo) return;
+    if (!hit) {
+      clickInfo.textContent = `클릭 좌표: (${x}, ${y}) | 선택 없음`;
+      return;
+    }
+
+    const rect = hit.rect;
+    clickInfo.textContent =
+      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 도형 ${hit.rectIndex + 1}, ` +
+      `사각형 (${rect.x}, ${rect.y}, size=${rect.size})`;
+  }
+
+  function handleCanvasClick(x, y) {
+    const hit = findRectAtPoint(x, y);
+    selectedRect = hit ? { groupIndex: hit.groupIndex, rectIndex: hit.rectIndex } : null;
+    updateClickInfo(x, y, hit);
+    drawBaseCanvas(currentRectGroups);
+    drawZoomCanvas();
+  }
+
+  function getCanvasCoordsFromEvent(event, canvas, scale) {
+    const rect = canvas.getBoundingClientRect();
+    const pixelX = Math.floor((event.clientX - rect.left) / scale);
+    const pixelY = Math.floor((event.clientY - rect.top) / scale);
+    const x = Math.max(0, Math.min(baseCanvas.width - 1, pixelX));
+    const y = Math.max(0, Math.min(baseCanvas.height - 1, pixelY));
+    return { x, y };
   }
 
   function getTotalRectCount(rectGroups) {
@@ -65,10 +118,23 @@
         baseCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.size - 1, rect.size - 1);
       });
     });
+
+    if (selectedRect) {
+      const selectedGroup = rectGroups[selectedRect.groupIndex];
+      const rect = selectedGroup && selectedGroup[selectedRect.rectIndex];
+      if (!rect) {
+        selectedRect = null;
+        return;
+      }
+
+      baseCtx.strokeStyle = '#ff3b30';
+      baseCtx.lineWidth = 2;
+      baseCtx.strokeRect(rect.x + 1, rect.y + 1, Math.max(1, rect.size - 2), Math.max(1, rect.size - 2));
+    }
   }
 
   function drawZoomCanvas() {
-    const scale = scaleValues[parseInt(scaleRange.value, 10) || 0];
+    const scale = getCurrentScale();
     scaleDisplay.textContent = `${scale}x`;
 
     const baseW = baseCanvas.width;
@@ -166,6 +232,17 @@
   }
 
   scaleRange.addEventListener('input', drawZoomCanvas);
+
+  baseCanvas.addEventListener('click', event => {
+    const point = getCanvasCoordsFromEvent(event, baseCanvas, 1);
+    handleCanvasClick(point.x, point.y);
+  });
+
+  zoomCanvas.addEventListener('click', event => {
+    const point = getCanvasCoordsFromEvent(event, zoomCanvas, getCurrentScale());
+    handleCanvasClick(point.x, point.y);
+  });
+
   btnLoadJson.addEventListener('click', loadJsonFromClipboard);
 
   renderGroups([]);
