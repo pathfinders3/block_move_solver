@@ -1,8 +1,10 @@
 (function () {
   const btnLoadJson = document.getElementById('btnLoadJson');
+  const btnMerge = document.getElementById('btnMerge');
   const jsonOutput = document.getElementById('jsonOutput');
   const status = document.getElementById('status');
   const clickInfo = document.getElementById('clickInfo');
+  const selectionInfo = document.getElementById('selectionInfo');
   const baseCanvas = document.getElementById('baseCanvas');
   const baseCanvasTitle = document.getElementById('baseCanvasTitle');
   const zoomCanvas = document.getElementById('zoomCanvas');
@@ -14,9 +16,11 @@
   const MIN_CANVAS_SIZE = 64;
   const MAX_CANVAS_SIZE = 512;
   const MOVE_STEP = 5;
+  const MERGE_DISTANCE_THRESHOLD = 8;
 
   let currentRectGroups = [];
   let selectedRect = null;
+  let selectedGroupIndices = [];
 
   function setStatus(message, isError) {
     status.textContent = message;
@@ -59,6 +63,33 @@
     return null;
   }
 
+  function updateMergeButtonState() {
+    if (!btnMerge) return;
+    btnMerge.disabled = selectedGroupIndices.length !== 2;
+  }
+
+  function updateSelectionInfo() {
+    if (!selectionInfo) return;
+
+    if (selectedGroupIndices.length === 0) {
+      selectionInfo.textContent = '선택된 그룹: 0개';
+      return;
+    }
+
+    const labels = selectedGroupIndices
+      .map(index => index + 1)
+      .sort((a, b) => a - b)
+      .join(', ');
+
+    selectionInfo.textContent = `선택된 그룹: ${selectedGroupIndices.length}개 (${labels})`;
+  }
+
+  function getPrimarySelectedGroupIndex() {
+    if (selectedGroupIndices.length > 0) return selectedGroupIndices[0];
+    if (selectedRect) return selectedRect.groupIndex;
+    return null;
+  }
+
   function updateClickInfo(x, y, hit) {
     if (!clickInfo) return;
     if (!hit) {
@@ -72,9 +103,40 @@
       `사각형 (${rect.x}, ${rect.y}, size=${rect.size})`;
   }
 
-  function handleCanvasClick(x, y) {
+  function handleCanvasClick(x, y, options) {
+    const toggleSelection = !!(options && options.toggleSelection);
     const hit = findRectAtPoint(x, y);
     selectedRect = hit ? { groupIndex: hit.groupIndex, rectIndex: hit.rectIndex } : null;
+
+    if (!hit) {
+      if (!toggleSelection) {
+        selectedGroupIndices = [];
+      }
+      updateMergeButtonState();
+      updateSelectionInfo();
+      updateClickInfo(x, y, hit);
+      drawBaseCanvas(currentRectGroups);
+      drawZoomCanvas();
+      return;
+    }
+
+    const groupIndex = hit.groupIndex;
+    if (toggleSelection) {
+      const existingIndex = selectedGroupIndices.indexOf(groupIndex);
+      if (existingIndex >= 0) {
+        selectedGroupIndices.splice(existingIndex, 1);
+      } else {
+        selectedGroupIndices.push(groupIndex);
+        if (selectedGroupIndices.length > 2) {
+          selectedGroupIndices.shift();
+        }
+      }
+    } else {
+      selectedGroupIndices = [groupIndex];
+    }
+
+    updateMergeButtonState();
+    updateSelectionInfo();
     updateClickInfo(x, y, hit);
     drawBaseCanvas(currentRectGroups);
     drawZoomCanvas();
@@ -101,12 +163,13 @@
   }
 
   function moveSelectedGroupBy(dx, dy) {
-    if (!selectedRect) {
+    const activeGroupIndex = getPrimarySelectedGroupIndex();
+    if (activeGroupIndex === null) {
       setStatus('먼저 이동할 그룹의 도형을 클릭해 선택해주세요.', true);
       return;
     }
 
-    const group = currentRectGroups[selectedRect.groupIndex];
+    const group = currentRectGroups[activeGroupIndex];
     if (!group || group.length === 0) {
       setStatus('선택된 그룹을 찾을 수 없습니다.', true);
       return;
@@ -121,10 +184,13 @@
       rect.y += clampedDy;
     });
 
-    const selectedMovedRect = group[selectedRect.rectIndex];
-    if (selectedMovedRect) {
+    const selectedMovedRect =
+      selectedRect && selectedRect.groupIndex === activeGroupIndex
+        ? group[selectedRect.rectIndex]
+        : null;
+    if (selectedRect && selectedMovedRect) {
       updateClickInfo(selectedMovedRect.x, selectedMovedRect.y, {
-        groupIndex: selectedRect.groupIndex,
+        groupIndex: activeGroupIndex,
         rectIndex: selectedRect.rectIndex,
         rect: selectedMovedRect
       });
@@ -132,7 +198,120 @@
 
     renderGroups(currentRectGroups);
     setStatus(
-      `그룹 ${selectedRect.groupIndex + 1} 이동: Δx=${clampedDx}, Δy=${clampedDy} (요청 5px 단위).`,
+      `그룹 ${activeGroupIndex + 1} 이동: Δx=${clampedDx}, Δy=${clampedDy} (요청 5px 단위).`,
+      false
+    );
+  }
+
+  function cloneRect(rect) {
+    return { x: rect.x, y: rect.y, size: rect.size };
+  }
+
+  function cloneGroup(group) {
+    return group.map(cloneRect);
+  }
+
+  function reverseGroup(group) {
+    return group.slice().reverse().map(cloneRect);
+  }
+
+  function getStartPoint(group) {
+    return group[0];
+  }
+
+  function getEndPoint(group) {
+    return group[group.length - 1];
+  }
+
+  function pointDistance(a, b) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function shiftGroup(group, dx, dy) {
+    group.forEach(rect => {
+      rect.x += dx;
+      rect.y += dy;
+    });
+  }
+
+  function mergeSelectedGroups() {
+    if (selectedGroupIndices.length !== 2) {
+      setStatus('Merge는 Ctrl+클릭으로 그룹 2개를 선택해야 실행됩니다.', true);
+      return;
+    }
+
+    const idxA = selectedGroupIndices[0];
+    const idxB = selectedGroupIndices[1];
+    const groupA = currentRectGroups[idxA];
+    const groupB = currentRectGroups[idxB];
+
+    if (!groupA || !groupB || groupA.length === 0 || groupB.length === 0) {
+      setStatus('병합할 그룹을 찾지 못했습니다.', true);
+      return;
+    }
+
+    const candidates = [
+      { a: cloneGroup(groupA), b: cloneGroup(groupB), reverseA: false, reverseB: false },
+      { a: cloneGroup(groupA), b: reverseGroup(groupB), reverseA: false, reverseB: true },
+      { a: reverseGroup(groupA), b: cloneGroup(groupB), reverseA: true, reverseB: false },
+      { a: reverseGroup(groupA), b: reverseGroup(groupB), reverseA: true, reverseB: true }
+    ];
+
+    let best = null;
+    candidates.forEach(candidate => {
+      const endA = getEndPoint(candidate.a);
+      const startB = getStartPoint(candidate.b);
+      const dist = pointDistance(endA, startB);
+      if (!best || dist < best.dist) {
+        best = { ...candidate, dist, endA, startB };
+      }
+    });
+
+    if (!best || best.dist > MERGE_DISTANCE_THRESHOLD) {
+      setStatus(
+        `병합 실패: 시작점/끝점이 충분히 가깝지 않습니다. (거리 ${best ? best.dist.toFixed(2) : '-'}, 임계 ${MERGE_DISTANCE_THRESHOLD})`,
+        true
+      );
+      return;
+    }
+
+    const dx = best.endA.x - best.startB.x;
+    const dy = best.endA.y - best.startB.y;
+    shiftGroup(best.b, dx, dy);
+
+    const merged = cloneGroup(best.a);
+    const shiftedStartB = getStartPoint(best.b);
+    const endA = getEndPoint(merged);
+    const shouldSkipFirst =
+      endA && shiftedStartB &&
+      endA.x === shiftedStartB.x &&
+      endA.y === shiftedStartB.y &&
+      endA.size === shiftedStartB.size;
+
+    const tail = shouldSkipFirst ? best.b.slice(1) : best.b;
+    merged.push(...tail.map(cloneRect));
+
+    const keepIndex = Math.min(idxA, idxB);
+    const removeIndex = Math.max(idxA, idxB);
+
+    currentRectGroups[keepIndex] = merged;
+    currentRectGroups.splice(removeIndex, 1);
+
+    selectedGroupIndices = [keepIndex];
+    selectedRect = { groupIndex: keepIndex, rectIndex: Math.max(0, merged.length - 1) };
+    updateMergeButtonState();
+    updateSelectionInfo();
+
+    renderGroups(currentRectGroups);
+    updateClickInfo(merged[merged.length - 1].x, merged[merged.length - 1].y, {
+      groupIndex: keepIndex,
+      rectIndex: Math.max(0, merged.length - 1),
+      rect: merged[Math.max(0, merged.length - 1)]
+    });
+    setStatus(
+      `그룹 병합 완료: ${idxA + 1} + ${idxB + 1} -> ${keepIndex + 1} (연결 거리 ${best.dist.toFixed(2)}).`,
       false
     );
   }
@@ -197,6 +376,14 @@
         baseCtx.lineWidth = 1;
         baseCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.size - 1, rect.size - 1);
       });
+
+      if (selectedGroupIndices.includes(groupIndex)) {
+        group.forEach(rect => {
+          baseCtx.strokeStyle = '#ffd60a';
+          baseCtx.lineWidth = 2;
+          baseCtx.strokeRect(rect.x + 1, rect.y + 1, Math.max(1, rect.size - 2), Math.max(1, rect.size - 2));
+        });
+      }
     });
 
     if (selectedRect) {
@@ -269,6 +456,9 @@
 
   function renderGroups(rectGroups) {
     currentRectGroups = rectGroups;
+    selectedGroupIndices = selectedGroupIndices.filter(index => index >= 0 && index < currentRectGroups.length);
+    updateMergeButtonState();
+    updateSelectionInfo();
     drawBaseCanvas(currentRectGroups);
     drawZoomCanvas();
   }
@@ -315,13 +505,17 @@
 
   baseCanvas.addEventListener('click', event => {
     const point = getCanvasCoordsFromEvent(event, baseCanvas, 1);
-    handleCanvasClick(point.x, point.y);
+    handleCanvasClick(point.x, point.y, { toggleSelection: event.ctrlKey || event.metaKey });
   });
 
   zoomCanvas.addEventListener('click', event => {
     const point = getCanvasCoordsFromEvent(event, zoomCanvas, getCurrentScale());
-    handleCanvasClick(point.x, point.y);
+    handleCanvasClick(point.x, point.y, { toggleSelection: event.ctrlKey || event.metaKey });
   });
+
+  if (btnMerge) {
+    btnMerge.addEventListener('click', mergeSelectedGroups);
+  }
 
   document.addEventListener('keydown', handleMoveKey);
 

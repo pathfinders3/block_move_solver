@@ -73,6 +73,12 @@
       font-size: 13px;
     }
 
+    .selection-info {
+      margin-bottom: 10px;
+      color: #ffd166;
+      font-size: 13px;
+    }
+
     .viewer {
       display: grid;
       grid-template-columns: max-content minmax(220px, 1fr);
@@ -165,6 +171,7 @@
 
     <div class="controls">
       <button id="btnLoadJson">클립보드 JSON 불러오기</button>
+      <button id="btnMerge" disabled>Merge (Ctrl+클릭 2개)</button>
     </div>
 
     <div id="status" class="status"></div>
@@ -176,6 +183,7 @@
       <span>이동: I(위) J(좌) K(아래) L(우), 5px</span>
     </div>
     <div id="clickInfo" class="click-info">클릭 좌표: -</div>
+    <div id="selectionInfo" class="selection-info">선택된 그룹: 0개</div>
 
     <div class="viewer">
       <div class="viewer-block">
