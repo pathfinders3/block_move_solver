@@ -17,10 +17,12 @@
   const MAX_CANVAS_SIZE = 512;
   const MOVE_STEP = 5;
   const MERGE_DISTANCE_THRESHOLD = 8;
+  const MAX_UNDO_STACK = 30;
 
   let currentRectGroups = [];
   let selectedRect = null;
   let selectedGroupIndices = [];
+  let mergeUndoStack = [];
 
   function setStatus(message, isError) {
     status.textContent = message;
@@ -211,6 +213,37 @@
     return group.map(cloneRect);
   }
 
+  function cloneGroups(groups) {
+    return groups.map(cloneGroup);
+  }
+
+  function pushMergeUndoSnapshot() {
+    mergeUndoStack.push({
+      groups: cloneGroups(currentRectGroups),
+      selectedRect: selectedRect ? { ...selectedRect } : null,
+      selectedGroupIndices: selectedGroupIndices.slice()
+    });
+
+    if (mergeUndoStack.length > MAX_UNDO_STACK) {
+      mergeUndoStack.shift();
+    }
+  }
+
+  function undoLastMerge() {
+    if (mergeUndoStack.length === 0) {
+      setStatus('되돌릴 Merge 기록이 없습니다.', true);
+      return;
+    }
+
+    const snapshot = mergeUndoStack.pop();
+    currentRectGroups = cloneGroups(snapshot.groups);
+    selectedRect = snapshot.selectedRect ? { ...snapshot.selectedRect } : null;
+    selectedGroupIndices = snapshot.selectedGroupIndices.slice();
+
+    renderGroups(currentRectGroups);
+    setStatus('마지막 Merge를 Ctrl+Z로 되돌렸습니다.', false);
+  }
+
   function reverseGroup(group) {
     return group.slice().reverse().map(cloneRect);
   }
@@ -277,6 +310,8 @@
       return;
     }
 
+    pushMergeUndoSnapshot();
+
     const dx = best.endA.x - best.startB.x;
     const dy = best.endA.y - best.startB.y;
     shiftGroup(best.b, dx, dy);
@@ -321,6 +356,12 @@
     const isTypingTarget =
       target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable);
     if (isTypingTarget) return;
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      undoLastMerge();
+      return;
+    }
 
     const key = event.key.toLowerCase();
     if (key === 'i') {
