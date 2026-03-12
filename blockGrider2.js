@@ -17,13 +17,17 @@
   const MIN_CANVAS_SIZE = 64;
   const MAX_CANVAS_SIZE = 512;
   const MOVE_STEP = 5;
-  const MERGE_DISTANCE_THRESHOLD = 8;
+  const MERGE_DISTANCE_THRESHOLD = 80;
   const MAX_UNDO_STACK = 30;
 
   let currentRectGroups = [];
   let selectedRect = null;
-  let selectedGroupIndices = [];
+  let selectedSelections = [];
   let mergeUndoStack = [];
+
+  function getSelectedGroupIndices() {
+    return selectedSelections.map(item => item.groupIndex);
+  }
 
   function setStatus(message, isError) {
     status.textContent = message;
@@ -68,7 +72,7 @@
 
   function updateMergeButtonState() {
     if (!btnMerge) return;
-    btnMerge.disabled = selectedGroupIndices.length !== 2;
+    btnMerge.disabled = selectedSelections.length !== 2;
   }
 
   function updateConnectButtonState() {
@@ -90,21 +94,20 @@
   function updateSelectionInfo() {
     if (!selectionInfo) return;
 
-    if (selectedGroupIndices.length === 0) {
+    if (selectedSelections.length === 0) {
       selectionInfo.textContent = '선택된 그룹: 0개';
       return;
     }
 
-    const labels = selectedGroupIndices
-      .map(index => index + 1)
-      .sort((a, b) => a - b)
+    const labels = selectedSelections
+      .map(item => `G${item.groupIndex + 1}:P${item.rectIndex + 1}`)
       .join(', ');
 
-    selectionInfo.textContent = `선택된 그룹: ${selectedGroupIndices.length}개 (${labels})`;
+    selectionInfo.textContent = `선택된 그룹: ${selectedSelections.length}개 (${labels})`;
   }
 
   function getPrimarySelectedGroupIndex() {
-    if (selectedGroupIndices.length > 0) return selectedGroupIndices[0];
+    if (selectedSelections.length > 0) return selectedSelections[0].groupIndex;
     if (selectedRect) return selectedRect.groupIndex;
     return null;
   }
@@ -129,7 +132,7 @@
 
     if (!hit) {
       if (!toggleSelection) {
-        selectedGroupIndices = [];
+        selectedSelections = [];
       }
       updateMergeButtonState();
       updateSelectionInfo();
@@ -141,18 +144,19 @@
     }
 
     const groupIndex = hit.groupIndex;
+    const rectIndex = hit.rectIndex;
     if (toggleSelection) {
-      const existingIndex = selectedGroupIndices.indexOf(groupIndex);
+      const existingIndex = selectedSelections.findIndex(item => item.groupIndex === groupIndex);
       if (existingIndex >= 0) {
-        selectedGroupIndices.splice(existingIndex, 1);
+        selectedSelections.splice(existingIndex, 1);
       } else {
-        selectedGroupIndices.push(groupIndex);
-        if (selectedGroupIndices.length > 2) {
-          selectedGroupIndices.shift();
+        selectedSelections.push({ groupIndex, rectIndex });
+        if (selectedSelections.length > 2) {
+          selectedSelections.shift();
         }
       }
     } else {
-      selectedGroupIndices = [groupIndex];
+      selectedSelections = [{ groupIndex, rectIndex }];
     }
 
     updateMergeButtonState();
@@ -240,7 +244,7 @@
     mergeUndoStack.push({
       groups: cloneGroups(currentRectGroups),
       selectedRect: selectedRect ? { ...selectedRect } : null,
-      selectedGroupIndices: selectedGroupIndices.slice()
+      selectedSelections: selectedSelections.map(item => ({ ...item }))
     });
 
     if (mergeUndoStack.length > MAX_UNDO_STACK) {
@@ -257,7 +261,7 @@
     const snapshot = mergeUndoStack.pop();
     currentRectGroups = cloneGroups(snapshot.groups);
     selectedRect = snapshot.selectedRect ? { ...snapshot.selectedRect } : null;
-    selectedGroupIndices = snapshot.selectedGroupIndices.slice();
+    selectedSelections = (snapshot.selectedSelections || []).map(item => ({ ...item }));
 
     renderGroups(currentRectGroups);
     setStatus('마지막 Merge를 Ctrl+Z로 되돌렸습니다.', false);
@@ -277,13 +281,21 @@
   }
 
   function mergeSelectedGroups() {
-    if (selectedGroupIndices.length !== 2) {
+    if (selectedSelections.length !== 2) {
       setStatus('Merge는 Ctrl+클릭으로 그룹 2개를 선택해야 실행됩니다.', true);
       return;
     }
 
-    const idxA = selectedGroupIndices[0];
-    const idxB = selectedGroupIndices[1];
+    const selA = selectedSelections[0];
+    const selB = selectedSelections[1];
+    const idxA = selA.groupIndex;
+    const idxB = selB.groupIndex;
+
+    if (idxA === idxB) {
+      setStatus('병합 실패: 서로 다른 2개 그룹에서 점을 선택해주세요.', true);
+      return;
+    }
+
     const groupA = currentRectGroups[idxA];
     const groupB = currentRectGroups[idxB];
 
@@ -292,26 +304,22 @@
       return;
     }
 
-    let best = null;
-    groupA.forEach((aRect, aIndex) => {
-      if (!aRect.canConnect) return;
-      groupB.forEach((bRect, bIndex) => {
-        if (!bRect.canConnect) return;
-        const dist = pointDistance(aRect, bRect);
-        if (!best || dist < best.dist) {
-          best = { aIndex, bIndex, dist, pointA: aRect, pointB: bRect };
-        }
-      });
-    });
-
-    if (!best) {
-      setStatus('병합 실패: 두 그룹에서 canConnect=true 점을 찾지 못했습니다.', true);
+    const pointA = groupA[selA.rectIndex];
+    const pointB = groupB[selB.rectIndex];
+    if (!pointA || !pointB) {
+      setStatus('병합 실패: 선택된 점 인덱스를 찾지 못했습니다.', true);
       return;
     }
 
-    if (best.dist > MERGE_DISTANCE_THRESHOLD) {
+    if (!pointA.canConnect || !pointB.canConnect) {
+      setStatus('병합 실패: 선택한 두 점 모두 canConnect=true 여야 합니다.', true);
+      return;
+    }
+
+    const selectedDistance = pointDistance(pointA, pointB);
+    if (selectedDistance > MERGE_DISTANCE_THRESHOLD) {
       setStatus(
-        `병합 실패: canConnect 점들이 충분히 가깝지 않습니다. (거리 ${best.dist.toFixed(2)}, 임계 ${MERGE_DISTANCE_THRESHOLD})`,
+        `병합 실패: 선택한 두 점이 충분히 가깝지 않습니다. (거리 ${selectedDistance.toFixed(2)}, 임계 ${MERGE_DISTANCE_THRESHOLD})`,
         true
       );
       return;
@@ -320,14 +328,14 @@
     pushMergeUndoSnapshot();
 
     const shiftedB = cloneGroup(groupB);
-    const dx = best.pointA.x - best.pointB.x;
-    const dy = best.pointA.y - best.pointB.y;
+    const dx = pointA.x - pointB.x;
+    const dy = pointA.y - pointB.y;
     shiftGroup(shiftedB, dx, dy);
 
     const merged = cloneGroup(groupA);
     shiftedB.forEach((rect, index) => {
-      if (index === best.bIndex) {
-        const a = merged[best.aIndex];
+      if (index === selB.rectIndex) {
+        const a = merged[selA.rectIndex];
         const isSamePoint = a && a.x === rect.x && a.y === rect.y && a.size === rect.size;
         if (isSamePoint) return;
       }
@@ -340,7 +348,7 @@
     currentRectGroups[keepIndex] = merged;
     currentRectGroups.splice(removeIndex, 1);
 
-    selectedGroupIndices = [keepIndex];
+    selectedSelections = [{ groupIndex: keepIndex, rectIndex: Math.max(0, merged.length - 1) }];
     selectedRect = { groupIndex: keepIndex, rectIndex: Math.max(0, merged.length - 1) };
     updateMergeButtonState();
     updateSelectionInfo();
@@ -353,7 +361,7 @@
       rect: merged[Math.max(0, merged.length - 1)]
     });
     setStatus(
-      `그룹 병합 완료: ${idxA + 1} + ${idxB + 1} -> ${keepIndex + 1} (canConnect 점 거리 ${best.dist.toFixed(2)}).`,
+      `그룹 병합 완료: ${idxA + 1} + ${idxB + 1} -> ${keepIndex + 1} (선택 점 거리 ${selectedDistance.toFixed(2)}).`,
       false
     );
   }
@@ -458,7 +466,7 @@
         }
       });
 
-      if (selectedGroupIndices.includes(groupIndex)) {
+      if (getSelectedGroupIndices().includes(groupIndex)) {
         const bounds = getGroupBounds(group);
         const width = Math.max(1, bounds.maxRight - bounds.minX);
         const height = Math.max(1, bounds.maxBottom - bounds.minY);
@@ -549,7 +557,24 @@
 
   function renderGroups(rectGroups) {
     currentRectGroups = rectGroups;
-    selectedGroupIndices = selectedGroupIndices.filter(index => index >= 0 && index < currentRectGroups.length);
+
+    selectedSelections = selectedSelections
+      .map(item => {
+        if (item.groupIndex < 0 || item.groupIndex >= currentRectGroups.length) return null;
+        const group = currentRectGroups[item.groupIndex];
+        if (!group || group.length === 0) return null;
+        const safeRectIndex = Math.max(0, Math.min(item.rectIndex, group.length - 1));
+        return { groupIndex: item.groupIndex, rectIndex: safeRectIndex };
+      })
+      .filter(Boolean);
+
+    if (selectedRect) {
+      const group = currentRectGroups[selectedRect.groupIndex];
+      if (!group || !group[selectedRect.rectIndex]) {
+        selectedRect = null;
+      }
+    }
+
     updateMergeButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
