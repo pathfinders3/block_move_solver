@@ -453,17 +453,12 @@
       const stroke = `hsl(${groupHue}, 85%, 62%)`;
 
       group.forEach(rect => {
-        baseCtx.fillStyle = fill;
+        baseCtx.fillStyle = rect.canConnect ? 'rgba(34, 197, 94, 0.75)' : fill;
         baseCtx.fillRect(rect.x, rect.y, rect.size, rect.size);
 
-        baseCtx.strokeStyle = rect.canConnect ? stroke : '#6b7280';
+        baseCtx.strokeStyle = rect.canConnect ? '#d4af37' : '#6b7280';
         baseCtx.lineWidth = 1;
         baseCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.size - 1, rect.size - 1);
-
-        if (rect.canConnect) {
-          baseCtx.fillStyle = '#00e5ff';
-          baseCtx.fillRect(rect.x + Math.max(0, Math.floor(rect.size / 2) - 1), rect.y + Math.max(0, Math.floor(rect.size / 2) - 1), 2, 2);
-        }
       });
 
       if (getSelectedGroupIndices().includes(groupIndex)) {
@@ -488,8 +483,9 @@
       }
 
       baseCtx.strokeStyle = '#ff3b30';
-      baseCtx.lineWidth = 2;
-      baseCtx.strokeRect(rect.x + 1, rect.y + 1, Math.max(1, rect.size - 2), Math.max(1, rect.size - 2));
+      baseCtx.lineWidth = 1;
+      baseCtx.setLineDash([]);
+      baseCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.size - 1, rect.size - 1);
     }
   }
 
