@@ -459,11 +459,15 @@
       });
 
       if (selectedGroupIndices.includes(groupIndex)) {
-        group.forEach(rect => {
-          baseCtx.strokeStyle = '#ffd60a';
-          baseCtx.lineWidth = 2;
-          baseCtx.strokeRect(rect.x + 1, rect.y + 1, Math.max(1, rect.size - 2), Math.max(1, rect.size - 2));
-        });
+        const bounds = getGroupBounds(group);
+        const width = Math.max(1, bounds.maxRight - bounds.minX);
+        const height = Math.max(1, bounds.maxBottom - bounds.minY);
+
+        baseCtx.strokeStyle = '#ffd60a';
+        baseCtx.lineWidth = 2;
+        baseCtx.setLineDash([4, 3]);
+        baseCtx.strokeRect(bounds.minX - 1.5, bounds.minY - 1.5, width + 3, height + 3);
+        baseCtx.setLineDash([]);
       }
     });
 
