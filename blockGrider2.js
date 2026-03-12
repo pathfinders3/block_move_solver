@@ -7,6 +7,9 @@
   const status = document.getElementById('status');
   const clickInfo = document.getElementById('clickInfo');
   const selectionInfo = document.getElementById('selectionInfo');
+  const segmentList = document.getElementById('segmentList');
+  const btnSegmentsShowAll = document.getElementById('btnSegmentsShowAll');
+  const btnSegmentsHideAll = document.getElementById('btnSegmentsHideAll');
   const baseCanvas = document.getElementById('baseCanvas');
   const baseCanvasTitle = document.getElementById('baseCanvasTitle');
   const zoomCanvas = document.getElementById('zoomCanvas');
@@ -30,6 +33,8 @@
   let selectedRect = null;
   let selectedSelections = [];
   let mergeUndoStack = [];
+  let visibleSegmentIds = new Set();
+  let knownSegmentIds = new Set();
 
   function createGroupId() {
     return `group-${groupSeq++}`;
@@ -112,6 +117,89 @@
     return getAllPoints(groups).length;
   }
 
+  function getSegmentHue(groupIndex, segmentIndex) {
+    return (groupIndex * 67 + segmentIndex * 17) % 360;
+  }
+
+  function getSegmentFillColor(groupIndex, segmentIndex) {
+    const hue = getSegmentHue(groupIndex, segmentIndex);
+    return `hsla(${hue}, 80%, 42%, 0.55)`;
+  }
+
+  function collectSegmentsWithMeta(groups) {
+    const rows = [];
+    groups.forEach((group, groupIndex) => {
+      group.segments.forEach((segment, segmentIndex) => {
+        rows.push({ groupIndex, segmentIndex, segment });
+      });
+    });
+    return rows;
+  }
+
+  function syncVisibleSegmentIds(groups) {
+    const currentIds = new Set();
+    collectSegmentsWithMeta(groups).forEach(row => {
+      currentIds.add(row.segment.id);
+    });
+
+    [...visibleSegmentIds].forEach(id => {
+      if (!currentIds.has(id)) visibleSegmentIds.delete(id);
+    });
+    [...knownSegmentIds].forEach(id => {
+      if (!currentIds.has(id)) knownSegmentIds.delete(id);
+    });
+
+    currentIds.forEach(id => {
+      if (!knownSegmentIds.has(id)) {
+        knownSegmentIds.add(id);
+        visibleSegmentIds.add(id);
+      }
+    });
+  }
+
+  function renderSegmentVisibilityPanel() {
+    if (!segmentList) return;
+
+    segmentList.innerHTML = '';
+    const rows = collectSegmentsWithMeta(currentGroups);
+    if (rows.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'segment-item';
+      empty.textContent = '세그먼트가 없습니다.';
+      segmentList.appendChild(empty);
+      return;
+    }
+
+    rows.forEach(row => {
+      const item = document.createElement('label');
+      item.className = 'segment-item';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = visibleSegmentIds.has(row.segment.id);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          visibleSegmentIds.add(row.segment.id);
+        } else {
+          visibleSegmentIds.delete(row.segment.id);
+        }
+        renderGroups(currentGroups);
+      });
+
+      const chip = document.createElement('span');
+      chip.className = 'segment-color-chip';
+      chip.style.backgroundColor = `hsl(${getSegmentHue(row.groupIndex, row.segmentIndex)} 85% 55%)`;
+
+      const text = document.createElement('span');
+      text.textContent = `G${row.groupIndex + 1} / S${row.segmentIndex + 1} (${row.segment.points.length}점)`;
+
+      item.appendChild(checkbox);
+      item.appendChild(chip);
+      item.appendChild(text);
+      segmentList.appendChild(item);
+    });
+  }
+
   function getSelectedGroupIndices() {
     const unique = [];
     selectedSelections.forEach(sel => {
@@ -148,6 +236,7 @@
       const group = currentGroups[g];
       for (let s = group.segments.length - 1; s >= 0; s--) {
         const segment = group.segments[s];
+        if (!visibleSegmentIds.has(segment.id)) continue;
         for (let p = segment.points.length - 1; p >= 0; p--) {
           const point = segment.points[p];
           if (isPointInRect(x, y, point)) {
@@ -282,9 +371,10 @@
     drawZoomCanvas();
   }
 
-  function getGroupBounds(group) {
+  function getGroupBounds(group, includeHidden) {
     const points = [];
     group.segments.forEach(segment => {
+      if (!includeHidden && !visibleSegmentIds.has(segment.id)) return;
       segment.points.forEach(point => points.push(point));
     });
 
@@ -329,7 +419,7 @@
       return;
     }
 
-    const bounds = getGroupBounds(group);
+    const bounds = getGroupBounds(group, true);
     const clampedDx = Math.max(-bounds.minX, Math.min(dx, MAX_CANVAS_SIZE - bounds.maxRight));
     const clampedDy = Math.max(-bounds.minY, Math.min(dy, MAX_CANVAS_SIZE - bounds.maxBottom));
 
@@ -594,8 +684,8 @@
 
     groups.forEach((group, groupIndex) => {
       group.segments.forEach((segment, segmentIndex) => {
-        const hue = (groupIndex * 67 + segmentIndex * 17) % 360;
-        const fill = `hsla(${hue}, 80%, 42%, 0.55)`;
+        if (!visibleSegmentIds.has(segment.id)) return;
+        const fill = getSegmentFillColor(groupIndex, segmentIndex);
 
         segment.points.forEach(point => {
           baseCtx.fillStyle = point.canConnect ? 'rgba(34, 197, 94, 0.75)' : fill;
@@ -608,7 +698,10 @@
       });
 
       if (getSelectedGroupIndices().includes(groupIndex)) {
-        const bounds = getGroupBounds(group);
+        const bounds = getGroupBounds(group, false);
+        if (bounds.maxRight <= bounds.minX || bounds.maxBottom <= bounds.minY) {
+          return;
+        }
         const width = Math.max(1, bounds.maxRight - bounds.minX);
         const height = Math.max(1, bounds.maxBottom - bounds.minY);
 
@@ -625,6 +718,7 @@
     redSelections.forEach(sel => {
       const group = groups[sel.groupIndex];
       const segment = group && group.segments[sel.segmentIndex];
+      if (!segment || !visibleSegmentIds.has(segment.id)) return;
       const point = segment && segment.points[sel.pointIndex];
       if (!point) return;
 
@@ -699,6 +793,7 @@
 
   function renderGroups(groups) {
     currentGroups = groups;
+    syncVisibleSegmentIds(currentGroups);
 
     selectedSelections = selectedSelections
       .map(sel => {
@@ -708,6 +803,7 @@
         const safeSegmentIndex = Math.max(0, Math.min(sel.segmentIndex, group.segments.length - 1));
         const segment = group.segments[safeSegmentIndex];
         if (!segment || segment.points.length === 0) return null;
+        if (!visibleSegmentIds.has(segment.id)) return null;
 
         const safePointIndex = Math.max(0, Math.min(sel.pointIndex, segment.points.length - 1));
         return {
@@ -722,7 +818,7 @@
       const group = currentGroups[selectedRect.groupIndex];
       const segment = group && group.segments[selectedRect.segmentIndex];
       const point = segment && segment.points[selectedRect.pointIndex];
-      if (!point) {
+      if (!point || !visibleSegmentIds.has(segment.id)) {
         selectedRect = null;
       }
     }
@@ -730,6 +826,7 @@
     updateMergeButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
+    renderSegmentVisibilityPanel();
     drawBaseCanvas(currentGroups);
     drawZoomCanvas();
   }
@@ -816,6 +913,24 @@
 
   if (btnExportJson) {
     btnExportJson.addEventListener('click', exportCurrentStructure);
+  }
+
+  if (btnSegmentsShowAll) {
+    btnSegmentsShowAll.addEventListener('click', () => {
+      collectSegmentsWithMeta(currentGroups).forEach(row => {
+        visibleSegmentIds.add(row.segment.id);
+      });
+      renderGroups(currentGroups);
+      setStatus('모든 세그먼트를 표시합니다.', false);
+    });
+  }
+
+  if (btnSegmentsHideAll) {
+    btnSegmentsHideAll.addEventListener('click', () => {
+      visibleSegmentIds.clear();
+      renderGroups(currentGroups);
+      setStatus('모든 세그먼트를 숨겼습니다.', false);
+    });
   }
 
   document.addEventListener('keydown', handleMoveKey);
