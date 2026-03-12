@@ -13,6 +13,7 @@
   const zoomCtx = zoomCanvas.getContext('2d', { willReadFrequently: true });
   const scaleRange = document.getElementById('scaleRange');
   const scaleDisplay = document.getElementById('scaleDisplay');
+
   const scaleValues = [2, 4, 8, 16, 32, 64];
   const MIN_CANVAS_SIZE = 64;
   const MAX_CANVAS_SIZE = 512;
@@ -20,13 +21,25 @@
   const MERGE_DISTANCE_THRESHOLD = 80;
   const MAX_UNDO_STACK = 30;
 
-  let currentRectGroups = [];
+  let groupSeq = 1;
+  let segmentSeq = 1;
+  let connectionSeq = 1;
+
+  let currentGroups = [];
   let selectedRect = null;
   let selectedSelections = [];
   let mergeUndoStack = [];
 
-  function getSelectedGroupIndices() {
-    return selectedSelections.map(item => item.groupIndex);
+  function createGroupId() {
+    return `group-${groupSeq++}`;
+  }
+
+  function createSegmentId() {
+    return `seg-${segmentSeq++}`;
+  }
+
+  function createConnectionId() {
+    return `conn-${connectionSeq++}`;
   }
 
   function setStatus(message, isError) {
@@ -34,15 +47,87 @@
     status.classList.toggle('error', !!isError);
   }
 
-  function calculateCanvasSize(rects) {
-    if (!rects || rects.length === 0) return MIN_CANVAS_SIZE;
+  function clonePoint(point) {
+    return {
+      x: point.x,
+      y: point.y,
+      size: point.size,
+      canConnect: !!point.canConnect
+    };
+  }
+
+  function cloneSegment(segment) {
+    return {
+      id: segment.id,
+      points: (segment.points || []).map(clonePoint)
+    };
+  }
+
+  function cloneConnection(connection) {
+    return {
+      id: connection.id,
+      from: { ...connection.from },
+      to: { ...connection.to },
+      distance: connection.distance
+    };
+  }
+
+  function cloneGroup(group) {
+    return {
+      id: group.id,
+      segments: (group.segments || []).map(cloneSegment),
+      connections: (group.connections || []).map(cloneConnection)
+    };
+  }
+
+  function cloneGroups(groups) {
+    return groups.map(cloneGroup);
+  }
+
+  function createGroupFromPoints(points) {
+    return {
+      id: createGroupId(),
+      segments: [
+        {
+          id: createSegmentId(),
+          points: points.map(clonePoint)
+        }
+      ],
+      connections: []
+    };
+  }
+
+  function getAllPoints(groups) {
+    const points = [];
+    groups.forEach(group => {
+      (group.segments || []).forEach(segment => {
+        (segment.points || []).forEach(point => points.push(point));
+      });
+    });
+    return points;
+  }
+
+  function getTotalRectCount(groups) {
+    return getAllPoints(groups).length;
+  }
+
+  function getSelectedGroupIndices() {
+    const unique = [];
+    selectedSelections.forEach(sel => {
+      if (!unique.includes(sel.groupIndex)) unique.push(sel.groupIndex);
+    });
+    return unique;
+  }
+
+  function calculateCanvasSize(points) {
+    if (!points || points.length === 0) return MIN_CANVAS_SIZE;
 
     let maxRight = MIN_CANVAS_SIZE;
     let maxBottom = MIN_CANVAS_SIZE;
 
-    rects.forEach(rect => {
-      maxRight = Math.max(maxRight, rect.x + rect.size);
-      maxBottom = Math.max(maxBottom, rect.y + rect.size);
+    points.forEach(point => {
+      maxRight = Math.max(maxRight, point.x + point.size);
+      maxBottom = Math.max(maxBottom, point.y + point.size);
     });
 
     const required = Math.max(MIN_CANVAS_SIZE, maxRight, maxBottom);
@@ -53,17 +138,26 @@
     return scaleValues[parseInt(scaleRange.value, 10) || 0];
   }
 
-  function isPointInRect(x, y, rect) {
-    return x >= rect.x && x < rect.x + rect.size && y >= rect.y && y < rect.y + rect.size;
+  function isPointInRect(x, y, point) {
+    return x >= point.x && x < point.x + point.size && y >= point.y && y < point.y + point.size;
   }
 
   function findRectAtPoint(x, y) {
-    for (let g = currentRectGroups.length - 1; g >= 0; g--) {
-      const group = currentRectGroups[g];
-      for (let r = group.length - 1; r >= 0; r--) {
-        const rect = group[r];
-        if (isPointInRect(x, y, rect)) {
-          return { groupIndex: g, rectIndex: r, rect };
+    for (let g = currentGroups.length - 1; g >= 0; g--) {
+      const group = currentGroups[g];
+      for (let s = group.segments.length - 1; s >= 0; s--) {
+        const segment = group.segments[s];
+        for (let p = segment.points.length - 1; p >= 0; p--) {
+          const point = segment.points[p];
+          if (isPointInRect(x, y, point)) {
+            return {
+              groupIndex: g,
+              segmentIndex: s,
+              pointIndex: p,
+              point,
+              rect: point
+            };
+          }
         }
       }
     }
@@ -84,10 +178,12 @@
       return;
     }
 
-    const group = currentRectGroups[selectedRect.groupIndex];
-    const rect = group && group[selectedRect.rectIndex];
-    const canConnect = !!(rect && rect.canConnect);
-    btnToggleConnect.disabled = !rect;
+    const group = currentGroups[selectedRect.groupIndex];
+    const segment = group && group.segments[selectedRect.segmentIndex];
+    const point = segment && segment.points[selectedRect.pointIndex];
+    const canConnect = !!(point && point.canConnect);
+
+    btnToggleConnect.disabled = !point;
     btnToggleConnect.textContent = `선택 점 연결: ${canConnect ? 'ON' : 'OFF'}`;
   }
 
@@ -100,7 +196,7 @@
     }
 
     const labels = selectedSelections
-      .map(item => `G${item.groupIndex + 1}:P${item.rectIndex + 1}`)
+      .map(item => `G${item.groupIndex + 1}:S${item.segmentIndex + 1}:P${item.pointIndex + 1}`)
       .join(', ');
 
     selectionInfo.textContent = `선택된 그룹: ${selectedSelections.length}개 (${labels})`;
@@ -119,16 +215,22 @@
       return;
     }
 
-    const rect = hit.rect;
+    const point = hit.point;
     clickInfo.textContent =
-      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 도형 ${hit.rectIndex + 1}, ` +
-      `사각형 (${rect.x}, ${rect.y}, size=${rect.size}, canConnect=${!!rect.canConnect})`;
+      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 선 ${hit.segmentIndex + 1}, 점 ${hit.pointIndex + 1}, ` +
+      `사각형 (${point.x}, ${point.y}, size=${point.size}, canConnect=${!!point.canConnect})`;
   }
 
   function handleCanvasClick(x, y, options) {
     const toggleSelection = !!(options && options.toggleSelection);
     const hit = findRectAtPoint(x, y);
-    selectedRect = hit ? { groupIndex: hit.groupIndex, rectIndex: hit.rectIndex } : null;
+    selectedRect = hit
+      ? {
+          groupIndex: hit.groupIndex,
+          segmentIndex: hit.segmentIndex,
+          pointIndex: hit.pointIndex
+        }
+      : null;
 
     if (!hit) {
       if (!toggleSelection) {
@@ -138,37 +240,54 @@
       updateSelectionInfo();
       updateConnectButtonState();
       updateClickInfo(x, y, hit);
-      drawBaseCanvas(currentRectGroups);
+      drawBaseCanvas(currentGroups);
       drawZoomCanvas();
       return;
     }
 
-    const groupIndex = hit.groupIndex;
-    const rectIndex = hit.rectIndex;
+    const selection = {
+      groupIndex: hit.groupIndex,
+      segmentIndex: hit.segmentIndex,
+      pointIndex: hit.pointIndex
+    };
+
     if (toggleSelection) {
-      const existingIndex = selectedSelections.findIndex(item => item.groupIndex === groupIndex);
+      const existingIndex = selectedSelections.findIndex(item => item.groupIndex === selection.groupIndex);
       if (existingIndex >= 0) {
-        selectedSelections.splice(existingIndex, 1);
+        const existing = selectedSelections[existingIndex];
+        const samePoint =
+          existing.segmentIndex === selection.segmentIndex &&
+          existing.pointIndex === selection.pointIndex;
+        if (samePoint) {
+          selectedSelections.splice(existingIndex, 1);
+        } else {
+          selectedSelections[existingIndex] = selection;
+        }
       } else {
-        selectedSelections.push({ groupIndex, rectIndex });
+        selectedSelections.push(selection);
         if (selectedSelections.length > 2) {
           selectedSelections.shift();
         }
       }
     } else {
-      selectedSelections = [{ groupIndex, rectIndex }];
+      selectedSelections = [selection];
     }
 
     updateMergeButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
     updateClickInfo(x, y, hit);
-    drawBaseCanvas(currentRectGroups);
+    drawBaseCanvas(currentGroups);
     drawZoomCanvas();
   }
 
   function getGroupBounds(group) {
-    if (!group || group.length === 0) {
+    const points = [];
+    group.segments.forEach(segment => {
+      segment.points.forEach(point => points.push(point));
+    });
+
+    if (points.length === 0) {
       return { minX: 0, minY: 0, maxRight: 0, maxBottom: 0 };
     }
 
@@ -177,14 +296,23 @@
     let maxRight = -Infinity;
     let maxBottom = -Infinity;
 
-    group.forEach(rect => {
-      minX = Math.min(minX, rect.x);
-      minY = Math.min(minY, rect.y);
-      maxRight = Math.max(maxRight, rect.x + rect.size);
-      maxBottom = Math.max(maxBottom, rect.y + rect.size);
+    points.forEach(point => {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxRight = Math.max(maxRight, point.x + point.size);
+      maxBottom = Math.max(maxBottom, point.y + point.size);
     });
 
     return { minX, minY, maxRight, maxBottom };
+  }
+
+  function shiftGroup(group, dx, dy) {
+    group.segments.forEach(segment => {
+      segment.points.forEach(point => {
+        point.x += dx;
+        point.y += dy;
+      });
+    });
   }
 
   function moveSelectedGroupBy(dx, dy) {
@@ -194,8 +322,8 @@
       return;
     }
 
-    const group = currentRectGroups[activeGroupIndex];
-    if (!group || group.length === 0) {
+    const group = currentGroups[activeGroupIndex];
+    if (!group || group.segments.length === 0) {
       setStatus('선택된 그룹을 찾을 수 없습니다.', true);
       return;
     }
@@ -204,45 +332,32 @@
     const clampedDx = Math.max(-bounds.minX, Math.min(dx, MAX_CANVAS_SIZE - bounds.maxRight));
     const clampedDy = Math.max(-bounds.minY, Math.min(dy, MAX_CANVAS_SIZE - bounds.maxBottom));
 
-    group.forEach(rect => {
-      rect.x += clampedDx;
-      rect.y += clampedDy;
-    });
+    shiftGroup(group, clampedDx, clampedDy);
 
-    const selectedMovedRect =
-      selectedRect && selectedRect.groupIndex === activeGroupIndex
-        ? group[selectedRect.rectIndex]
-        : null;
-    if (selectedRect && selectedMovedRect) {
-      updateClickInfo(selectedMovedRect.x, selectedMovedRect.y, {
-        groupIndex: activeGroupIndex,
-        rectIndex: selectedRect.rectIndex,
-        rect: selectedMovedRect
-      });
+    if (selectedRect && selectedRect.groupIndex === activeGroupIndex) {
+      const segment = group.segments[selectedRect.segmentIndex];
+      const point = segment && segment.points[selectedRect.pointIndex];
+      if (point) {
+        updateClickInfo(point.x, point.y, {
+          groupIndex: selectedRect.groupIndex,
+          segmentIndex: selectedRect.segmentIndex,
+          pointIndex: selectedRect.pointIndex,
+          point,
+          rect: point
+        });
+      }
     }
 
-    renderGroups(currentRectGroups);
+    renderGroups(currentGroups);
     setStatus(
       `그룹 ${activeGroupIndex + 1} 이동: Δx=${clampedDx}, Δy=${clampedDy} (요청 5px 단위).`,
       false
     );
   }
 
-  function cloneRect(rect) {
-    return { x: rect.x, y: rect.y, size: rect.size, canConnect: !!rect.canConnect };
-  }
-
-  function cloneGroup(group) {
-    return group.map(cloneRect);
-  }
-
-  function cloneGroups(groups) {
-    return groups.map(cloneGroup);
-  }
-
   function pushMergeUndoSnapshot() {
     mergeUndoStack.push({
-      groups: cloneGroups(currentRectGroups),
+      groups: cloneGroups(currentGroups),
       selectedRect: selectedRect ? { ...selectedRect } : null,
       selectedSelections: selectedSelections.map(item => ({ ...item }))
     });
@@ -259,11 +374,11 @@
     }
 
     const snapshot = mergeUndoStack.pop();
-    currentRectGroups = cloneGroups(snapshot.groups);
+    currentGroups = cloneGroups(snapshot.groups);
     selectedRect = snapshot.selectedRect ? { ...snapshot.selectedRect } : null;
     selectedSelections = (snapshot.selectedSelections || []).map(item => ({ ...item }));
 
-    renderGroups(currentRectGroups);
+    renderGroups(currentGroups);
     setStatus('마지막 Merge를 Ctrl+Z로 되돌렸습니다.', false);
   }
 
@@ -273,11 +388,22 @@
     return Math.sqrt(dx * dx + dy * dy);
   }
 
-  function shiftGroup(group, dx, dy) {
-    group.forEach(rect => {
-      rect.x += dx;
-      rect.y += dy;
+  function remapSegmentIdsForMerge(group) {
+    const idMap = {};
+    group.segments.forEach(segment => {
+      const oldId = segment.id;
+      const newId = createSegmentId();
+      idMap[oldId] = newId;
+      segment.id = newId;
     });
+
+    group.connections.forEach(conn => {
+      conn.id = createConnectionId();
+      conn.from.segmentId = idMap[conn.from.segmentId] || conn.from.segmentId;
+      conn.to.segmentId = idMap[conn.to.segmentId] || conn.to.segmentId;
+    });
+
+    return idMap;
   }
 
   function mergeSelectedGroups() {
@@ -296,16 +422,17 @@
       return;
     }
 
-    const groupA = currentRectGroups[idxA];
-    const groupB = currentRectGroups[idxB];
-
-    if (!groupA || !groupB || groupA.length === 0 || groupB.length === 0) {
+    const groupA = currentGroups[idxA];
+    const groupB = currentGroups[idxB];
+    if (!groupA || !groupB) {
       setStatus('병합할 그룹을 찾지 못했습니다.', true);
       return;
     }
 
-    const pointA = groupA[selA.rectIndex];
-    const pointB = groupB[selB.rectIndex];
+    const segmentA = groupA.segments[selA.segmentIndex];
+    const segmentB = groupB.segments[selB.segmentIndex];
+    const pointA = segmentA && segmentA.points[selA.pointIndex];
+    const pointB = segmentB && segmentB.points[selB.pointIndex];
     if (!pointA || !pointB) {
       setStatus('병합 실패: 선택된 점 인덱스를 찾지 못했습니다.', true);
       return;
@@ -327,38 +454,56 @@
 
     pushMergeUndoSnapshot();
 
-    const shiftedB = cloneGroup(groupB);
-    const dx = pointA.x - pointB.x;
-    const dy = pointA.y - pointB.y;
-    shiftGroup(shiftedB, dx, dy);
+    const mergedGroup = cloneGroup(groupA);
+    const shiftedSource = cloneGroup(groupB);
+    const sourceIdMap = remapSegmentIdsForMerge(shiftedSource);
 
-    const merged = cloneGroup(groupA);
-    shiftedB.forEach((rect, index) => {
-      if (index === selB.rectIndex) {
-        const a = merged[selA.rectIndex];
-        const isSamePoint = a && a.x === rect.x && a.y === rect.y && a.size === rect.size;
-        if (isSamePoint) return;
-      }
-      merged.push(cloneRect(rect));
+    const pointA2 = mergedGroup.segments[selA.segmentIndex].points[selA.pointIndex];
+    const pointB2 = shiftedSource.segments[selB.segmentIndex].points[selB.pointIndex];
+    const dx = pointA2.x - pointB2.x;
+    const dy = pointA2.y - pointB2.y;
+    shiftGroup(shiftedSource, dx, dy);
+
+    mergedGroup.segments.push(...shiftedSource.segments.map(cloneSegment));
+    mergedGroup.connections.push(...shiftedSource.connections.map(cloneConnection));
+
+    mergedGroup.connections.push({
+      id: createConnectionId(),
+      from: {
+        segmentId: mergedGroup.segments[selA.segmentIndex].id,
+        pointIndex: selA.pointIndex
+      },
+      to: {
+        segmentId: sourceIdMap[groupB.segments[selB.segmentIndex].id],
+        pointIndex: selB.pointIndex
+      },
+      distance: Number(selectedDistance.toFixed(4))
     });
 
     const keepIndex = Math.min(idxA, idxB);
     const removeIndex = Math.max(idxA, idxB);
 
-    currentRectGroups[keepIndex] = merged;
-    currentRectGroups.splice(removeIndex, 1);
+    currentGroups[keepIndex] = mergedGroup;
+    currentGroups.splice(removeIndex, 1);
 
-    selectedSelections = [{ groupIndex: keepIndex, rectIndex: Math.max(0, merged.length - 1) }];
-    selectedRect = { groupIndex: keepIndex, rectIndex: Math.max(0, merged.length - 1) };
-    updateMergeButtonState();
-    updateSelectionInfo();
-    updateConnectButtonState();
+    selectedSelections = [
+      {
+        groupIndex: keepIndex,
+        segmentIndex: selA.segmentIndex,
+        pointIndex: selA.pointIndex
+      }
+    ];
+    selectedRect = { ...selectedSelections[0] };
 
-    renderGroups(currentRectGroups);
-    updateClickInfo(merged[merged.length - 1].x, merged[merged.length - 1].y, {
-      groupIndex: keepIndex,
-      rectIndex: Math.max(0, merged.length - 1),
-      rect: merged[Math.max(0, merged.length - 1)]
+    renderGroups(currentGroups);
+    const selectedPoint =
+      currentGroups[keepIndex].segments[selectedRect.segmentIndex].points[selectedRect.pointIndex];
+    updateClickInfo(selectedPoint.x, selectedPoint.y, {
+      groupIndex: selectedRect.groupIndex,
+      segmentIndex: selectedRect.segmentIndex,
+      pointIndex: selectedRect.pointIndex,
+      point: selectedPoint,
+      rect: selectedPoint
     });
     setStatus(
       `그룹 병합 완료: ${idxA + 1} + ${idxB + 1} -> ${keepIndex + 1} (선택 점 거리 ${selectedDistance.toFixed(2)}).`,
@@ -372,24 +517,27 @@
       return;
     }
 
-    const group = currentRectGroups[selectedRect.groupIndex];
-    const rect = group && group[selectedRect.rectIndex];
-    if (!rect) {
+    const group = currentGroups[selectedRect.groupIndex];
+    const segment = group && group.segments[selectedRect.segmentIndex];
+    const point = segment && segment.points[selectedRect.pointIndex];
+    if (!point) {
       setStatus('선택 점을 찾을 수 없습니다.', true);
       updateConnectButtonState();
       return;
     }
 
-    rect.canConnect = !rect.canConnect;
+    point.canConnect = !point.canConnect;
     updateConnectButtonState();
-    renderGroups(currentRectGroups);
-    updateClickInfo(rect.x, rect.y, {
+    renderGroups(currentGroups);
+    updateClickInfo(point.x, point.y, {
       groupIndex: selectedRect.groupIndex,
-      rectIndex: selectedRect.rectIndex,
-      rect
+      segmentIndex: selectedRect.segmentIndex,
+      pointIndex: selectedRect.pointIndex,
+      point,
+      rect: point
     });
     setStatus(
-      `그룹 ${selectedRect.groupIndex + 1} / 점 ${selectedRect.rectIndex + 1} canConnect=${rect.canConnect}`,
+      `그룹 ${selectedRect.groupIndex + 1} / 선 ${selectedRect.segmentIndex + 1} / 점 ${selectedRect.pointIndex + 1} canConnect=${point.canConnect}`,
       false
     );
   }
@@ -431,13 +579,9 @@
     return { x, y };
   }
 
-  function getTotalRectCount(rectGroups) {
-    return rectGroups.reduce((sum, group) => sum + group.length, 0);
-  }
-
-  function drawBaseCanvas(rectGroups) {
-    const mergedRects = rectGroups.flat();
-    const canvasSize = calculateCanvasSize(mergedRects);
+  function drawBaseCanvas(groups) {
+    const allPoints = getAllPoints(groups);
+    const canvasSize = calculateCanvasSize(allPoints);
     baseCanvas.width = canvasSize;
     baseCanvas.height = canvasSize;
     if (baseCanvasTitle) {
@@ -447,18 +591,19 @@
     baseCtx.fillStyle = '#ffffff';
     baseCtx.fillRect(0, 0, baseCanvas.width, baseCanvas.height);
 
-    rectGroups.forEach((group, groupIndex) => {
-      const groupHue = (groupIndex * 67) % 360;
-      const fill = `hsla(${groupHue}, 80%, 42%, 0.55)`;
-      const stroke = `hsl(${groupHue}, 85%, 62%)`;
+    groups.forEach((group, groupIndex) => {
+      group.segments.forEach((segment, segmentIndex) => {
+        const hue = (groupIndex * 67 + segmentIndex * 17) % 360;
+        const fill = `hsla(${hue}, 80%, 42%, 0.55)`;
 
-      group.forEach(rect => {
-        baseCtx.fillStyle = rect.canConnect ? 'rgba(34, 197, 94, 0.75)' : fill;
-        baseCtx.fillRect(rect.x, rect.y, rect.size, rect.size);
+        segment.points.forEach(point => {
+          baseCtx.fillStyle = point.canConnect ? 'rgba(34, 197, 94, 0.75)' : fill;
+          baseCtx.fillRect(point.x, point.y, point.size, point.size);
 
-        baseCtx.strokeStyle = rect.canConnect ? '#d4af37' : '#6b7280';
-        baseCtx.lineWidth = 1;
-        baseCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.size - 1, rect.size - 1);
+          baseCtx.strokeStyle = point.canConnect ? '#d4af37' : '#6b7280';
+          baseCtx.lineWidth = 1;
+          baseCtx.strokeRect(point.x + 0.5, point.y + 0.5, point.size - 1, point.size - 1);
+        });
       });
 
       if (getSelectedGroupIndices().includes(groupIndex)) {
@@ -474,19 +619,18 @@
       }
     });
 
-    const redSelections = selectedSelections.length > 0
-      ? selectedSelections
-      : (selectedRect ? [selectedRect] : []);
+    const redSelections = selectedSelections.length > 0 ? selectedSelections : selectedRect ? [selectedRect] : [];
 
     redSelections.forEach(sel => {
-      const selectedGroup = rectGroups[sel.groupIndex];
-      const rect = selectedGroup && selectedGroup[sel.rectIndex];
-      if (!rect) return;
+      const group = groups[sel.groupIndex];
+      const segment = group && group.segments[sel.segmentIndex];
+      const point = segment && segment.points[sel.pointIndex];
+      if (!point) return;
 
       baseCtx.strokeStyle = '#ff3b30';
       baseCtx.lineWidth = 1;
       baseCtx.setLineDash([]);
-      baseCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.size - 1, rect.size - 1);
+      baseCtx.strokeRect(point.x + 0.5, point.y + 0.5, point.size - 1, point.size - 1);
     });
   }
 
@@ -516,10 +660,12 @@
     }
   }
 
-  function normalizeRects(parsed) {
+  function normalizePoints(parsed) {
     const source = Array.isArray(parsed)
       ? parsed
-      : (parsed && Array.isArray(parsed.rects) ? parsed.rects : null);
+      : parsed && Array.isArray(parsed.rects)
+      ? parsed.rects
+      : null;
 
     if (!source) return null;
 
@@ -538,9 +684,7 @@
         x: Math.round(x),
         y: Math.round(y),
         size: Math.round(size),
-        canConnect: typeof item.canConnect === 'boolean'
-          ? item.canConnect
-          : false
+        canConnect: typeof item.canConnect === 'boolean' ? item.canConnect : false
       });
     }
 
@@ -552,22 +696,32 @@
     return normalized;
   }
 
-  function renderGroups(rectGroups) {
-    currentRectGroups = rectGroups;
+  function renderGroups(groups) {
+    currentGroups = groups;
 
     selectedSelections = selectedSelections
-      .map(item => {
-        if (item.groupIndex < 0 || item.groupIndex >= currentRectGroups.length) return null;
-        const group = currentRectGroups[item.groupIndex];
-        if (!group || group.length === 0) return null;
-        const safeRectIndex = Math.max(0, Math.min(item.rectIndex, group.length - 1));
-        return { groupIndex: item.groupIndex, rectIndex: safeRectIndex };
+      .map(sel => {
+        const group = currentGroups[sel.groupIndex];
+        if (!group) return null;
+
+        const safeSegmentIndex = Math.max(0, Math.min(sel.segmentIndex, group.segments.length - 1));
+        const segment = group.segments[safeSegmentIndex];
+        if (!segment || segment.points.length === 0) return null;
+
+        const safePointIndex = Math.max(0, Math.min(sel.pointIndex, segment.points.length - 1));
+        return {
+          groupIndex: sel.groupIndex,
+          segmentIndex: safeSegmentIndex,
+          pointIndex: safePointIndex
+        };
       })
       .filter(Boolean);
 
     if (selectedRect) {
-      const group = currentRectGroups[selectedRect.groupIndex];
-      if (!group || !group[selectedRect.rectIndex]) {
+      const group = currentGroups[selectedRect.groupIndex];
+      const segment = group && group.segments[selectedRect.segmentIndex];
+      const point = segment && segment.points[selectedRect.pointIndex];
+      if (!point) {
         selectedRect = null;
       }
     }
@@ -575,7 +729,7 @@
     updateMergeButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
-    drawBaseCanvas(currentRectGroups);
+    drawBaseCanvas(currentGroups);
     drawZoomCanvas();
   }
 
@@ -596,20 +750,20 @@
         return;
       }
 
-      const rects = normalizeRects(parsed);
-      if (!rects) {
+      const points = normalizePoints(parsed);
+      if (!points) {
         setStatus('JSON 배열 형식이 아닙니다. [{x,y,size,...}] 형태가 필요합니다.', true);
         jsonOutput.value = JSON.stringify(parsed, null, 2);
         return;
       }
 
-      const nextGroups = currentRectGroups.concat([rects]);
+      const nextGroups = currentGroups.concat([createGroupFromPoints(points)]);
       renderGroups(nextGroups);
       console.log(`🖼️ 실제 해상도: ${baseCanvas.width}x${baseCanvas.height}`);
 
       jsonOutput.value = JSON.stringify(parsed, null, 2);
       setStatus(
-        `JSON을 불러왔습니다. 그룹 ${currentRectGroups.length}개, 누적 ${getTotalRectCount(currentRectGroups)}개 렌더링 완료.`,
+        `JSON을 불러왔습니다. 그룹 ${currentGroups.length}개, 누적 ${getTotalRectCount(currentGroups)}개 렌더링 완료.`,
         false
       );
     } catch (error) {
