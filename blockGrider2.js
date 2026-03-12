@@ -286,7 +286,7 @@
     }
 
     const labels = selectedSelections
-      .map(item => `G${item.groupIndex + 1}:S${item.segmentIndex + 1}:P${item.pointIndex + 1}`)
+      .map(item => `G${item.groupIndex + 1}:S${item.segmentIndex + 1}:P${item.pointIndex}`)
       .join(', ');
 
     selectionInfo.textContent = `선택된 그룹: ${selectedSelections.length}개 (${labels})`;
@@ -312,7 +312,7 @@
         ? currentGroups[hit.groupIndex].segments[hit.segmentIndex].id
         : '-';
     clickInfo.textContent =
-      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 선 ${hit.segmentIndex + 1} (id=${segmentId}), 점 ${hit.pointIndex + 1}, ` +
+      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 선 ${hit.segmentIndex + 1} (id=${segmentId}), 점 ${hit.pointIndex}, ` +
       `사각형 (${point.x}, ${point.y}, size=${point.size}, canConnect=${!!point.canConnect})`;
   }
 
