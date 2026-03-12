@@ -474,19 +474,20 @@
       }
     });
 
-    if (selectedRect) {
-      const selectedGroup = rectGroups[selectedRect.groupIndex];
-      const rect = selectedGroup && selectedGroup[selectedRect.rectIndex];
-      if (!rect) {
-        selectedRect = null;
-        return;
-      }
+    const redSelections = selectedSelections.length > 0
+      ? selectedSelections
+      : (selectedRect ? [selectedRect] : []);
+
+    redSelections.forEach(sel => {
+      const selectedGroup = rectGroups[sel.groupIndex];
+      const rect = selectedGroup && selectedGroup[sel.rectIndex];
+      if (!rect) return;
 
       baseCtx.strokeStyle = '#ff3b30';
       baseCtx.lineWidth = 1;
       baseCtx.setLineDash([]);
       baseCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.size - 1, rect.size - 1);
-    }
+    });
   }
 
   function drawZoomCanvas() {
