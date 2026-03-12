@@ -286,7 +286,12 @@
     }
 
     const labels = selectedSelections
-      .map(item => `G${item.groupIndex + 1}:S${item.segmentIndex + 1}:P${item.pointIndex}`)
+      .map(item => {
+        const group = currentGroups[item.groupIndex];
+        const segment = group && group.segments[item.segmentIndex];
+        const totalPoints = segment ? segment.points.length : 0;
+        return `G${item.groupIndex + 1}:S${item.segmentIndex + 1}:P ${item.pointIndex}/${totalPoints}`;
+      })
       .join(', ');
 
     selectionInfo.textContent = `선택된 그룹: ${selectedSelections.length}개 (${labels})`;
@@ -311,8 +316,14 @@
       currentGroups[hit.groupIndex].segments[hit.segmentIndex]
         ? currentGroups[hit.groupIndex].segments[hit.segmentIndex].id
         : '-';
+    const segment =
+      currentGroups[hit.groupIndex] &&
+      currentGroups[hit.groupIndex].segments[hit.segmentIndex]
+        ? currentGroups[hit.groupIndex].segments[hit.segmentIndex]
+        : null;
+    const totalPoints = segment ? segment.points.length : 0;
     clickInfo.textContent =
-      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 선 ${hit.segmentIndex + 1} (id=${segmentId}), 점 ${hit.pointIndex}, ` +
+      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 선 ${hit.segmentIndex + 1} (id=${segmentId}), 점 P ${hit.pointIndex}/${totalPoints}, ` +
       `사각형 (${point.x}, ${point.y}, size=${point.size}, canConnect=${!!point.canConnect})`;
   }
 
