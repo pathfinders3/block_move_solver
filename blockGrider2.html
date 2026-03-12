@@ -58,6 +58,14 @@
       margin-bottom: 12px;
     }
 
+    .toggle-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
     .viewer-controls {
       display: flex;
       align-items: center;
@@ -172,6 +180,8 @@
     <div class="controls">
       <button id="btnLoadJson">클립보드 JSON 불러오기</button>
       <button id="btnMerge" disabled>Merge (Ctrl+클릭 2개)</button>
+      <button id="btnToggleConnect" disabled>선택 점 연결: OFF</button>
+      <span class="toggle-wrap">선택 점의 canConnect 토글</span>
     </div>
 
     <div id="status" class="status"></div>

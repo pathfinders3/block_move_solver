@@ -1,6 +1,7 @@
 (function () {
   const btnLoadJson = document.getElementById('btnLoadJson');
   const btnMerge = document.getElementById('btnMerge');
+  const btnToggleConnect = document.getElementById('btnToggleConnect');
   const jsonOutput = document.getElementById('jsonOutput');
   const status = document.getElementById('status');
   const clickInfo = document.getElementById('clickInfo');
@@ -70,6 +71,22 @@
     btnMerge.disabled = selectedGroupIndices.length !== 2;
   }
 
+  function updateConnectButtonState() {
+    if (!btnToggleConnect) return;
+
+    if (!selectedRect) {
+      btnToggleConnect.disabled = true;
+      btnToggleConnect.textContent = '선택 점 연결: OFF';
+      return;
+    }
+
+    const group = currentRectGroups[selectedRect.groupIndex];
+    const rect = group && group[selectedRect.rectIndex];
+    const canConnect = !!(rect && rect.canConnect);
+    btnToggleConnect.disabled = !rect;
+    btnToggleConnect.textContent = `선택 점 연결: ${canConnect ? 'ON' : 'OFF'}`;
+  }
+
   function updateSelectionInfo() {
     if (!selectionInfo) return;
 
@@ -102,7 +119,7 @@
     const rect = hit.rect;
     clickInfo.textContent =
       `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 도형 ${hit.rectIndex + 1}, ` +
-      `사각형 (${rect.x}, ${rect.y}, size=${rect.size})`;
+      `사각형 (${rect.x}, ${rect.y}, size=${rect.size}, canConnect=${!!rect.canConnect})`;
   }
 
   function handleCanvasClick(x, y, options) {
@@ -116,6 +133,7 @@
       }
       updateMergeButtonState();
       updateSelectionInfo();
+      updateConnectButtonState();
       updateClickInfo(x, y, hit);
       drawBaseCanvas(currentRectGroups);
       drawZoomCanvas();
@@ -139,6 +157,7 @@
 
     updateMergeButtonState();
     updateSelectionInfo();
+    updateConnectButtonState();
     updateClickInfo(x, y, hit);
     drawBaseCanvas(currentRectGroups);
     drawZoomCanvas();
@@ -206,7 +225,7 @@
   }
 
   function cloneRect(rect) {
-    return { x: rect.x, y: rect.y, size: rect.size };
+    return { x: rect.x, y: rect.y, size: rect.size, canConnect: !!rect.canConnect };
   }
 
   function cloneGroup(group) {
@@ -244,18 +263,6 @@
     setStatus('마지막 Merge를 Ctrl+Z로 되돌렸습니다.', false);
   }
 
-  function reverseGroup(group) {
-    return group.slice().reverse().map(cloneRect);
-  }
-
-  function getStartPoint(group) {
-    return group[0];
-  }
-
-  function getEndPoint(group) {
-    return group[group.length - 1];
-  }
-
   function pointDistance(a, b) {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
@@ -285,26 +292,26 @@
       return;
     }
 
-    const candidates = [
-      { a: cloneGroup(groupA), b: cloneGroup(groupB), reverseA: false, reverseB: false },
-      { a: cloneGroup(groupA), b: reverseGroup(groupB), reverseA: false, reverseB: true },
-      { a: reverseGroup(groupA), b: cloneGroup(groupB), reverseA: true, reverseB: false },
-      { a: reverseGroup(groupA), b: reverseGroup(groupB), reverseA: true, reverseB: true }
-    ];
-
     let best = null;
-    candidates.forEach(candidate => {
-      const endA = getEndPoint(candidate.a);
-      const startB = getStartPoint(candidate.b);
-      const dist = pointDistance(endA, startB);
-      if (!best || dist < best.dist) {
-        best = { ...candidate, dist, endA, startB };
-      }
+    groupA.forEach((aRect, aIndex) => {
+      if (!aRect.canConnect) return;
+      groupB.forEach((bRect, bIndex) => {
+        if (!bRect.canConnect) return;
+        const dist = pointDistance(aRect, bRect);
+        if (!best || dist < best.dist) {
+          best = { aIndex, bIndex, dist, pointA: aRect, pointB: bRect };
+        }
+      });
     });
 
-    if (!best || best.dist > MERGE_DISTANCE_THRESHOLD) {
+    if (!best) {
+      setStatus('병합 실패: 두 그룹에서 canConnect=true 점을 찾지 못했습니다.', true);
+      return;
+    }
+
+    if (best.dist > MERGE_DISTANCE_THRESHOLD) {
       setStatus(
-        `병합 실패: 시작점/끝점이 충분히 가깝지 않습니다. (거리 ${best ? best.dist.toFixed(2) : '-'}, 임계 ${MERGE_DISTANCE_THRESHOLD})`,
+        `병합 실패: canConnect 점들이 충분히 가깝지 않습니다. (거리 ${best.dist.toFixed(2)}, 임계 ${MERGE_DISTANCE_THRESHOLD})`,
         true
       );
       return;
@@ -312,21 +319,20 @@
 
     pushMergeUndoSnapshot();
 
-    const dx = best.endA.x - best.startB.x;
-    const dy = best.endA.y - best.startB.y;
-    shiftGroup(best.b, dx, dy);
+    const shiftedB = cloneGroup(groupB);
+    const dx = best.pointA.x - best.pointB.x;
+    const dy = best.pointA.y - best.pointB.y;
+    shiftGroup(shiftedB, dx, dy);
 
-    const merged = cloneGroup(best.a);
-    const shiftedStartB = getStartPoint(best.b);
-    const endA = getEndPoint(merged);
-    const shouldSkipFirst =
-      endA && shiftedStartB &&
-      endA.x === shiftedStartB.x &&
-      endA.y === shiftedStartB.y &&
-      endA.size === shiftedStartB.size;
-
-    const tail = shouldSkipFirst ? best.b.slice(1) : best.b;
-    merged.push(...tail.map(cloneRect));
+    const merged = cloneGroup(groupA);
+    shiftedB.forEach((rect, index) => {
+      if (index === best.bIndex) {
+        const a = merged[best.aIndex];
+        const isSamePoint = a && a.x === rect.x && a.y === rect.y && a.size === rect.size;
+        if (isSamePoint) return;
+      }
+      merged.push(cloneRect(rect));
+    });
 
     const keepIndex = Math.min(idxA, idxB);
     const removeIndex = Math.max(idxA, idxB);
@@ -338,6 +344,7 @@
     selectedRect = { groupIndex: keepIndex, rectIndex: Math.max(0, merged.length - 1) };
     updateMergeButtonState();
     updateSelectionInfo();
+    updateConnectButtonState();
 
     renderGroups(currentRectGroups);
     updateClickInfo(merged[merged.length - 1].x, merged[merged.length - 1].y, {
@@ -346,7 +353,35 @@
       rect: merged[Math.max(0, merged.length - 1)]
     });
     setStatus(
-      `그룹 병합 완료: ${idxA + 1} + ${idxB + 1} -> ${keepIndex + 1} (연결 거리 ${best.dist.toFixed(2)}).`,
+      `그룹 병합 완료: ${idxA + 1} + ${idxB + 1} -> ${keepIndex + 1} (canConnect 점 거리 ${best.dist.toFixed(2)}).`,
+      false
+    );
+  }
+
+  function toggleSelectedPointConnect() {
+    if (!selectedRect) {
+      setStatus('먼저 점을 클릭해 선택해주세요.', true);
+      return;
+    }
+
+    const group = currentRectGroups[selectedRect.groupIndex];
+    const rect = group && group[selectedRect.rectIndex];
+    if (!rect) {
+      setStatus('선택 점을 찾을 수 없습니다.', true);
+      updateConnectButtonState();
+      return;
+    }
+
+    rect.canConnect = !rect.canConnect;
+    updateConnectButtonState();
+    renderGroups(currentRectGroups);
+    updateClickInfo(rect.x, rect.y, {
+      groupIndex: selectedRect.groupIndex,
+      rectIndex: selectedRect.rectIndex,
+      rect
+    });
+    setStatus(
+      `그룹 ${selectedRect.groupIndex + 1} / 점 ${selectedRect.rectIndex + 1} canConnect=${rect.canConnect}`,
       false
     );
   }
@@ -413,9 +448,14 @@
         baseCtx.fillStyle = fill;
         baseCtx.fillRect(rect.x, rect.y, rect.size, rect.size);
 
-        baseCtx.strokeStyle = stroke;
+        baseCtx.strokeStyle = rect.canConnect ? stroke : '#6b7280';
         baseCtx.lineWidth = 1;
         baseCtx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.size - 1, rect.size - 1);
+
+        if (rect.canConnect) {
+          baseCtx.fillStyle = '#00e5ff';
+          baseCtx.fillRect(rect.x + Math.max(0, Math.floor(rect.size / 2) - 1), rect.y + Math.max(0, Math.floor(rect.size / 2) - 1), 2, 2);
+        }
       });
 
       if (selectedGroupIndices.includes(groupIndex)) {
@@ -488,8 +528,16 @@
       normalized.push({
         x: Math.round(x),
         y: Math.round(y),
-        size: Math.round(size)
+        size: Math.round(size),
+        canConnect: typeof item.canConnect === 'boolean'
+          ? item.canConnect
+          : false
       });
+    }
+
+    if (normalized.length > 0 && !source.some(item => Object.prototype.hasOwnProperty.call(item, 'canConnect'))) {
+      normalized[0].canConnect = true;
+      normalized[normalized.length - 1].canConnect = true;
     }
 
     return normalized;
@@ -500,6 +548,7 @@
     selectedGroupIndices = selectedGroupIndices.filter(index => index >= 0 && index < currentRectGroups.length);
     updateMergeButtonState();
     updateSelectionInfo();
+    updateConnectButtonState();
     drawBaseCanvas(currentRectGroups);
     drawZoomCanvas();
   }
@@ -556,6 +605,10 @@
 
   if (btnMerge) {
     btnMerge.addEventListener('click', mergeSelectedGroups);
+  }
+
+  if (btnToggleConnect) {
+    btnToggleConnect.addEventListener('click', toggleSelectedPointConnect);
   }
 
   document.addEventListener('keydown', handleMoveKey);
