@@ -306,8 +306,13 @@
     }
 
     const point = hit.point;
+    const segmentId =
+      currentGroups[hit.groupIndex] &&
+      currentGroups[hit.groupIndex].segments[hit.segmentIndex]
+        ? currentGroups[hit.groupIndex].segments[hit.segmentIndex].id
+        : '-';
     clickInfo.textContent =
-      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 선 ${hit.segmentIndex + 1}, 점 ${hit.pointIndex + 1}, ` +
+      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 선 ${hit.segmentIndex + 1} (id=${segmentId}), 점 ${hit.pointIndex + 1}, ` +
       `사각형 (${point.x}, ${point.y}, size=${point.size}, canConnect=${!!point.canConnect})`;
   }
 
