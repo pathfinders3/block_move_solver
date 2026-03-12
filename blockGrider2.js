@@ -1,5 +1,6 @@
 (function () {
   const btnLoadJson = document.getElementById('btnLoadJson');
+  const btnExportJson = document.getElementById('btnExportJson');
   const btnMerge = document.getElementById('btnMerge');
   const btnToggleConnect = document.getElementById('btnToggleConnect');
   const jsonOutput = document.getElementById('jsonOutput');
@@ -771,6 +772,28 @@
     }
   }
 
+  async function exportCurrentStructure() {
+    const payload = {
+      version: 1,
+      groups: cloneGroups(currentGroups)
+    };
+    const text = JSON.stringify(payload, null, 2);
+    jsonOutput.value = text;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus(
+        `현재 구조 JSON 내보내기 완료: 그룹 ${currentGroups.length}개, 점 ${getTotalRectCount(currentGroups)}개 (클립보드 복사됨).`,
+        false
+      );
+    } catch (error) {
+      setStatus(
+        `현재 구조 JSON 내보내기 완료: 그룹 ${currentGroups.length}개, 점 ${getTotalRectCount(currentGroups)}개 (클립보드 복사는 실패).`,
+        false
+      );
+    }
+  }
+
   scaleRange.addEventListener('input', drawZoomCanvas);
 
   baseCanvas.addEventListener('click', event => {
@@ -789,6 +812,10 @@
 
   if (btnToggleConnect) {
     btnToggleConnect.addEventListener('click', toggleSelectedPointConnect);
+  }
+
+  if (btnExportJson) {
+    btnExportJson.addEventListener('click', exportCurrentStructure);
   }
 
   document.addEventListener('keydown', handleMoveKey);
