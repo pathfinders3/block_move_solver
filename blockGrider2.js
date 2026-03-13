@@ -313,20 +313,30 @@
     }
 
     const point = hit.point;
+    const group = currentGroups[hit.groupIndex];
     const segmentId =
-      currentGroups[hit.groupIndex] &&
-      currentGroups[hit.groupIndex].segments[hit.segmentIndex]
-        ? currentGroups[hit.groupIndex].segments[hit.segmentIndex].id
+      group &&
+      group.segments[hit.segmentIndex]
+        ? group.segments[hit.segmentIndex].id
         : '-';
     const segment =
-      currentGroups[hit.groupIndex] &&
-      currentGroups[hit.groupIndex].segments[hit.segmentIndex]
-        ? currentGroups[hit.groupIndex].segments[hit.segmentIndex]
+      group &&
+      group.segments[hit.segmentIndex]
+        ? group.segments[hit.segmentIndex]
         : null;
     const totalPoints = segment ? segment.points.length : 0;
+    const isMergeConnectedPoint = !!(
+      group &&
+      group.connections &&
+      group.connections.some(conn => (
+        (conn.from.segmentId === segmentId && conn.from.pointIndex === hit.pointIndex) ||
+        (conn.to.segmentId === segmentId && conn.to.pointIndex === hit.pointIndex)
+      ))
+    );
     clickInfo.textContent =
       `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 선 ${hit.segmentIndex + 1} (id=${segmentId}), 점 P ${hit.pointIndex}/${totalPoints}, ` +
-      `사각형 (${point.x}, ${point.y}, size=${point.size}, canConnect=${!!point.canConnect})`;
+      `사각형 (${point.x}, ${point.y}, size=${point.size}, canConnect=${!!point.canConnect}), ` +
+      `MERGE 연결점=${isMergeConnectedPoint ? '예' : '아니오'}`;
   }
 
   function handleCanvasClick(x, y, options) {
