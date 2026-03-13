@@ -2,6 +2,7 @@
   const btnLoadJson = document.getElementById('btnLoadJson');
   const btnExportJson = document.getElementById('btnExportJson');
   const btnMerge = document.getElementById('btnMerge');
+  const btnDisconnect = document.getElementById('btnDisconnect');
   const btnToggleConnect = document.getElementById('btnToggleConnect');
   const jsonOutput = document.getElementById('jsonOutput');
   const status = document.getElementById('status');
@@ -259,6 +260,29 @@
     btnMerge.disabled = selectedSelections.length !== 2;
   }
 
+  function getPointAndSegmentFromSelection(selection) {
+    if (!selection) return null;
+    const group = currentGroups[selection.groupIndex];
+    const segment = group && group.segments[selection.segmentIndex];
+    const point = segment && segment.points[selection.pointIndex];
+    if (!group || !segment || !point) return null;
+    return { group, segment, point };
+  }
+
+  function isSelectionMergeConnected(selection) {
+    const info = getPointAndSegmentFromSelection(selection);
+    if (!info) return false;
+    return info.group.connections.some(conn =>
+      (conn.from.segmentId === info.segment.id && conn.from.pointIndex === selection.pointIndex) ||
+      (conn.to.segmentId === info.segment.id && conn.to.pointIndex === selection.pointIndex)
+    );
+  }
+
+  function updateDisconnectButtonState() {
+    if (!btnDisconnect) return;
+    btnDisconnect.disabled = !isSelectionMergeConnected(selectedRect);
+  }
+
   function updateConnectButtonState() {
     if (!btnToggleConnect) return;
 
@@ -357,6 +381,7 @@
       updateMergeButtonState();
       updateSelectionInfo();
       updateConnectButtonState();
+      updateDisconnectButtonState();
       updateClickInfo(x, y, hit);
       drawBaseCanvas(currentGroups);
       drawZoomCanvas();
@@ -394,6 +419,7 @@
     updateMergeButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
+    updateDisconnectButtonState();
     updateClickInfo(x, y, hit);
     drawBaseCanvas(currentGroups);
     drawZoomCanvas();
@@ -893,6 +919,7 @@
     updateMergeButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
+    updateDisconnectButtonState();
     renderSegmentVisibilityPanel();
     drawBaseCanvas(currentGroups);
     drawZoomCanvas();
