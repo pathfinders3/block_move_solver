@@ -286,11 +286,13 @@
     }
 
     const labels = selectedSelections
-      .map(item => {
+      .map((item, index) => {
         const group = currentGroups[item.groupIndex];
         const segment = group && group.segments[item.segmentIndex];
         const totalPoints = segment ? segment.points.length : 0;
-        return `G${item.groupIndex + 1}:S${item.segmentIndex + 1}:P ${item.pointIndex}/${totalPoints}`;
+        const role = index === 0 ? 'MAIN' : 'SUB';
+        const colorName = index === 0 ? '빨강' : '파랑';
+        return `${role}(${colorName}) G${item.groupIndex + 1}:S${item.segmentIndex + 1}:P ${item.pointIndex}/${totalPoints}`;
       })
       .join(', ');
 
@@ -733,19 +735,28 @@
       }
     });
 
-    const redSelections = selectedSelections.length > 0 ? selectedSelections : selectedRect ? [selectedRect] : [];
+    const orderedSelections = selectedSelections.length > 0 ? selectedSelections : selectedRect ? [selectedRect] : [];
 
-    redSelections.forEach(sel => {
+    orderedSelections.forEach((sel, index) => {
       const group = groups[sel.groupIndex];
       const segment = group && group.segments[sel.segmentIndex];
       if (!segment || !visibleSegmentIds.has(segment.id)) return;
       const point = segment && segment.points[sel.pointIndex];
       if (!point) return;
 
-      baseCtx.strokeStyle = '#ff3b30';
+      if (selectedSelections.length > 0 && index === 0) {
+        baseCtx.strokeStyle = '#ff3b30';
+        baseCtx.setLineDash([]);
+      } else if (selectedSelections.length > 0 && index === 1) {
+        baseCtx.strokeStyle = '#2563eb';
+        baseCtx.setLineDash([]);
+      } else {
+        baseCtx.strokeStyle = '#ff3b30';
+        baseCtx.setLineDash([]);
+      }
       baseCtx.lineWidth = 1;
-      baseCtx.setLineDash([]);
       baseCtx.strokeRect(point.x + 0.5, point.y + 0.5, point.size - 1, point.size - 1);
+      baseCtx.setLineDash([]);
     });
   }
 
