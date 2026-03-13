@@ -587,6 +587,10 @@
       distance: Number(selectedDistance.toFixed(4))
     });
 
+    const mainSegmentId = mergedGroup.segments[selA.segmentIndex].id;
+    const subOriginalSegmentId = groupB.segments[selB.segmentIndex].id;
+    const subMergedSegmentId = sourceIdMap[subOriginalSegmentId] || subOriginalSegmentId;
+
     const keepIndex = Math.min(idxA, idxB);
     const removeIndex = Math.max(idxA, idxB);
 
@@ -613,7 +617,7 @@
       rect: selectedPoint
     });
     setStatus(
-      `그룹 병합 완료: ${idxA + 1} + ${idxB + 1} -> ${keepIndex + 1} (선택 점 거리 ${selectedDistance.toFixed(2)}).`,
+      `MERGE 완료: main=${mainSegmentId}, sub=${subOriginalSegmentId} -> ${subMergedSegmentId}, 거리=${selectedDistance.toFixed(2)}`,
       false
     );
   }
