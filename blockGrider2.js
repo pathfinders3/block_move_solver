@@ -625,34 +625,60 @@
   }
 
   function toggleSelectedPointConnect() {
-    if (!selectedRect) {
+    const targets = selectedSelections.length > 0
+      ? selectedSelections
+      : (selectedRect ? [selectedRect] : []);
+
+    if (targets.length === 0) {
       setStatus('먼저 점을 클릭해 선택해주세요.', true);
       return;
     }
 
-    const group = currentGroups[selectedRect.groupIndex];
-    const segment = group && group.segments[selectedRect.segmentIndex];
-    const point = segment && segment.points[selectedRect.pointIndex];
-    if (!point) {
+    const first = targets[0];
+    const firstGroup = currentGroups[first.groupIndex];
+    const firstSegment = firstGroup && firstGroup.segments[first.segmentIndex];
+    const firstPoint = firstSegment && firstSegment.points[first.pointIndex];
+    if (!firstPoint) {
+      setStatus('기준 점(첫 번째 선택 점)을 찾을 수 없습니다.', true);
+      return;
+    }
+
+    const nextValue = !firstPoint.canConnect;
+
+    let toggledCount = 0;
+    targets.forEach(sel => {
+      const group = currentGroups[sel.groupIndex];
+      const segment = group && group.segments[sel.segmentIndex];
+      const point = segment && segment.points[sel.pointIndex];
+      if (!point) return;
+
+      point.canConnect = nextValue;
+      toggledCount += 1;
+    });
+
+    if (toggledCount === 0) {
       setStatus('선택 점을 찾을 수 없습니다.', true);
       updateConnectButtonState();
       return;
     }
 
-    point.canConnect = !point.canConnect;
-    updateConnectButtonState();
     renderGroups(currentGroups);
-    updateClickInfo(point.x, point.y, {
-      groupIndex: selectedRect.groupIndex,
-      segmentIndex: selectedRect.segmentIndex,
-      pointIndex: selectedRect.pointIndex,
-      point,
-      rect: point
-    });
-    setStatus(
-      `그룹 ${selectedRect.groupIndex + 1} / 선 ${selectedRect.segmentIndex + 1} / 점 ${selectedRect.pointIndex + 1} canConnect=${point.canConnect}`,
-      false
-    );
+
+    const primary = targets[0];
+    const group = currentGroups[primary.groupIndex];
+    const segment = group && group.segments[primary.segmentIndex];
+    const point = segment && segment.points[primary.pointIndex];
+    if (point) {
+      updateClickInfo(point.x, point.y, {
+        groupIndex: primary.groupIndex,
+        segmentIndex: primary.segmentIndex,
+        pointIndex: primary.pointIndex,
+        point,
+        rect: point
+      });
+    }
+
+    setStatus(`선택 점 ${toggledCount}개 canConnect=${nextValue} 로 일괄 적용했습니다.`, false);
   }
 
   function handleMoveKey(event) {
