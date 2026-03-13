@@ -36,6 +36,8 @@
   let mergeUndoStack = [];
   let visibleSegmentIds = new Set();
   let knownSegmentIds = new Set();
+  let lastCycleKey = '';
+  let lastCycleIndex = 0;
 
   function createGroupId() {
     return `group-${groupSeq++}`;
@@ -232,7 +234,8 @@
     return x >= point.x && x < point.x + point.size && y >= point.y && y < point.y + point.size;
   }
 
-  function findRectAtPoint(x, y) {
+  function findRectsAtPoint(x, y) {
+    const hits = [];
     for (let g = currentGroups.length - 1; g >= 0; g--) {
       const group = currentGroups[g];
       for (let s = group.segments.length - 1; s >= 0; s--) {
@@ -241,18 +244,18 @@
         for (let p = segment.points.length - 1; p >= 0; p--) {
           const point = segment.points[p];
           if (isPointInRect(x, y, point)) {
-            return {
+            hits.push({
               groupIndex: g,
               segmentIndex: s,
               pointIndex: p,
               point,
               rect: point
-            };
+            });
           }
         }
       }
     }
-    return null;
+    return hits;
   }
 
   function updateMergeButtonState() {
@@ -365,7 +368,27 @@
 
   function handleCanvasClick(x, y, options) {
     const toggleSelection = !!(options && options.toggleSelection);
-    const hit = findRectAtPoint(x, y);
+    const cycleSelection = !!(options && options.cycleSelection);
+    const hits = findRectsAtPoint(x, y);
+
+    let hit = null;
+    if (hits.length > 0) {
+      const cycleKey = `${x},${y}|${hits.map(h => `${h.groupIndex}-${h.segmentIndex}-${h.pointIndex}`).join('|')}`;
+      if (cycleSelection && hits.length > 1) {
+        if (lastCycleKey === cycleKey) {
+          lastCycleIndex = (lastCycleIndex + 1) % hits.length;
+        } else {
+          lastCycleKey = cycleKey;
+          lastCycleIndex = 0;
+        }
+        hit = hits[lastCycleIndex];
+      } else {
+        lastCycleKey = cycleKey;
+        lastCycleIndex = 0;
+        hit = hits[0];
+      }
+    }
+
     selectedRect = hit
       ? {
           groupIndex: hit.groupIndex,
@@ -375,6 +398,8 @@
       : null;
 
     if (!hit) {
+      lastCycleKey = '';
+      lastCycleIndex = 0;
       if (!toggleSelection) {
         selectedSelections = [];
       }
@@ -989,12 +1014,18 @@
 
   baseCanvas.addEventListener('click', event => {
     const point = getCanvasCoordsFromEvent(event, baseCanvas, 1);
-    handleCanvasClick(point.x, point.y, { toggleSelection: event.ctrlKey || event.metaKey });
+    handleCanvasClick(point.x, point.y, {
+      toggleSelection: event.ctrlKey || event.metaKey,
+      cycleSelection: event.altKey
+    });
   });
 
   zoomCanvas.addEventListener('click', event => {
     const point = getCanvasCoordsFromEvent(event, zoomCanvas, getCurrentScale());
-    handleCanvasClick(point.x, point.y, { toggleSelection: event.ctrlKey || event.metaKey });
+    handleCanvasClick(point.x, point.y, {
+      toggleSelection: event.ctrlKey || event.metaKey,
+      cycleSelection: event.altKey
+    });
   });
 
   if (btnMerge) {
