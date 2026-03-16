@@ -4,6 +4,8 @@
   const btnMerge = document.getElementById('btnMerge');
   const btnDisconnect = document.getElementById('btnDisconnect');
   const btnToggleConnect = document.getElementById('btnToggleConnect');
+  const btnPrevPoint = document.getElementById('btnPrevPoint');
+  const btnNextPoint = document.getElementById('btnNextPoint');
   const jsonOutput = document.getElementById('jsonOutput');
   const status = document.getElementById('status');
   const clickInfo = document.getElementById('clickInfo');
@@ -295,6 +297,22 @@
     btnDisconnect.disabled = !isSelectionMergeConnected(selectedRect);
   }
 
+  function updatePointNavButtonState() {
+    if (!btnPrevPoint || !btnNextPoint) return;
+
+    const info = getPointAndSegmentFromSelection(selectedRect);
+    if (!info) {
+      btnPrevPoint.disabled = true;
+      btnNextPoint.disabled = true;
+      return;
+    }
+
+    const pointIndex = selectedRect.pointIndex;
+    const maxIndex = info.segment.points.length - 1;
+    btnPrevPoint.disabled = pointIndex <= 0;
+    btnNextPoint.disabled = pointIndex >= maxIndex;
+  }
+
   function updateConnectButtonState() {
     if (!btnToggleConnect) return;
 
@@ -471,6 +489,54 @@
     updateClickInfo(x, y, hit, { index: lastCycleIndex, total: Math.max(1, hits.length) });
     drawBaseCanvas(currentGroups);
     drawZoomCanvas();
+  }
+
+  function navigateSelectedPoint(step) {
+    if (!selectedRect) {
+      setStatus('먼저 점을 클릭해 선택해주세요.', true);
+      return;
+    }
+
+    const info = getPointAndSegmentFromSelection(selectedRect);
+    if (!info) {
+      setStatus('선택 점 정보를 찾을 수 없습니다.', true);
+      return;
+    }
+
+    const maxIndex = info.segment.points.length - 1;
+    const nextPointIndex = Math.max(0, Math.min(maxIndex, selectedRect.pointIndex + step));
+    if (nextPointIndex === selectedRect.pointIndex) {
+      updatePointNavButtonState();
+      return;
+    }
+
+    selectedRect = {
+      groupIndex: selectedRect.groupIndex,
+      segmentIndex: selectedRect.segmentIndex,
+      pointIndex: nextPointIndex
+    };
+
+    const selectionIdx = selectedSelections.findIndex(
+      item => item.groupIndex === selectedRect.groupIndex
+    );
+    if (selectionIdx >= 0) {
+      selectedSelections[selectionIdx] = {
+        groupIndex: selectedRect.groupIndex,
+        segmentIndex: selectedRect.segmentIndex,
+        pointIndex: nextPointIndex
+      };
+    }
+
+    const point = info.segment.points[nextPointIndex];
+    updateClickInfo(point.x, point.y, {
+      groupIndex: selectedRect.groupIndex,
+      segmentIndex: selectedRect.segmentIndex,
+      pointIndex: nextPointIndex,
+      point,
+      rect: point
+    });
+
+    renderGroups(currentGroups);
   }
 
   function getGroupBounds(group, includeHidden) {
@@ -968,6 +1034,7 @@
     updateSelectionInfo();
     updateConnectButtonState();
     updateDisconnectButtonState();
+    updatePointNavButtonState();
     renderSegmentVisibilityPanel();
     drawBaseCanvas(currentGroups);
     drawZoomCanvas();
@@ -1057,6 +1124,14 @@
 
   if (btnToggleConnect) {
     btnToggleConnect.addEventListener('click', toggleSelectedPointConnect);
+  }
+
+  if (btnPrevPoint) {
+    btnPrevPoint.addEventListener('click', () => navigateSelectedPoint(-1));
+  }
+
+  if (btnNextPoint) {
+    btnNextPoint.addEventListener('click', () => navigateSelectedPoint(1));
   }
 
   if (btnExportJson) {
