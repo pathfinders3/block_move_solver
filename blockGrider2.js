@@ -51,6 +51,15 @@
     return `conn-${connectionSeq++}`;
   }
 
+  function escHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+
   function setStatus(message, isError) {
     status.textContent = message;
     status.classList.toggle('error', !!isError);
@@ -317,13 +326,16 @@
         const group = currentGroups[item.groupIndex];
         const segment = group && group.segments[item.segmentIndex];
         const totalPoints = segment ? segment.points.length : 0;
-        const role = index === 0 ? 'MAIN' : 'SUB';
-        const colorName = index === 0 ? '빨강' : '파랑';
-        return `${role}(${colorName}) G${item.groupIndex + 1}:S${item.segmentIndex + 1}:P ${item.pointIndex}/${totalPoints}`;
+        const roleTag = index === 0
+          ? '<span class="role-tag role-main">MAIN(빨강)</span>'
+          : '<span class="role-tag role-sub">SUB(파랑)</span>';
+        const hue = getSegmentHue(item.groupIndex, item.segmentIndex);
+        const segmentTag = `<span class="segment-tag" style="background:hsl(${hue} 70% 36%);">S${item.segmentIndex + 1}</span>`;
+        return `${roleTag} G${item.groupIndex + 1}:${segmentTag}:P ${item.pointIndex}/${totalPoints}`;
       })
       .join(', ');
 
-    selectionInfo.textContent = `선택된 그룹: ${selectedSelections.length}개 (${labels})`;
+    selectionInfo.innerHTML = `선택된 그룹: <span class="info-badge">${selectedSelections.length}개</span> ${labels}`;
   }
 
   function getPrimarySelectedGroupIndex() {
@@ -332,7 +344,7 @@
     return null;
   }
 
-  function updateClickInfo(x, y, hit) {
+  function updateClickInfo(x, y, hit, cycleMeta) {
     if (!clickInfo) return;
     if (!hit) {
       clickInfo.textContent = `클릭 좌표: (${x}, ${y}) | 선택 없음`;
@@ -360,10 +372,21 @@
         (conn.to.segmentId === segmentId && conn.to.pointIndex === hit.pointIndex)
       ))
     );
-    clickInfo.textContent =
-      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 선 ${hit.segmentIndex + 1} (id=${segmentId}), 점 P ${hit.pointIndex}/${totalPoints}, ` +
-      `사각형 (${point.x}, ${point.y}, size=${point.size}, canConnect=${!!point.canConnect}), ` +
-      `MERGE 연결점=${isMergeConnectedPoint ? '예' : '아니오'}`;
+
+    const candidateIndex = cycleMeta && Number.isInteger(cycleMeta.index) ? cycleMeta.index + 1 : null;
+    const candidateTotal = cycleMeta && Number.isInteger(cycleMeta.total) ? cycleMeta.total : null;
+    const candidateBadge =
+      candidateTotal && candidateTotal > 1
+        ? `<span class="info-badge badge-sub">후보 ${candidateIndex}/${candidateTotal}</span>`
+        : '';
+    const mergeBadge = isMergeConnectedPoint
+      ? '<span class="info-badge badge-main">MERGE 연결점</span>'
+      : '<span class="info-badge">일반 점</span>';
+
+    clickInfo.innerHTML =
+      `${candidateBadge}${mergeBadge}` +
+      `클릭 좌표: (${x}, ${y}) | 그룹 ${hit.groupIndex + 1}, 선 ${hit.segmentIndex + 1} (id=${escHtml(segmentId)}), ` +
+      `점 P ${hit.pointIndex}/${totalPoints}, 사각형 (${point.x}, ${point.y}, size=${point.size}, canConnect=${!!point.canConnect})`;
   }
 
   function handleCanvasClick(x, y, options) {
@@ -445,7 +468,7 @@
     updateSelectionInfo();
     updateConnectButtonState();
     updateDisconnectButtonState();
-    updateClickInfo(x, y, hit);
+    updateClickInfo(x, y, hit, { index: lastCycleIndex, total: Math.max(1, hits.length) });
     drawBaseCanvas(currentGroups);
     drawZoomCanvas();
   }
