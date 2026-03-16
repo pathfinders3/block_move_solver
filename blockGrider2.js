@@ -297,6 +297,16 @@
     btnDisconnect.disabled = !isSelectionMergeConnected(selectedRect);
   }
 
+  function findConnectionIndexForSelection(selection) {
+    const info = getPointAndSegmentFromSelection(selection);
+    if (!info) return -1;
+
+    return info.group.connections.findIndex(conn =>
+      (conn.from.segmentId === info.segment.id && conn.from.pointIndex === selection.pointIndex) ||
+      (conn.to.segmentId === info.segment.id && conn.to.pointIndex === selection.pointIndex)
+    );
+  }
+
   function updatePointNavButtonState() {
     if (!btnPrevPoint || !btnNextPoint) return;
 
@@ -665,6 +675,60 @@
     return idMap;
   }
 
+  function splitGroupByConnections(group) {
+    const segmentIdToSegment = new Map();
+    const adjacency = new Map();
+
+    group.segments.forEach(segment => {
+      segmentIdToSegment.set(segment.id, segment);
+      adjacency.set(segment.id, new Set());
+    });
+
+    group.connections.forEach(conn => {
+      if (!adjacency.has(conn.from.segmentId) || !adjacency.has(conn.to.segmentId)) return;
+      adjacency.get(conn.from.segmentId).add(conn.to.segmentId);
+      adjacency.get(conn.to.segmentId).add(conn.from.segmentId);
+    });
+
+    const visited = new Set();
+    const components = [];
+
+    group.segments.forEach(segment => {
+      if (visited.has(segment.id)) return;
+
+      const queue = [segment.id];
+      visited.add(segment.id);
+      const componentSegmentIds = new Set();
+
+      while (queue.length > 0) {
+        const current = queue.shift();
+        componentSegmentIds.add(current);
+
+        adjacency.get(current).forEach(nextId => {
+          if (visited.has(nextId)) return;
+          visited.add(nextId);
+          queue.push(nextId);
+        });
+      }
+
+      const componentSegments = group.segments
+        .filter(seg => componentSegmentIds.has(seg.id))
+        .map(cloneSegment);
+
+      const componentConnections = group.connections
+        .filter(conn => componentSegmentIds.has(conn.from.segmentId) && componentSegmentIds.has(conn.to.segmentId))
+        .map(cloneConnection);
+
+      components.push({
+        id: null,
+        segments: componentSegments,
+        connections: componentConnections
+      });
+    });
+
+    return components;
+  }
+
   function mergeSelectedGroups() {
     if (selectedSelections.length !== 2) {
       setStatus('Merge는 Ctrl+클릭으로 그룹 2개를 선택해야 실행됩니다.', true);
@@ -829,6 +893,74 @@
     }
 
     setStatus(`선택 점 ${toggledCount}개 canConnect=${nextValue} 로 일괄 적용했습니다.`, false);
+  }
+
+  function disconnectSelectedPoint() {
+    if (!selectedRect) {
+      setStatus('먼저 점을 클릭해 선택해주세요.', true);
+      return;
+    }
+
+    const info = getPointAndSegmentFromSelection(selectedRect);
+    if (!info) {
+      setStatus('선택 점 정보를 찾을 수 없습니다.', true);
+      return;
+    }
+
+    const connectionIndex = findConnectionIndexForSelection(selectedRect);
+    if (connectionIndex < 0) {
+      setStatus('선택 점은 MERGE 연결점이 아닙니다.', true);
+      return;
+    }
+
+    const sourceGroupIndex = selectedRect.groupIndex;
+    const sourceSegmentId = info.segment.id;
+    const sourcePointIndex = selectedRect.pointIndex;
+
+    pushMergeUndoSnapshot();
+    const [removed] = info.group.connections.splice(connectionIndex, 1);
+
+    const splitGroups = splitGroupByConnections(info.group);
+    const keepCount = splitGroups.length;
+
+    if (keepCount === 0) {
+      currentGroups.splice(sourceGroupIndex, 1);
+      selectedRect = null;
+      selectedSelections = [];
+      renderGroups(currentGroups);
+      setStatus('연결 해제 후 그룹이 비어 삭제되었습니다.', false);
+      return;
+    }
+
+    const normalizedGroups = splitGroups.map((g, idx) => ({
+      id: idx === 0 ? info.group.id : createGroupId(),
+      segments: g.segments.map(cloneSegment),
+      connections: g.connections.map(cloneConnection)
+    }));
+
+    currentGroups.splice(sourceGroupIndex, 1, ...normalizedGroups);
+
+    let nextSelectedRect = null;
+    normalizedGroups.forEach((g, compIdx) => {
+      if (nextSelectedRect) return;
+      const segIdx = g.segments.findIndex(seg => seg.id === sourceSegmentId);
+      if (segIdx < 0) return;
+      const ptIdx = Math.max(0, Math.min(sourcePointIndex, g.segments[segIdx].points.length - 1));
+      nextSelectedRect = {
+        groupIndex: sourceGroupIndex + compIdx,
+        segmentIndex: segIdx,
+        pointIndex: ptIdx
+      };
+    });
+
+    selectedRect = nextSelectedRect;
+    selectedSelections = nextSelectedRect ? [nextSelectedRect] : [];
+
+    renderGroups(currentGroups);
+    setStatus(
+      `연결 해제 완료: ${removed.from.segmentId}:P${removed.from.pointIndex} -> ${removed.to.segmentId}:P${removed.to.pointIndex} (그룹 분리 ${keepCount}개)`,
+      false
+    );
   }
 
   function handleMoveKey(event) {
@@ -1124,6 +1256,10 @@
 
   if (btnToggleConnect) {
     btnToggleConnect.addEventListener('click', toggleSelectedPointConnect);
+  }
+
+  if (btnDisconnect) {
+    btnDisconnect.addEventListener('click', disconnectSelectedPoint);
   }
 
   if (btnPrevPoint) {
