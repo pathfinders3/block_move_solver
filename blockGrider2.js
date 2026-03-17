@@ -27,6 +27,7 @@
   const MOVE_STEP = 5;
   const MERGE_DISTANCE_THRESHOLD = 80;
   const MAX_UNDO_STACK = 30;
+  const SEGMENT_HUE_PALETTE = [210, 30, 135, 280, 350, 55, 175, 305, 15, 195];
 
   let groupSeq = 1;
   let segmentSeq = 1;
@@ -40,6 +41,8 @@
   let knownSegmentIds = new Set();
   let lastCycleKey = '';
   let lastCycleIndex = 0;
+  let lastTabCycleKey = '';
+  let lastTabCycleIndex = -1;
 
   function createGroupId() {
     return `group-${groupSeq++}`;
@@ -132,7 +135,8 @@
   }
 
   function getSegmentHue(groupIndex, segmentIndex) {
-    return (groupIndex * 67 + segmentIndex * 17) % 360;
+    const paletteIndex = (groupIndex * 5 + segmentIndex) % SEGMENT_HUE_PALETTE.length;
+    return SEGMENT_HUE_PALETTE[paletteIndex];
   }
 
   function getSegmentFillColor(groupIndex, segmentIndex) {
@@ -313,6 +317,98 @@
       (conn.from.segmentId === info.segment.id && conn.from.pointIndex === selection.pointIndex) ||
       (conn.to.segmentId === info.segment.id && conn.to.pointIndex === selection.pointIndex)
     );
+  }
+
+  function getConnectedSelectionsForSelection(selection) {
+    const info = getPointAndSegmentFromSelection(selection);
+    if (!info) return [];
+
+    const segmentIdToIndex = new Map();
+    info.group.segments.forEach((segment, index) => {
+      segmentIdToIndex.set(segment.id, index);
+    });
+
+    const unique = new Set();
+    const results = [];
+
+    info.group.connections.forEach(conn => {
+      let peer = null;
+
+      if (conn.from.segmentId === info.segment.id && conn.from.pointIndex === selection.pointIndex) {
+        peer = conn.to;
+      } else if (conn.to.segmentId === info.segment.id && conn.to.pointIndex === selection.pointIndex) {
+        peer = conn.from;
+      }
+
+      if (!peer) return;
+
+      const peerSegmentIndex = segmentIdToIndex.get(peer.segmentId);
+      if (!Number.isInteger(peerSegmentIndex)) return;
+
+      const peerSegment = info.group.segments[peerSegmentIndex];
+      if (!peerSegment || !peerSegment.points[peer.pointIndex]) return;
+
+      const key = `${peerSegmentIndex}-${peer.pointIndex}`;
+      if (unique.has(key)) return;
+      unique.add(key);
+
+      results.push({
+        groupIndex: selection.groupIndex,
+        segmentIndex: peerSegmentIndex,
+        pointIndex: peer.pointIndex
+      });
+    });
+
+    return results;
+  }
+
+  function cycleToConnectedMergePoint(reverse) {
+    if (!selectedRect) return false;
+
+    const peers = getConnectedSelectionsForSelection(selectedRect);
+    if (peers.length === 0) return false;
+
+    const cycleKey = `${selectedRect.groupIndex}-${selectedRect.segmentIndex}-${selectedRect.pointIndex}|${peers
+      .map(item => `${item.groupIndex}-${item.segmentIndex}-${item.pointIndex}`)
+      .join('|')}`;
+
+    if (lastTabCycleKey === cycleKey) {
+      if (reverse) {
+        lastTabCycleIndex = (lastTabCycleIndex - 1 + peers.length) % peers.length;
+      } else {
+        lastTabCycleIndex = (lastTabCycleIndex + 1) % peers.length;
+      }
+    } else {
+      lastTabCycleKey = cycleKey;
+      lastTabCycleIndex = reverse ? peers.length - 1 : 0;
+    }
+
+    const next = peers[lastTabCycleIndex];
+    selectedRect = { ...next };
+
+    const selectedIndex = selectedSelections.findIndex(item => item.groupIndex === next.groupIndex);
+    if (selectedIndex >= 0) {
+      selectedSelections[selectedIndex] = { ...next };
+    } else if (selectedSelections.length === 0) {
+      selectedSelections = [{ ...next }];
+    }
+
+    const group = currentGroups[next.groupIndex];
+    const segment = group && group.segments[next.segmentIndex];
+    const point = segment && segment.points[next.pointIndex];
+    if (!point) return false;
+
+    updateClickInfo(point.x, point.y, {
+      groupIndex: next.groupIndex,
+      segmentIndex: next.segmentIndex,
+      pointIndex: next.pointIndex,
+      point,
+      rect: point
+    });
+
+    renderGroups(currentGroups);
+    setStatus('Tab으로 MERGE 연결 상대 점으로 전환했습니다.', false);
+    return true;
   }
 
   function updatePointNavButtonState() {
@@ -1004,6 +1100,14 @@
       return;
     }
 
+    if (event.key === 'Tab') {
+      const switched = cycleToConnectedMergePoint(event.shiftKey);
+      if (switched) {
+        event.preventDefault();
+      }
+      return;
+    }
+
     if (event.key === 'Delete') {
       event.preventDefault();
       deleteSelectedGroups();
@@ -1066,10 +1170,8 @@
           }
           baseCtx.fillRect(point.x, point.y, point.size, point.size);
 
-          if (isMergePoint && point.canConnect) {
-            baseCtx.strokeStyle = '#0097a7';
-          } else if (isMergePoint) {
-            baseCtx.strokeStyle = '#8a3b00';
+          if (isMergePoint) {
+            baseCtx.strokeStyle = '#4c1d95';
           } else if (point.canConnect) {
             baseCtx.strokeStyle = '#d4af37';
           } else {
