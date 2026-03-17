@@ -292,6 +292,14 @@
     );
   }
 
+  function isPointMergeConnected(group, segmentId, pointIndex) {
+    if (!group || !group.connections) return false;
+    return group.connections.some(conn =>
+      (conn.from.segmentId === segmentId && conn.from.pointIndex === pointIndex) ||
+      (conn.to.segmentId === segmentId && conn.to.pointIndex === pointIndex)
+    );
+  }
+
   function updateDisconnectButtonState() {
     if (!btnDisconnect) return;
     btnDisconnect.disabled = !isSelectionMergeConnected(selectedRect);
@@ -392,14 +400,7 @@
         ? group.segments[hit.segmentIndex]
         : null;
     const totalPoints = segment ? segment.points.length : 0;
-    const isMergeConnectedPoint = !!(
-      group &&
-      group.connections &&
-      group.connections.some(conn => (
-        (conn.from.segmentId === segmentId && conn.from.pointIndex === hit.pointIndex) ||
-        (conn.to.segmentId === segmentId && conn.to.pointIndex === hit.pointIndex)
-      ))
-    );
+    const isMergeConnectedPoint = isPointMergeConnected(group, segmentId, hit.pointIndex);
 
     const candidateIndex = cycleMeta && Number.isInteger(cycleMeta.index) ? cycleMeta.index + 1 : null;
     const candidateTotal = cycleMeta && Number.isInteger(cycleMeta.total) ? cycleMeta.total : null;
@@ -1051,13 +1052,37 @@
         if (!visibleSegmentIds.has(segment.id)) return;
         const fill = getSegmentFillColor(groupIndex, segmentIndex);
 
-        segment.points.forEach(point => {
-          baseCtx.fillStyle = point.canConnect ? 'rgba(34, 197, 94, 0.75)' : fill;
+        segment.points.forEach((point, pointIndex) => {
+          const isMergePoint = isPointMergeConnected(group, segment.id, pointIndex);
+
+          if (isMergePoint) {
+            baseCtx.fillStyle = 'rgba(255, 138, 0, 0.85)';
+          } else if (point.canConnect) {
+            baseCtx.fillStyle = 'rgba(34, 197, 94, 0.75)';
+          } else {
+            baseCtx.fillStyle = fill;
+          }
           baseCtx.fillRect(point.x, point.y, point.size, point.size);
 
-          baseCtx.strokeStyle = point.canConnect ? '#d4af37' : '#6b7280';
+          if (isMergePoint) {
+            baseCtx.strokeStyle = '#8a3b00';
+          } else if (point.canConnect) {
+            baseCtx.strokeStyle = '#d4af37';
+          } else {
+            baseCtx.strokeStyle = '#6b7280';
+          }
           baseCtx.lineWidth = 1;
           baseCtx.strokeRect(point.x + 0.5, point.y + 0.5, point.size - 1, point.size - 1);
+
+          if (isMergePoint && point.canConnect) {
+            baseCtx.fillStyle = '#22c55e';
+            baseCtx.fillRect(
+              point.x + Math.max(0, Math.floor(point.size / 2) - 1),
+              point.y + Math.max(0, Math.floor(point.size / 2) - 1),
+              2,
+              2
+            );
+          }
         });
       });
 
