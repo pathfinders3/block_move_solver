@@ -1160,7 +1160,7 @@
           const isMergePoint = isPointMergeConnected(group, segment.id, pointIndex);
 
           if (isMergePoint && point.canConnect) {
-            baseCtx.fillStyle = '#00e5ff';
+            baseCtx.fillStyle = '#c4b5fd';
           } else if (isMergePoint) {
             baseCtx.fillStyle = 'rgba(255, 138, 0, 0.85)';
           } else if (point.canConnect) {
@@ -1181,7 +1181,7 @@
           baseCtx.strokeRect(point.x + 0.5, point.y + 0.5, point.size - 1, point.size - 1);
 
           if (isMergePoint && point.canConnect && point.size >= 3) {
-            baseCtx.fillStyle = '#00e5ff';
+            baseCtx.fillStyle = '#c4b5fd';
             baseCtx.fillRect(point.x + 1, point.y + 1, point.size - 2, point.size - 2);
           }
         });
