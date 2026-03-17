@@ -963,6 +963,34 @@
     );
   }
 
+  function deleteSelectedGroups() {
+    let targetGroupIndices = getSelectedGroupIndices();
+
+    if (targetGroupIndices.length === 0 && selectedRect) {
+      targetGroupIndices = [selectedRect.groupIndex];
+    }
+
+    if (targetGroupIndices.length === 0) {
+      setStatus('삭제할 그룹이 선택되지 않았습니다.', true);
+      return;
+    }
+
+    pushMergeUndoSnapshot();
+
+    const uniqueSortedDesc = [...new Set(targetGroupIndices)].sort((a, b) => b - a);
+    uniqueSortedDesc.forEach(index => {
+      if (index >= 0 && index < currentGroups.length) {
+        currentGroups.splice(index, 1);
+      }
+    });
+
+    selectedRect = null;
+    selectedSelections = [];
+
+    renderGroups(currentGroups);
+    setStatus(`그룹 ${uniqueSortedDesc.length}개를 삭제했습니다. (Ctrl+Z로 복구 가능)`, false);
+  }
+
   function handleMoveKey(event) {
     const target = event.target;
     const isTypingTarget =
@@ -972,6 +1000,12 @@
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault();
       undoLastMerge();
+      return;
+    }
+
+    if (event.key === 'Delete') {
+      event.preventDefault();
+      deleteSelectedGroups();
       return;
     }
 
