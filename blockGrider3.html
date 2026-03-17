@@ -6,14 +6,14 @@
   <title>blockGrider3 Receiver</title>
   <style>
     :root {
-      --bg: #f4f7fb;
-      --panel: #ffffff;
-      --text: #0f172a;
-      --muted: #475569;
-      --border: #cbd5e1;
-      --accent: #0ea5e9;
-      --ok: #166534;
-      --warn: #92400e;
+      --bg: #0b1220;
+      --panel: #111a2b;
+      --text: #e6edf7;
+      --muted: #9db0c7;
+      --border: #334155;
+      --accent: #38bdf8;
+      --ok: #86efac;
+      --warn: #facc15;
     }
 
     * { box-sizing: border-box; }
@@ -21,7 +21,7 @@
     body {
       margin: 0;
       padding: 24px;
-      background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 45%, #ecfeff 100%);
+      background: radial-gradient(circle at 20% 20%, #18233b 0%, var(--bg) 62%);
       color: var(--text);
       font-family: "Consolas", "Menlo", "Monaco", monospace;
     }
@@ -33,7 +33,7 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 18px;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4);
     }
 
     h1 {
@@ -58,28 +58,82 @@
       display: inline-flex;
       align-items: center;
       border: 1px solid var(--border);
-      background: #f8fafc;
+      background: #1b2940;
       padding: 4px 8px;
       border-radius: 999px;
       font-size: 12px;
-      color: #1e293b;
+      color: #dbe7f5;
     }
 
     .status {
       margin: 0 0 12px;
       padding: 10px 12px;
       border-radius: 8px;
-      border: 1px solid #bbf7d0;
-      background: #f0fdf4;
+      border: 1px solid #14532d;
+      background: #0f2b1a;
       color: var(--ok);
       font-size: 13px;
       line-height: 1.45;
     }
 
     .status.warn {
-      border-color: #fde68a;
-      background: #fffbeb;
+      border-color: #713f12;
+      background: #2f1f0f;
       color: var(--warn);
+    }
+
+    .viewer-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0;
+      color: var(--muted);
+      font-size: 13px;
+      flex-wrap: wrap;
+    }
+
+    .viewer {
+      display: grid;
+      grid-template-columns: max-content minmax(220px, 1fr);
+      gap: 14px;
+      align-items: start;
+      margin: 8px 0 14px;
+    }
+
+    .viewer-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .viewer-title {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    canvas {
+      border: 1px solid var(--border);
+      background: #030712;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border-radius: 8px;
+    }
+
+    .zoom-scroll {
+      width: 100%;
+      max-width: 100%;
+      max-height: 520px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #030712;
+      padding: 6px;
+    }
+
+    #zoomCanvas {
+      display: block;
+      border: 0;
+      border-radius: 0;
     }
 
     textarea {
@@ -92,8 +146,8 @@
       outline: none;
       font-size: 13px;
       line-height: 1.45;
-      color: #0f172a;
-      background: #ffffff;
+      color: #e2e8f0;
+      background: #0a1425;
     }
 
     .actions {
@@ -105,9 +159,9 @@
     }
 
     button {
-      border: 1px solid #0284c7;
+      border: 1px solid #0ea5e9;
       background: var(--accent);
-      color: #082f49;
+      color: #06263b;
       border-radius: 8px;
       padding: 8px 12px;
       font-weight: 700;
@@ -127,6 +181,28 @@
     </div>
 
     <div id="status" class="status warn">대기 중...</div>
+
+    <div class="viewer-controls">
+      <label for="scaleRange">확대 배율:</label>
+      <input type="range" id="scaleRange" min="0" max="5" value="1" step="1">
+      <span id="scaleDisplay">4x</span>
+      <span>|</span>
+      <span>비트맵 미리보기</span>
+    </div>
+
+    <div class="viewer">
+      <div class="viewer-block">
+        <div class="viewer-title" id="baseCanvasTitle">원본 64x64</div>
+        <canvas id="baseCanvas" width="64" height="64"></canvas>
+      </div>
+      <div class="viewer-block">
+        <div class="viewer-title">확대 보기</div>
+        <div class="zoom-scroll">
+          <canvas id="zoomCanvas" width="1024" height="1024"></canvas>
+        </div>
+      </div>
+    </div>
+
     <textarea id="output" placeholder="전달된 JSON이 여기 표시됩니다."></textarea>
 
     <div class="actions">
@@ -135,79 +211,6 @@
     </div>
   </div>
 
-  <script>
-    (function () {
-      const output = document.getElementById('output');
-      const status = document.getElementById('status');
-      const badgeMethod = document.getElementById('badgeMethod');
-      const badgeGroups = document.getElementById('badgeGroups');
-      const badgePoints = document.getElementById('badgePoints');
-      const btnCopy = document.getElementById('btnCopy');
-      const btnReload = document.getElementById('btnReload');
-
-      function setStatus(message, warn) {
-        status.textContent = message;
-        status.classList.toggle('warn', !!warn);
-      }
-
-      function countPoints(groups) {
-        return (groups || []).reduce((sum, group) => {
-          return sum + (group.segments || []).reduce((segmentSum, segment) => {
-            return segmentSum + (segment.points || []).length;
-          }, 0);
-        }, 0);
-      }
-
-      function updateMeta(payload, methodText) {
-        const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
-        badgeMethod.textContent = `전달 방식: ${methodText}`;
-        badgeGroups.textContent = `그룹: ${groups.length}`;
-        badgePoints.textContent = `점: ${countPoints(groups)}`;
-      }
-
-      function receiveFromTransferKey() {
-        const params = new URLSearchParams(window.location.search);
-        const transferKey = params.get('transferKey');
-        if (!transferKey) {
-          setStatus('transferKey가 없어 데이터 수신에 실패했습니다.', true);
-          badgeMethod.textContent = '전달 방식: 없음';
-          return;
-        }
-
-        const text = localStorage.getItem(transferKey);
-        if (!text) {
-          setStatus('localStorage에서 데이터를 찾지 못했습니다. 새 탭이 너무 늦게 열렸거나 전달 데이터가 이미 정리되었을 수 있습니다.', true);
-          badgeMethod.textContent = '전달 방식: transferKey(localStorage)';
-          return;
-        }
-
-        localStorage.removeItem(transferKey);
-
-        output.value = text;
-
-        try {
-          const payload = JSON.parse(text);
-          updateMeta(payload, 'transferKey(localStorage)');
-          setStatus('JSON 수신 완료.', false);
-        } catch (error) {
-          updateMeta(null, 'transferKey(localStorage)');
-          setStatus('JSON 파싱에 실패했습니다.', true);
-        }
-      }
-
-      btnCopy.addEventListener('click', async () => {
-        try {
-          await navigator.clipboard.writeText(output.value || '');
-          setStatus('JSON을 클립보드에 복사했습니다.', false);
-        } catch (error) {
-          setStatus('클립보드 복사에 실패했습니다.', true);
-        }
-      });
-
-      btnReload.addEventListener('click', receiveFromTransferKey);
-
-      receiveFromTransferKey();
-    })();
-  </script>
+  <script src="blockGrider3.js"></script>
 </body>
 </html>
