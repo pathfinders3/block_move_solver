@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>blockGrider3 Receiver</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --border: #cbd5e1;
+      --accent: #0ea5e9;
+      --ok: #166534;
+      --warn: #92400e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 45%, #ecfeff 100%);
+      color: var(--text);
+      font-family: "Consolas", "Menlo", "Monaco", monospace;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+
+    p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #1e293b;
+    }
+
+    .status {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #bbf7d0;
+      background: #f0fdf4;
+      color: var(--ok);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .status.warn {
+      border-color: #fde68a;
+      background: #fffbeb;
+      color: var(--warn);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 520px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      resize: vertical;
+      outline: none;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #0f172a;
+      background: #ffffff;
+    }
+
+    .actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1px solid #0284c7;
+      background: var(--accent);
+      color: #082f49;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>blockGrider3 수신 페이지</h1>
+    <p>blockGrider2에서 전달된 JSON을 표시합니다. 정적 HTML 환경에서는 POST 본문을 직접 읽기 어려워 transferKey(localStorage) 방식으로 수신합니다.</p>
+
+    <div class="meta">
+      <span id="badgeMethod" class="badge">전달 방식: -</span>
+      <span id="badgeGroups" class="badge">그룹: -</span>
+      <span id="badgePoints" class="badge">점: -</span>
+    </div>
+
+    <div id="status" class="status warn">대기 중...</div>
+    <textarea id="output" placeholder="전달된 JSON이 여기 표시됩니다."></textarea>
+
+    <div class="actions">
+      <button id="btnCopy" type="button">JSON 복사</button>
+      <button id="btnReload" type="button">재수신 시도</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const output = document.getElementById('output');
+      const status = document.getElementById('status');
+      const badgeMethod = document.getElementById('badgeMethod');
+      const badgeGroups = document.getElementById('badgeGroups');
+      const badgePoints = document.getElementById('badgePoints');
+      const btnCopy = document.getElementById('btnCopy');
+      const btnReload = document.getElementById('btnReload');
+
+      function setStatus(message, warn) {
+        status.textContent = message;
+        status.classList.toggle('warn', !!warn);
+      }
+
+      function countPoints(groups) {
+        return (groups || []).reduce((sum, group) => {
+          return sum + (group.segments || []).reduce((segmentSum, segment) => {
+            return segmentSum + (segment.points || []).length;
+          }, 0);
+        }, 0);
+      }
+
+      function updateMeta(payload, methodText) {
+        const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
+        badgeMethod.textContent = `전달 방식: ${methodText}`;
+        badgeGroups.textContent = `그룹: ${groups.length}`;
+        badgePoints.textContent = `점: ${countPoints(groups)}`;
+      }
+
+      function receiveFromTransferKey() {
+        const params = new URLSearchParams(window.location.search);
+        const transferKey = params.get('transferKey');
+        if (!transferKey) {
+          setStatus('transferKey가 없어 데이터 수신에 실패했습니다.', true);
+          badgeMethod.textContent = '전달 방식: 없음';
+          return;
+        }
+
+        const text = localStorage.getItem(transferKey);
+        if (!text) {
+          setStatus('localStorage에서 데이터를 찾지 못했습니다. 새 탭이 너무 늦게 열렸거나 전달 데이터가 이미 정리되었을 수 있습니다.', true);
+          badgeMethod.textContent = '전달 방식: transferKey(localStorage)';
+          return;
+        }
+
+        localStorage.removeItem(transferKey);
+
+        output.value = text;
+
+        try {
+          const payload = JSON.parse(text);
+          updateMeta(payload, 'transferKey(localStorage)');
+          setStatus('JSON 수신 완료.', false);
+        } catch (error) {
+          updateMeta(null, 'transferKey(localStorage)');
+          setStatus('JSON 파싱에 실패했습니다.', true);
+        }
+      }
+
+      btnCopy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(output.value || '');
+          setStatus('JSON을 클립보드에 복사했습니다.', false);
+        } catch (error) {
+          setStatus('클립보드 복사에 실패했습니다.', true);
+        }
+      });
+
+      btnReload.addEventListener('click', receiveFromTransferKey);
+
+      receiveFromTransferKey();
+    })();
+  </script>
+</body>
+</html>

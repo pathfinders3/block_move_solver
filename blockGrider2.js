@@ -1378,15 +1378,51 @@
     const text = JSON.stringify(payload, null, 2);
     jsonOutput.value = text;
 
+    const transferKey = `bg2-export-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const targetUrl = `blockGrider3.html?transferKey=${encodeURIComponent(transferKey)}`;
+    let opened = false;
+
+    try {
+      localStorage.setItem(transferKey, text);
+    } catch (error) {
+      // Ignore storage errors and continue with best-effort open/post.
+    }
+
+    try {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = targetUrl;
+      form.target = '_blank';
+      form.style.display = 'none';
+
+      const hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'payload';
+      hidden.value = text;
+      form.appendChild(hidden);
+
+      document.body.appendChild(form);
+      form.submit();
+      form.remove();
+      opened = true;
+    } catch (error) {
+      opened = false;
+    }
+
+    if (!opened) {
+      const win = window.open(targetUrl, '_blank', 'noopener');
+      opened = !!win;
+    }
+
     try {
       await navigator.clipboard.writeText(text);
       setStatus(
-        `현재 구조 JSON 내보내기 완료: 그룹 ${currentGroups.length}개, 점 ${getTotalRectCount(currentGroups)}개 (클립보드 복사됨).`,
+        `현재 구조 JSON 내보내기 완료: 그룹 ${currentGroups.length}개, 점 ${getTotalRectCount(currentGroups)}개 (클립보드 복사됨, blockGrider3 열기 ${opened ? '성공' : '실패'}).`,
         false
       );
     } catch (error) {
       setStatus(
-        `현재 구조 JSON 내보내기 완료: 그룹 ${currentGroups.length}개, 점 ${getTotalRectCount(currentGroups)}개 (클립보드 복사는 실패).`,
+        `현재 구조 JSON 내보내기 완료: 그룹 ${currentGroups.length}개, 점 ${getTotalRectCount(currentGroups)}개 (클립보드 복사는 실패, blockGrider3 열기 ${opened ? '성공' : '실패'}).`,
         false
       );
     }
