@@ -1055,7 +1055,9 @@
         segment.points.forEach((point, pointIndex) => {
           const isMergePoint = isPointMergeConnected(group, segment.id, pointIndex);
 
-          if (isMergePoint) {
+          if (isMergePoint && point.canConnect) {
+            baseCtx.fillStyle = '#00e5ff';
+          } else if (isMergePoint) {
             baseCtx.fillStyle = 'rgba(255, 138, 0, 0.85)';
           } else if (point.canConnect) {
             baseCtx.fillStyle = 'rgba(34, 197, 94, 0.75)';
@@ -1064,7 +1066,9 @@
           }
           baseCtx.fillRect(point.x, point.y, point.size, point.size);
 
-          if (isMergePoint) {
+          if (isMergePoint && point.canConnect) {
+            baseCtx.strokeStyle = '#0097a7';
+          } else if (isMergePoint) {
             baseCtx.strokeStyle = '#8a3b00';
           } else if (point.canConnect) {
             baseCtx.strokeStyle = '#d4af37';
@@ -1074,14 +1078,9 @@
           baseCtx.lineWidth = 1;
           baseCtx.strokeRect(point.x + 0.5, point.y + 0.5, point.size - 1, point.size - 1);
 
-          if (isMergePoint && point.canConnect) {
-            baseCtx.fillStyle = '#22c55e';
-            baseCtx.fillRect(
-              point.x + Math.max(0, Math.floor(point.size / 2) - 1),
-              point.y + Math.max(0, Math.floor(point.size / 2) - 1),
-              2,
-              2
-            );
+          if (isMergePoint && point.canConnect && point.size >= 3) {
+            baseCtx.fillStyle = '#00e5ff';
+            baseCtx.fillRect(point.x + 1, point.y + 1, point.size - 2, point.size - 2);
           }
         });
       });
