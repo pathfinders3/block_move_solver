@@ -2,6 +2,7 @@
   const btnLoadJson = document.getElementById('btnLoadJson');
   const btnExportJson = document.getElementById('btnExportJson');
   const btnMerge = document.getElementById('btnMerge');
+  const btnSplitSegment = document.getElementById('btnSplitSegment');
   const btnDisconnect = document.getElementById('btnDisconnect');
   const btnToggleConnect = document.getElementById('btnToggleConnect');
   const btnPrevPoint = document.getElementById('btnPrevPoint');
@@ -276,6 +277,36 @@
   function updateMergeButtonState() {
     if (!btnMerge) return;
     btnMerge.disabled = selectedSelections.length !== 2;
+  }
+
+  function getSplitSelectionContext() {
+    if (selectedSelections.length !== 2) return null;
+
+    const a = selectedSelections[0];
+    const b = selectedSelections[1];
+    if (a.groupIndex !== b.groupIndex) return null;
+    if (a.segmentIndex !== b.segmentIndex) return null;
+    if (a.pointIndex === b.pointIndex) return null;
+
+    const group = currentGroups[a.groupIndex];
+    const segment = group && group.segments[a.segmentIndex];
+    if (!group || !segment || !Array.isArray(segment.points) || segment.points.length < 2) return null;
+
+    const startIndex = Math.min(a.pointIndex, b.pointIndex);
+    const endIndex = Math.max(a.pointIndex, b.pointIndex);
+    if (startIndex < 0 || endIndex >= segment.points.length) return null;
+
+    return {
+      groupIndex: a.groupIndex,
+      segmentIndex: a.segmentIndex,
+      startIndex,
+      endIndex
+    };
+  }
+
+  function updateSplitButtonState() {
+    if (!btnSplitSegment) return;
+    btnSplitSegment.disabled = !getSplitSelectionContext();
   }
 
   function getPointAndSegmentFromSelection(selection) {
@@ -571,6 +602,7 @@
         selectedSelections = [];
       }
       updateMergeButtonState();
+      updateSplitButtonState();
       updateSelectionInfo();
       updateConnectButtonState();
       updateDisconnectButtonState();
@@ -601,6 +633,7 @@
     }
 
     updateMergeButtonState();
+    updateSplitButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
     updateDisconnectButtonState();
@@ -942,6 +975,161 @@
     });
     setStatus(
       `MERGE 완료: main=${mainSegmentId}, sub=${subOriginalSegmentId} -> ${subMergedSegmentId}, 거리=${selectedDistance.toFixed(2)}`,
+      false
+    );
+  }
+
+  function splitSelectedSegmentRange() {
+    const splitContext = getSplitSelectionContext();
+    if (!splitContext) {
+      setStatus('분할 실패: 같은 선(세그먼트)에서 서로 다른 두 점을 선택해주세요.', true);
+      return;
+    }
+
+    const group = currentGroups[splitContext.groupIndex];
+    const segment = group && group.segments[splitContext.segmentIndex];
+    if (!group || !segment) {
+      setStatus('분할 실패: 선택된 세그먼트를 찾지 못했습니다.', true);
+      return;
+    }
+
+    const originalPoints = segment.points;
+    const originalLen = originalPoints.length;
+    const startIndex = splitContext.startIndex;
+    const endIndex = splitContext.endIndex;
+
+    if (startIndex === 0 && endIndex === originalLen - 1) {
+      setStatus('분할 실패: 선 전체가 선택되었습니다. 내부 구간을 선택해주세요.', true);
+      return;
+    }
+
+    const keptPoints = originalPoints
+      .slice(0, startIndex)
+      .concat(originalPoints.slice(endIndex + 1))
+      .map(clonePoint);
+    const extractedPoints = originalPoints.slice(startIndex, endIndex + 1).map(clonePoint);
+
+    if (keptPoints.length < 2 || extractedPoints.length < 2) {
+      setStatus('분할 실패: 분할 결과 중 하나의 세그먼트 점 수가 너무 적습니다.', true);
+      return;
+    }
+
+    function classifyEndpoint(endpoint) {
+      if (!endpoint || endpoint.segmentId !== segment.id) return 'external';
+
+      const rawIndex = Number(endpoint.pointIndex);
+      if (!Number.isFinite(rawIndex)) return 'external';
+      const index = Math.max(0, Math.min(originalLen - 1, Math.round(rawIndex)));
+      return index >= startIndex && index <= endIndex ? 'new' : 'old';
+    }
+
+    const hasUnsupportedCrossConnection = (group.connections || []).some(conn => {
+      const fromClass = classifyEndpoint(conn.from);
+      const toClass = classifyEndpoint(conn.to);
+
+      if (fromClass !== 'new' && toClass !== 'new') return false;
+      if (fromClass !== 'new' || toClass !== 'new') return true;
+
+      // Both endpoints are in extracted range; if either side references another segment,
+      // splitting into a separate group would create cross-group links.
+      return conn.from.segmentId !== segment.id || conn.to.segmentId !== segment.id;
+    });
+
+    if (hasUnsupportedCrossConnection) {
+      setStatus('분할 실패: 선택 구간에 연결된 MERGE가 있어 독립 그룹 분할이 불가합니다. 먼저 연결 해제를 진행해주세요.', true);
+      return;
+    }
+
+    pushMergeUndoSnapshot();
+
+    const originalSegmentId = segment.id;
+    const newSegment = {
+      id: createSegmentId(),
+      points: extractedPoints
+    };
+
+    function mapOldIndexToKeptIndex(oldIndex) {
+      if (oldIndex < startIndex) return oldIndex;
+      return oldIndex - (endIndex - startIndex + 1);
+    }
+
+    function mapEndpoint(endpoint) {
+      const mapped = { ...endpoint };
+      if (!mapped || mapped.segmentId !== originalSegmentId) {
+        return { endpoint: mapped, bucket: 'external' };
+      }
+
+      const rawIndex = Number(mapped.pointIndex);
+      const oldIndex = Number.isFinite(rawIndex)
+        ? Math.max(0, Math.min(originalLen - 1, Math.round(rawIndex)))
+        : 0;
+
+      if (oldIndex >= startIndex && oldIndex <= endIndex) {
+        mapped.segmentId = newSegment.id;
+        mapped.pointIndex = oldIndex - startIndex;
+        return { endpoint: mapped, bucket: 'new' };
+      }
+
+      mapped.segmentId = originalSegmentId;
+      mapped.pointIndex = mapOldIndexToKeptIndex(oldIndex);
+      return { endpoint: mapped, bucket: 'old' };
+    }
+
+    const keptConnections = [];
+    const newConnections = [];
+
+    (group.connections || []).forEach(conn => {
+      const mappedFrom = mapEndpoint(conn.from);
+      const mappedTo = mapEndpoint(conn.to);
+      const mappedConn = {
+        ...cloneConnection(conn),
+        from: mappedFrom.endpoint,
+        to: mappedTo.endpoint
+      };
+
+      if (mappedFrom.bucket === 'new' && mappedTo.bucket === 'new') {
+        newConnections.push(mappedConn);
+      } else {
+        keptConnections.push(mappedConn);
+      }
+    });
+
+    segment.points = keptPoints;
+    group.connections = keptConnections;
+
+    const newGroup = {
+      id: createGroupId(),
+      segments: [newSegment],
+      connections: newConnections
+    };
+
+    const newGroupIndex = splitContext.groupIndex + 1;
+    currentGroups.splice(newGroupIndex, 0, newGroup);
+
+    selectedSelections = selectedSelections.map(sel => ({
+      groupIndex: newGroupIndex,
+      segmentIndex: 0,
+      pointIndex: Math.max(0, Math.min(newSegment.points.length - 1, sel.pointIndex - startIndex))
+    }));
+    selectedRect = selectedSelections.length > 0 ? { ...selectedSelections[0] } : null;
+
+    renderGroups(currentGroups);
+
+    const selectedPoint = selectedRect
+      ? currentGroups[selectedRect.groupIndex].segments[selectedRect.segmentIndex].points[selectedRect.pointIndex]
+      : null;
+    if (selectedPoint) {
+      updateClickInfo(selectedPoint.x, selectedPoint.y, {
+        groupIndex: selectedRect.groupIndex,
+        segmentIndex: selectedRect.segmentIndex,
+        pointIndex: selectedRect.pointIndex,
+        point: selectedPoint,
+        rect: selectedPoint
+      });
+    }
+
+    setStatus(
+      `선 분할 완료: 기존 그룹 G${splitContext.groupIndex + 1} ${keptPoints.length}점 유지, 신규 그룹 G${newGroupIndex + 1} ${extractedPoints.length}점 생성`,
       false
     );
   }
@@ -1334,6 +1522,7 @@
     }
 
     updateMergeButtonState();
+    updateSplitButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
     updateDisconnectButtonState();
@@ -1459,6 +1648,10 @@
 
   if (btnMerge) {
     btnMerge.addEventListener('click', mergeSelectedGroups);
+  }
+
+  if (btnSplitSegment) {
+    btnSplitSegment.addEventListener('click', splitSelectedSegmentRange);
   }
 
   if (btnToggleConnect) {
