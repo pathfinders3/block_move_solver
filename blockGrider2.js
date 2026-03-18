@@ -362,8 +362,18 @@
     return results;
   }
 
+  function findSelectionIndexExact(selection) {
+    return selectedSelections.findIndex(item =>
+      item.groupIndex === selection.groupIndex &&
+      item.segmentIndex === selection.segmentIndex &&
+      item.pointIndex === selection.pointIndex
+    );
+  }
+
   function cycleToConnectedMergePoint(reverse) {
     if (!selectedRect) return false;
+
+    const prevSelected = { ...selectedRect };
 
     const peers = getConnectedSelectionsForSelection(selectedRect);
     if (peers.length === 0) return false;
@@ -386,7 +396,7 @@
     const next = peers[lastTabCycleIndex];
     selectedRect = { ...next };
 
-    const selectedIndex = selectedSelections.findIndex(item => item.groupIndex === next.groupIndex);
+    const selectedIndex = findSelectionIndexExact(prevSelected);
     if (selectedIndex >= 0) {
       selectedSelections[selectedIndex] = { ...next };
     } else if (selectedSelections.length === 0) {
@@ -467,7 +477,16 @@
       })
       .join(', ');
 
-    selectionInfo.innerHTML = `선택된 그룹: <span class="info-badge">${selectedSelections.length}개</span> ${labels}`;
+    const uniqueGroupCount = new Set(selectedSelections.map(item => item.groupIndex)).size;
+    const isSameSegmentTwoPoints =
+      selectedSelections.length === 2 &&
+      selectedSelections[0].groupIndex === selectedSelections[1].groupIndex &&
+      selectedSelections[0].segmentIndex === selectedSelections[1].segmentIndex;
+    const sameSegmentNotice = isSameSegmentTwoPoints
+      ? '<span class="highlight-note">같은 선(세그먼트) 2점 선택</span>'
+      : '';
+
+    selectionInfo.innerHTML = `선택된 그룹: <span class="info-badge">${uniqueGroupCount}개</span>, ${sameSegmentNotice} ${labels}`;
   }
 
   function getPrimarySelectedGroupIndex() {
@@ -568,17 +587,9 @@
     };
 
     if (toggleSelection) {
-      const existingIndex = selectedSelections.findIndex(item => item.groupIndex === selection.groupIndex);
+      const existingIndex = findSelectionIndexExact(selection);
       if (existingIndex >= 0) {
-        const existing = selectedSelections[existingIndex];
-        const samePoint =
-          existing.segmentIndex === selection.segmentIndex &&
-          existing.pointIndex === selection.pointIndex;
-        if (samePoint) {
-          selectedSelections.splice(existingIndex, 1);
-        } else {
-          selectedSelections[existingIndex] = selection;
-        }
+        selectedSelections.splice(existingIndex, 1);
       } else {
         selectedSelections.push(selection);
         if (selectedSelections.length > 2) {
@@ -604,6 +615,8 @@
       return;
     }
 
+    const prevSelected = { ...selectedRect };
+
     const info = getPointAndSegmentFromSelection(selectedRect);
     if (!info) {
       setStatus('선택 점 정보를 찾을 수 없습니다.', true);
@@ -623,9 +636,7 @@
       pointIndex: nextPointIndex
     };
 
-    const selectionIdx = selectedSelections.findIndex(
-      item => item.groupIndex === selectedRect.groupIndex
-    );
+    const selectionIdx = findSelectionIndexExact(prevSelected);
     if (selectionIdx >= 0) {
       selectedSelections[selectionIdx] = {
         groupIndex: selectedRect.groupIndex,
