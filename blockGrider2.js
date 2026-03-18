@@ -3,6 +3,7 @@
   const btnExportJson = document.getElementById('btnExportJson');
   const btnMerge = document.getElementById('btnMerge');
   const btnSplitSegment = document.getElementById('btnSplitSegment');
+  const btnCheckAdjRange = document.getElementById('btnCheckAdjRange');
   const btnDisconnect = document.getElementById('btnDisconnect');
   const btnToggleConnect = document.getElementById('btnToggleConnect');
   const btnPrevPoint = document.getElementById('btnPrevPoint');
@@ -309,6 +310,11 @@
     btnSplitSegment.disabled = !getSplitSelectionContext();
   }
 
+  function updateCheckAdjRangeButtonState() {
+    if (!btnCheckAdjRange) return;
+    btnCheckAdjRange.disabled = !getSplitSelectionContext();
+  }
+
   function getPointAndSegmentFromSelection(selection) {
     if (!selection) return null;
     const group = currentGroups[selection.groupIndex];
@@ -603,9 +609,11 @@
       }
       updateMergeButtonState();
       updateSplitButtonState();
+      updateCheckAdjRangeButtonState();
       updateSelectionInfo();
       updateConnectButtonState();
       updateDisconnectButtonState();
+      updatePointNavButtonState();
       updateClickInfo(x, y, hit);
       drawBaseCanvas(currentGroups);
       drawZoomCanvas();
@@ -634,9 +642,11 @@
 
     updateMergeButtonState();
     updateSplitButtonState();
+    updateCheckAdjRangeButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
     updateDisconnectButtonState();
+    updatePointNavButtonState();
     updateClickInfo(x, y, hit, { index: lastCycleIndex, total: Math.max(1, hits.length) });
     drawBaseCanvas(currentGroups);
     drawZoomCanvas();
@@ -1161,6 +1171,49 @@
     );
   }
 
+  function checkAdjacencyInSelectedRange() {
+    const splitContext = getSplitSelectionContext();
+    if (!splitContext) {
+      setStatus('검사 실패: 같은 선(세그먼트)에서 서로 다른 두 점 A,B를 선택해주세요.', true);
+      return;
+    }
+
+    const group = currentGroups[splitContext.groupIndex];
+    const segment = group && group.segments[splitContext.segmentIndex];
+    if (!group || !segment || !Array.isArray(segment.points)) {
+      setStatus('검사 실패: 선택된 세그먼트를 찾지 못했습니다.', true);
+      return;
+    }
+
+    const startIndex = splitContext.startIndex;
+    const endIndex = splitContext.endIndex;
+    let allAdjacent = true;
+    let firstFail = null;
+
+    for (let i = startIndex; i < endIndex; i++) {
+      const a = segment.points[i];
+      const b = segment.points[i + 1];
+      if (!areRectsAdjacent(a, b)) {
+        allAdjacent = false;
+        firstFail = { from: i, to: i + 1 };
+        break;
+      }
+    }
+
+    const edgeCount = endIndex - startIndex;
+    if (allAdjacent) {
+      setStatus(
+        `A~B 인접 검사: 인접 (G${splitContext.groupIndex + 1}, S${splitContext.segmentIndex + 1}, P${startIndex}~P${endIndex}, ${edgeCount}구간 모두 인접)`,
+        false
+      );
+    } else {
+      setStatus(
+        `A~B 인접 검사: 비인접 (첫 비인접 구간 P${firstFail.from}->P${firstFail.to})`,
+        true
+      );
+    }
+  }
+
   function toggleSelectedPointConnect() {
     const targets = selectedSelections.length > 0
       ? selectedSelections
@@ -1550,6 +1603,7 @@
 
     updateMergeButtonState();
     updateSplitButtonState();
+    updateCheckAdjRangeButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
     updateDisconnectButtonState();
@@ -1679,6 +1733,10 @@
 
   if (btnSplitSegment) {
     btnSplitSegment.addEventListener('click', splitSelectedSegmentRange);
+  }
+
+  if (btnCheckAdjRange) {
+    btnCheckAdjRange.addEventListener('click', checkAdjacencyInSelectedRange);
   }
 
   if (btnToggleConnect) {
