@@ -8,6 +8,7 @@
   const btnCopy = document.getElementById('btnCopy');
   const btnReload = document.getElementById('btnReload');
   const btnSimplifyDp = document.getElementById('btnSimplifyDp');
+  const btnTogglePathLines = document.getElementById('btnTogglePathLines');
   const baseCanvas = document.getElementById('baseCanvas');
   const zoomCanvas = document.getElementById('zoomCanvas');
   const baseCanvasTitle = document.getElementById('baseCanvasTitle');
@@ -25,6 +26,7 @@
     btnCopy,
     btnReload,
     btnSimplifyDp,
+    btnTogglePathLines,
     baseCanvas,
     zoomCanvas,
     baseCanvasTitle,
@@ -54,6 +56,7 @@
   let currentPayload = null;
   let dpSourcePayload = null;
   let dpAutoApplyTimer = null;
+  let showPathLines = false;
 
   function setStatus(message, warn) {
     status.textContent = message;
@@ -235,6 +238,53 @@
     return `hsl(${hue} 90% 70%)`;
   }
 
+  function drawSegmentPathLines(groups) {
+    baseCtx.save();
+    baseCtx.lineJoin = 'round';
+    baseCtx.lineCap = 'round';
+
+    groups.forEach((group, groupIndex) => {
+      (group.segments || []).forEach((segment, segmentIndex) => {
+        const points = Array.isArray(segment.points) ? segment.points : [];
+        if (points.length < 2) return;
+
+        const coords = points
+          .map(point => {
+            const x = Number(point.x);
+            const y = Number(point.y);
+            const size = Number(point.size);
+            if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size)) return null;
+            const centerX = x + size / 2;
+            const centerY = y + size / 2;
+            return { x: centerX, y: centerY };
+          })
+          .filter(Boolean);
+
+        if (coords.length < 2) return;
+
+        baseCtx.beginPath();
+        baseCtx.moveTo(coords[0].x, coords[0].y);
+        for (let i = 1; i < coords.length; i++) {
+          baseCtx.lineTo(coords[i].x, coords[i].y);
+        }
+
+        baseCtx.strokeStyle = 'rgba(2, 6, 23, 0.95)';
+        baseCtx.lineWidth = 3;
+        baseCtx.stroke();
+
+        baseCtx.strokeStyle = getSegmentColor(groupIndex, segmentIndex);
+        baseCtx.lineWidth = 1.5;
+        baseCtx.stroke();
+      });
+    });
+
+    baseCtx.restore();
+  }
+
+  function updatePathLineButtonLabel() {
+    btnTogglePathLines.textContent = `경로 선 보기: ${showPathLines ? 'ON' : 'OFF'}`;
+  }
+
   function drawBaseCanvas(payload) {
     const size = calculateCanvasSize(payload);
     baseCanvas.width = size;
@@ -269,6 +319,10 @@
         });
       });
     });
+
+    if (showPathLines) {
+      drawSegmentPathLines(groups);
+    }
   }
 
   function drawZoomCanvas() {
@@ -407,6 +461,14 @@
     applyDpSimplification({ refreshSourceFromTextarea: true, isAuto: false });
   });
 
+  btnTogglePathLines.addEventListener('click', () => {
+    showPathLines = !showPathLines;
+    updatePathLineButtonLabel();
+    if (!currentPayload) return;
+    drawBaseCanvas(currentPayload);
+    drawZoomCanvas();
+  });
+
   scaleRange.addEventListener('input', () => {
     if (!currentPayload) return;
     drawZoomCanvas();
@@ -429,6 +491,7 @@
   });
 
   updateDpToleranceDisplay();
+  updatePathLineButtonLabel();
 
   receiveFromTransferKey();
   }
