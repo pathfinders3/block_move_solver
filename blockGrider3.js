@@ -49,8 +49,11 @@
   const MIN_CANVAS_SIZE = 64;
   const MAX_CANVAS_SIZE = 1024;
   const DEFAULT_DP_EPSILON = 1.5;
+  const DP_AUTO_APPLY_DEBOUNCE_MS = 80;
 
   let currentPayload = null;
+  let dpSourcePayload = null;
+  let dpAutoApplyTimer = null;
 
   function setStatus(message, warn) {
     status.textContent = message;
@@ -179,6 +182,10 @@
     return next;
   }
 
+  function deepCloneJson(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
   function updateMeta(payload, methodText) {
     const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
     badgeMethod.textContent = `전달 방식: ${methodText}`;
@@ -302,6 +309,54 @@
     return JSON.parse(text);
   }
 
+  function applyDpSimplification(options) {
+    const opts = options || {};
+    const refreshSourceFromTextarea = !!opts.refreshSourceFromTextarea;
+    const isAuto = !!opts.isAuto;
+
+    if (refreshSourceFromTextarea) {
+      try {
+        const parsed = parseOutputPayload();
+        if (!parsed || !Array.isArray(parsed.groups)) {
+          setStatus('적용할 groups 데이터가 없습니다.', true);
+          return false;
+        }
+        dpSourcePayload = parsed;
+      } catch (error) {
+        setStatus('현재 textarea JSON 파싱에 실패해 DP 단순화를 적용할 수 없습니다.', true);
+        return false;
+      }
+    }
+
+    if (!dpSourcePayload || !Array.isArray(dpSourcePayload.groups)) {
+      if (!isAuto) {
+        setStatus('DP 단순화 기준 데이터가 없습니다. 먼저 JSON을 수신하거나 입력해주세요.', true);
+      }
+      return false;
+    }
+
+    const epsilon = getCurrentDpTolerance();
+    const beforePoints = countPoints(dpSourcePayload.groups);
+    const simplified = simplifyPayloadByDp(dpSourcePayload, epsilon);
+    const afterPoints = countPoints(simplified.groups || []);
+
+    output.value = JSON.stringify(simplified, null, 2);
+    updateMeta(simplified, 'transferKey(localStorage)');
+    renderPayload(simplified);
+    setStatus(`DP 단순화 적용 완료 (epsilon=${epsilon.toFixed(1)}): ${beforePoints} -> ${afterPoints} 점`, false);
+    return true;
+  }
+
+  function scheduleAutoDpApply() {
+    if (dpAutoApplyTimer) {
+      clearTimeout(dpAutoApplyTimer);
+    }
+    dpAutoApplyTimer = setTimeout(() => {
+      dpAutoApplyTimer = null;
+      applyDpSimplification({ isAuto: true });
+    }, DP_AUTO_APPLY_DEBOUNCE_MS);
+  }
+
   function receiveFromTransferKey() {
     const params = new URLSearchParams(window.location.search);
     const transferKey = params.get('transferKey');
@@ -326,6 +381,7 @@
 
     try {
       const payload = JSON.parse(text);
+      dpSourcePayload = deepCloneJson(payload);
       updateMeta(payload, 'transferKey(localStorage)');
       renderPayload(payload);
       setStatus('JSON 수신 완료. 캔버스 렌더링을 완료했습니다.', false);
@@ -348,28 +404,7 @@
   btnReload.addEventListener('click', receiveFromTransferKey);
 
   btnSimplifyDp.addEventListener('click', () => {
-    let payload;
-    try {
-      payload = parseOutputPayload();
-    } catch (error) {
-      setStatus('현재 textarea JSON 파싱에 실패해 DP 단순화를 적용할 수 없습니다.', true);
-      return;
-    }
-
-    if (!payload || !Array.isArray(payload.groups)) {
-      setStatus('적용할 groups 데이터가 없습니다.', true);
-      return;
-    }
-
-    const beforePoints = countPoints(payload.groups);
-    const epsilon = getCurrentDpTolerance();
-    const simplified = simplifyPayloadByDp(payload, epsilon);
-    const afterPoints = countPoints(simplified.groups || []);
-
-    output.value = JSON.stringify(simplified, null, 2);
-    updateMeta(simplified, 'transferKey(localStorage)');
-    renderPayload(simplified);
-    setStatus(`DP 단순화 적용 완료 (epsilon=${epsilon.toFixed(1)}): ${beforePoints} -> ${afterPoints} 점`, false);
+    applyDpSimplification({ refreshSourceFromTextarea: true, isAuto: false });
   });
 
   scaleRange.addEventListener('input', () => {
@@ -377,7 +412,21 @@
     drawZoomCanvas();
   });
 
-  dpToleranceRange.addEventListener('input', updateDpToleranceDisplay);
+  dpToleranceRange.addEventListener('input', () => {
+    updateDpToleranceDisplay();
+    scheduleAutoDpApply();
+  });
+
+  output.addEventListener('input', () => {
+    try {
+      const parsed = parseOutputPayload();
+      if (parsed && Array.isArray(parsed.groups)) {
+        dpSourcePayload = parsed;
+      }
+    } catch (error) {
+      // 사용자가 타이핑 중인 순간의 불완전 JSON은 무시
+    }
+  });
 
   updateDpToleranceDisplay();
 
