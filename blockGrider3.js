@@ -7,11 +7,14 @@
   const badgePoints = document.getElementById('badgePoints');
   const btnCopy = document.getElementById('btnCopy');
   const btnReload = document.getElementById('btnReload');
+  const btnSimplifyDp = document.getElementById('btnSimplifyDp');
   const baseCanvas = document.getElementById('baseCanvas');
   const zoomCanvas = document.getElementById('zoomCanvas');
   const baseCanvasTitle = document.getElementById('baseCanvasTitle');
   const scaleRange = document.getElementById('scaleRange');
   const scaleDisplay = document.getElementById('scaleDisplay');
+  const dpToleranceRange = document.getElementById('dpToleranceRange');
+  const dpToleranceDisplay = document.getElementById('dpToleranceDisplay');
 
   const required = [
     output,
@@ -21,11 +24,14 @@
     badgePoints,
     btnCopy,
     btnReload,
+    btnSimplifyDp,
     baseCanvas,
     zoomCanvas,
     baseCanvasTitle,
     scaleRange,
-    scaleDisplay
+    scaleDisplay,
+    dpToleranceRange,
+    dpToleranceDisplay
   ];
   if (required.some(el => !el)) {
     console.error('blockGrider3 init 실패: 필수 DOM 요소를 찾지 못했습니다. blockGrider3.html에서만 실행해주세요.');
@@ -42,6 +48,7 @@
   const scaleValues = [2, 4, 8, 16, 32, 64];
   const MIN_CANVAS_SIZE = 64;
   const MAX_CANVAS_SIZE = 1024;
+  const DEFAULT_DP_EPSILON = 1.5;
 
   let currentPayload = null;
 
@@ -58,6 +65,120 @@
     }, 0);
   }
 
+  function clonePoint(point) {
+    return {
+      x: Number(point.x),
+      y: Number(point.y),
+      size: Number(point.size),
+      canConnect: !!point.canConnect
+    };
+  }
+
+  function perpendicularDistance(point, start, end) {
+    const px = Number(point.x);
+    const py = Number(point.y);
+    const x1 = Number(start.x);
+    const y1 = Number(start.y);
+    const x2 = Number(end.x);
+    const y2 = Number(end.y);
+
+    if (![px, py, x1, y1, x2, y2].every(Number.isFinite)) return 0;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (dx === 0 && dy === 0) {
+      return Math.hypot(px - x1, py - y1);
+    }
+
+    return Math.abs(dy * px - dx * py + x2 * y1 - y2 * x1) / Math.hypot(dx, dy);
+  }
+
+  function simplifySegmentDp(points, epsilon) {
+    const len = points.length;
+    if (len <= 2) return points.map(clonePoint);
+
+    const keep = new Array(len).fill(false);
+    keep[0] = true;
+    keep[len - 1] = true;
+
+    function mark(startIdx, endIdx) {
+      if (endIdx - startIdx <= 1) return;
+
+      let maxDist = -1;
+      let farthestIdx = -1;
+      for (let i = startIdx + 1; i < endIdx; i++) {
+        const dist = perpendicularDistance(points[i], points[startIdx], points[endIdx]);
+        if (dist > maxDist) {
+          maxDist = dist;
+          farthestIdx = i;
+        }
+      }
+
+      if (farthestIdx >= 0 && maxDist > epsilon) {
+        keep[farthestIdx] = true;
+        mark(startIdx, farthestIdx);
+        mark(farthestIdx, endIdx);
+      }
+    }
+
+    mark(0, len - 1);
+
+    const simplified = [];
+    for (let i = 0; i < len; i++) {
+      if (keep[i]) simplified.push(clonePoint(points[i]));
+    }
+    return simplified;
+  }
+
+  function simplifyByConnectNodes(points, epsilon) {
+    if (!Array.isArray(points) || points.length <= 2) {
+      return (points || []).map(clonePoint);
+    }
+
+    const boundaries = [0];
+    for (let i = 1; i < points.length - 1; i++) {
+      if (points[i] && points[i].canConnect === true) {
+        boundaries.push(i);
+      }
+    }
+    boundaries.push(points.length - 1);
+
+    const simplified = [];
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      const start = boundaries[i];
+      const end = boundaries[i + 1];
+      const chunk = points.slice(start, end + 1);
+      const chunkSimplified = simplifySegmentDp(chunk, epsilon);
+
+      if (i === 0) {
+        simplified.push(...chunkSimplified);
+      } else {
+        simplified.push(...chunkSimplified.slice(1));
+      }
+    }
+
+    return simplified;
+  }
+
+  function simplifyPayloadByDp(payload, epsilon) {
+    const next = {
+      ...payload,
+      groups: Array.isArray(payload.groups)
+        ? payload.groups.map(group => ({
+            ...group,
+            segments: Array.isArray(group.segments)
+              ? group.segments.map(segment => ({
+                  ...segment,
+                  points: simplifyByConnectNodes(Array.isArray(segment.points) ? segment.points : [], epsilon)
+                }))
+              : []
+          }))
+        : []
+    };
+
+    return next;
+  }
+
   function updateMeta(payload, methodText) {
     const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
     badgeMethod.textContent = `전달 방식: ${methodText}`;
@@ -68,6 +189,16 @@
   function getCurrentScale() {
     const idx = parseInt(scaleRange.value, 10) || 0;
     return scaleValues[idx];
+  }
+
+  function getCurrentDpTolerance() {
+    const epsilon = Number(dpToleranceRange.value);
+    if (!Number.isFinite(epsilon)) return DEFAULT_DP_EPSILON;
+    return Math.max(0, epsilon);
+  }
+
+  function updateDpToleranceDisplay() {
+    dpToleranceDisplay.textContent = getCurrentDpTolerance().toFixed(1);
   }
 
   function calculateCanvasSize(payload) {
@@ -165,6 +296,12 @@
     drawZoomCanvas();
   }
 
+  function parseOutputPayload() {
+    const text = (output.value || '').trim();
+    if (!text) return null;
+    return JSON.parse(text);
+  }
+
   function receiveFromTransferKey() {
     const params = new URLSearchParams(window.location.search);
     const transferKey = params.get('transferKey');
@@ -210,10 +347,39 @@
 
   btnReload.addEventListener('click', receiveFromTransferKey);
 
+  btnSimplifyDp.addEventListener('click', () => {
+    let payload;
+    try {
+      payload = parseOutputPayload();
+    } catch (error) {
+      setStatus('현재 textarea JSON 파싱에 실패해 DP 단순화를 적용할 수 없습니다.', true);
+      return;
+    }
+
+    if (!payload || !Array.isArray(payload.groups)) {
+      setStatus('적용할 groups 데이터가 없습니다.', true);
+      return;
+    }
+
+    const beforePoints = countPoints(payload.groups);
+    const epsilon = getCurrentDpTolerance();
+    const simplified = simplifyPayloadByDp(payload, epsilon);
+    const afterPoints = countPoints(simplified.groups || []);
+
+    output.value = JSON.stringify(simplified, null, 2);
+    updateMeta(simplified, 'transferKey(localStorage)');
+    renderPayload(simplified);
+    setStatus(`DP 단순화 적용 완료 (epsilon=${epsilon.toFixed(1)}): ${beforePoints} -> ${afterPoints} 점`, false);
+  });
+
   scaleRange.addEventListener('input', () => {
     if (!currentPayload) return;
     drawZoomCanvas();
   });
+
+  dpToleranceRange.addEventListener('input', updateDpToleranceDisplay);
+
+  updateDpToleranceDisplay();
 
   receiveFromTransferKey();
   }
