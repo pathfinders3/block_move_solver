@@ -656,6 +656,8 @@
       return;
     }
 
+    const prevPoint = info.point;
+
     const maxIndex = info.segment.points.length - 1;
     const nextPointIndex = Math.max(0, Math.min(maxIndex, selectedRect.pointIndex + step));
     if (nextPointIndex === selectedRect.pointIndex) {
@@ -686,6 +688,9 @@
       point,
       rect: point
     });
+
+    const adjacentLabel = areRectsAdjacent(prevPoint, point) ? '인접' : '비인접';
+    setStatus(`점 이동: P${prevSelected.pointIndex} -> P${nextPointIndex} (${adjacentLabel})`, false);
 
     renderGroups(currentGroups);
   }
@@ -796,6 +801,28 @@
     const dx = a.x - b.x;
     const dy = a.y - b.y;
     return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function areRectsAdjacent(a, b) {
+    if (!a || !b) return false;
+
+    const ax1 = Number(a.x);
+    const ay1 = Number(a.y);
+    const ax2 = ax1 + Number(a.size);
+    const ay2 = ay1 + Number(a.size);
+
+    const bx1 = Number(b.x);
+    const by1 = Number(b.y);
+    const bx2 = bx1 + Number(b.size);
+    const by2 = by1 + Number(b.size);
+
+    if (![ax1, ay1, ax2, ay2, bx1, by1, bx2, by2].every(Number.isFinite)) return false;
+
+    const horizontalGap = Math.max(0, Math.max(ax1, bx1) - Math.min(ax2, bx2));
+    const verticalGap = Math.max(0, Math.max(ay1, by1) - Math.min(ay2, by2));
+
+    // 겹치거나 변/꼭짓점이 닿아 있으면 인접으로 간주
+    return horizontalGap === 0 && verticalGap === 0;
   }
 
   function remapSegmentIdsForMerge(group) {
