@@ -3,6 +3,7 @@
   const btnExportJson = document.getElementById('btnExportJson');
   const btnMerge = document.getElementById('btnMerge');
   const btnSplitSegment = document.getElementById('btnSplitSegment');
+  const btnReverseIndices = document.getElementById('btnReverseIndices');
   const btnCheckAdjRange = document.getElementById('btnCheckAdjRange');
   const btnCheckAdjForward = document.getElementById('btnCheckAdjForward');
   const btnDisconnect = document.getElementById('btnDisconnect');
@@ -309,6 +310,11 @@
   function updateSplitButtonState() {
     if (!btnSplitSegment) return;
     btnSplitSegment.disabled = !getSplitSelectionContext();
+  }
+
+  function updateReverseIndicesButtonState() {
+    if (!btnReverseIndices) return;
+    btnReverseIndices.disabled = !getSplitSelectionContext();
   }
 
   function updateCheckAdjRangeButtonState() {
@@ -634,6 +640,7 @@
       }
       updateMergeButtonState();
       updateSplitButtonState();
+      updateReverseIndicesButtonState();
       updateCheckAdjRangeButtonState();
       updateCheckAdjForwardButtonState();
       updateSelectionInfo();
@@ -668,6 +675,7 @@
 
     updateMergeButtonState();
     updateSplitButtonState();
+    updateReverseIndicesButtonState();
     updateCheckAdjRangeButtonState();
     updateCheckAdjForwardButtonState();
     updateSelectionInfo();
@@ -1241,6 +1249,85 @@
     }
   }
 
+  function reverseIndicesInSelectedRange() {
+    const splitContext = getSplitSelectionContext();
+    if (!splitContext) {
+      setStatus('반전 실패: 같은 선(세그먼트)에서 서로 다른 두 점 A,B를 선택해주세요.', true);
+      return;
+    }
+
+    const group = currentGroups[splitContext.groupIndex];
+    const segment = group && group.segments[splitContext.segmentIndex];
+    if (!group || !segment || !Array.isArray(segment.points)) {
+      setStatus('반전 실패: 선택된 세그먼트를 찾지 못했습니다.', true);
+      return;
+    }
+
+    const startIndex = splitContext.startIndex;
+    const endIndex = splitContext.endIndex;
+    if (startIndex < 0 || endIndex >= segment.points.length || startIndex >= endIndex) {
+      setStatus('반전 실패: 유효한 A~B 구간이 아닙니다.', true);
+      return;
+    }
+
+    const points = segment.points;
+    let left = startIndex;
+    let right = endIndex;
+    while (left < right) {
+      const temp = points[left];
+      points[left] = points[right];
+      points[right] = temp;
+      left += 1;
+      right -= 1;
+    }
+
+    const remapIndex = idx => {
+      if (idx < startIndex || idx > endIndex) return idx;
+      return startIndex + endIndex - idx;
+    };
+
+    selectedSelections = selectedSelections.map(sel => {
+      if (sel.groupIndex !== splitContext.groupIndex || sel.segmentIndex !== splitContext.segmentIndex) {
+        return { ...sel };
+      }
+      return {
+        groupIndex: sel.groupIndex,
+        segmentIndex: sel.segmentIndex,
+        pointIndex: remapIndex(sel.pointIndex)
+      };
+    });
+
+    if (selectedRect &&
+      selectedRect.groupIndex === splitContext.groupIndex &&
+      selectedRect.segmentIndex === splitContext.segmentIndex) {
+      selectedRect = {
+        groupIndex: selectedRect.groupIndex,
+        segmentIndex: selectedRect.segmentIndex,
+        pointIndex: remapIndex(selectedRect.pointIndex)
+      };
+    }
+
+    renderGroups(currentGroups);
+
+    const active = selectedRect
+      ? currentGroups[selectedRect.groupIndex].segments[selectedRect.segmentIndex].points[selectedRect.pointIndex]
+      : null;
+    if (active) {
+      updateClickInfo(active.x, active.y, {
+        groupIndex: selectedRect.groupIndex,
+        segmentIndex: selectedRect.segmentIndex,
+        pointIndex: selectedRect.pointIndex,
+        point: active,
+        rect: active
+      });
+    }
+
+    setStatus(
+      `Indices 반전 완료: G${splitContext.groupIndex + 1}, S${splitContext.segmentIndex + 1}, P${startIndex}~P${endIndex}`,
+      false
+    );
+  }
+
   function checkAdjacencyForwardFromSelectedPoint() {
     const context = getForwardAdjStartContext();
     if (!context) {
@@ -1699,6 +1786,7 @@
 
     updateMergeButtonState();
     updateSplitButtonState();
+    updateReverseIndicesButtonState();
     updateCheckAdjRangeButtonState();
     updateCheckAdjForwardButtonState();
     updateSelectionInfo();
@@ -1830,6 +1918,10 @@
 
   if (btnSplitSegment) {
     btnSplitSegment.addEventListener('click', splitSelectedSegmentRange);
+  }
+
+  if (btnReverseIndices) {
+    btnReverseIndices.addEventListener('click', reverseIndicesInSelectedRange);
   }
 
   if (btnCheckAdjRange) {
