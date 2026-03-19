@@ -1359,6 +1359,15 @@
       };
     });
 
+    // 반전 후에는 인덱스가 작은 점을 새 시작점(빨강), 큰 점을 새 끝점(파랑)으로 고정한다.
+    const targetSelections = selectedSelections.filter(sel =>
+      sel.groupIndex === splitContext.groupIndex && sel.segmentIndex === splitContext.segmentIndex
+    );
+    if (targetSelections.length === 2) {
+      targetSelections.sort((a, b) => a.pointIndex - b.pointIndex);
+      selectedSelections = [targetSelections[0], targetSelections[1]];
+    }
+
     if (selectedRect &&
       selectedRect.groupIndex === splitContext.groupIndex &&
       selectedRect.segmentIndex === splitContext.segmentIndex) {
@@ -1385,7 +1394,7 @@
     }
 
     setStatus(
-      `Indices 반전 완료: G${splitContext.groupIndex + 1}, S${splitContext.segmentIndex + 1}, P${startIndex}~P${endIndex}`,
+      `Indices 반전 완료: G${splitContext.groupIndex + 1}, S${splitContext.segmentIndex + 1}, P${startIndex}~P${endIndex} (새 시작점=빨강, 새 끝점=파랑)`,
       false
     );
   }
