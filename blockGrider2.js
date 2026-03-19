@@ -4,6 +4,7 @@
   const btnMerge = document.getElementById('btnMerge');
   const btnSplitSegment = document.getElementById('btnSplitSegment');
   const btnCheckAdjRange = document.getElementById('btnCheckAdjRange');
+  const btnCheckAdjForward = document.getElementById('btnCheckAdjForward');
   const btnDisconnect = document.getElementById('btnDisconnect');
   const btnToggleConnect = document.getElementById('btnToggleConnect');
   const btnPrevPoint = document.getElementById('btnPrevPoint');
@@ -315,6 +316,30 @@
     btnCheckAdjRange.disabled = !getSplitSelectionContext();
   }
 
+  function getForwardAdjStartContext() {
+    if (!selectedRect) return null;
+    if (selectedSelections.length > 1) return null;
+
+    const info = getPointAndSegmentFromSelection(selectedRect);
+    if (!info) return null;
+
+    const startIndex = selectedRect.pointIndex;
+    const endIndex = info.segment.points.length - 1;
+    if (startIndex < 0 || startIndex >= endIndex) return null;
+
+    return {
+      groupIndex: selectedRect.groupIndex,
+      segmentIndex: selectedRect.segmentIndex,
+      startIndex,
+      endIndex
+    };
+  }
+
+  function updateCheckAdjForwardButtonState() {
+    if (!btnCheckAdjForward) return;
+    btnCheckAdjForward.disabled = !getForwardAdjStartContext();
+  }
+
   function getPointAndSegmentFromSelection(selection) {
     if (!selection) return null;
     const group = currentGroups[selection.groupIndex];
@@ -610,6 +635,7 @@
       updateMergeButtonState();
       updateSplitButtonState();
       updateCheckAdjRangeButtonState();
+      updateCheckAdjForwardButtonState();
       updateSelectionInfo();
       updateConnectButtonState();
       updateDisconnectButtonState();
@@ -643,6 +669,7 @@
     updateMergeButtonState();
     updateSplitButtonState();
     updateCheckAdjRangeButtonState();
+    updateCheckAdjForwardButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
     updateDisconnectButtonState();
@@ -1214,6 +1241,75 @@
     }
   }
 
+  function checkAdjacencyForwardFromSelectedPoint() {
+    const context = getForwardAdjStartContext();
+    if (!context) {
+      setStatus('검사 실패: 시작점 1개를 선택하고(같은 선), 마지막 점이 아니어야 합니다.', true);
+      return;
+    }
+
+    const group = currentGroups[context.groupIndex];
+    const segment = group && group.segments[context.segmentIndex];
+    if (!group || !segment || !Array.isArray(segment.points)) {
+      setStatus('검사 실패: 선택된 세그먼트를 찾지 못했습니다.', true);
+      return;
+    }
+
+    const startIndex = context.startIndex;
+    const lastIndex = context.endIndex;
+
+    let stopIndex = lastIndex;
+    let firstNonAdjacentEdge = null;
+
+    for (let i = startIndex; i < lastIndex; i++) {
+      const a = segment.points[i];
+      const b = segment.points[i + 1];
+
+      if (!areRectsAdjacent(a, b)) {
+        stopIndex = i + 1;
+        firstNonAdjacentEdge = { from: i, to: i + 1 };
+        break;
+      }
+    }
+
+    const startSelection = {
+      groupIndex: context.groupIndex,
+      segmentIndex: context.segmentIndex,
+      pointIndex: startIndex
+    };
+    const endSelection = {
+      groupIndex: context.groupIndex,
+      segmentIndex: context.segmentIndex,
+      pointIndex: stopIndex
+    };
+
+    selectedSelections = [startSelection, endSelection];
+    selectedRect = { ...endSelection };
+
+    renderGroups(currentGroups);
+
+    const point = currentGroups[selectedRect.groupIndex].segments[selectedRect.segmentIndex].points[selectedRect.pointIndex];
+    updateClickInfo(point.x, point.y, {
+      groupIndex: selectedRect.groupIndex,
+      segmentIndex: selectedRect.segmentIndex,
+      pointIndex: selectedRect.pointIndex,
+      point,
+      rect: point
+    });
+
+    if (firstNonAdjacentEdge) {
+      setStatus(
+        `증가 인접 검사: P${startIndex}부터 검사 중 비인접 구간 P${firstNonAdjacentEdge.from}->P${firstNonAdjacentEdge.to} 발견. 끝점 P${stopIndex} 자동 선택 완료.`,
+        false
+      );
+    } else {
+      setStatus(
+        `증가 인접 검사: P${startIndex}부터 마지막 P${lastIndex}까지 모두 인접. 끝점 P${stopIndex} 자동 선택 완료.`,
+        false
+      );
+    }
+  }
+
   function toggleSelectedPointConnect() {
     const targets = selectedSelections.length > 0
       ? selectedSelections
@@ -1604,6 +1700,7 @@
     updateMergeButtonState();
     updateSplitButtonState();
     updateCheckAdjRangeButtonState();
+    updateCheckAdjForwardButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
     updateDisconnectButtonState();
@@ -1737,6 +1834,10 @@
 
   if (btnCheckAdjRange) {
     btnCheckAdjRange.addEventListener('click', checkAdjacencyInSelectedRange);
+  }
+
+  if (btnCheckAdjForward) {
+    btnCheckAdjForward.addEventListener('click', checkAdjacencyForwardFromSelectedPoint);
   }
 
   if (btnToggleConnect) {
