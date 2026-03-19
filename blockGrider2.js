@@ -31,6 +31,7 @@
   const MOVE_STEP = 5;
   const MERGE_DISTANCE_THRESHOLD = 80;
   const MAX_UNDO_STACK = 30;
+  const ADJ_RANGE_HIGHLIGHT_MS = 4000;
   const SEGMENT_HUE_PALETTE = [210, 30, 135, 280, 350, 55, 175, 305, 15, 195];
 
   let groupSeq = 1;
@@ -47,6 +48,8 @@
   let lastCycleIndex = 0;
   let lastTabCycleKey = '';
   let lastTabCycleIndex = -1;
+  let adjacencyHighlightRange = null;
+  let adjacencyHighlightTimer = null;
 
   function createGroupId() {
     return `group-${groupSeq++}`;
@@ -890,6 +893,42 @@
     return horizontalGap === 0 && verticalGap === 0;
   }
 
+  function isPointInAdjacencyHighlight(group, segment, pointIndex) {
+    if (!adjacencyHighlightRange) return false;
+    if (!group || !segment) return false;
+    if (group.id !== adjacencyHighlightRange.groupId) return false;
+    if (segment.id !== adjacencyHighlightRange.segmentId) return false;
+    return pointIndex >= adjacencyHighlightRange.startIndex && pointIndex <= adjacencyHighlightRange.endIndex;
+  }
+
+  function startAdjacencyRangeHighlight(context) {
+    if (!context) return;
+
+    const group = currentGroups[context.groupIndex];
+    const segment = group && group.segments[context.segmentIndex];
+    if (!group || !segment) return;
+
+    adjacencyHighlightRange = {
+      groupId: group.id,
+      segmentId: segment.id,
+      startIndex: context.startIndex,
+      endIndex: context.endIndex
+    };
+
+    if (adjacencyHighlightTimer) {
+      clearTimeout(adjacencyHighlightTimer);
+      adjacencyHighlightTimer = null;
+    }
+
+    renderGroups(currentGroups);
+
+    adjacencyHighlightTimer = setTimeout(() => {
+      adjacencyHighlightTimer = null;
+      adjacencyHighlightRange = null;
+      renderGroups(currentGroups);
+    }, ADJ_RANGE_HIGHLIGHT_MS);
+  }
+
   function remapSegmentIdsForMerge(group) {
     const idMap = {};
     group.segments.forEach(segment => {
@@ -1257,8 +1296,9 @@
 
     const edgeCount = endIndex - startIndex;
     if (allAdjacent) {
+      startAdjacencyRangeHighlight(splitContext);
       setStatus(
-        `A~B 인접 검사: 인접 (G${splitContext.groupIndex + 1}, S${splitContext.segmentIndex + 1}, P${startIndex}~P${endIndex}, ${edgeCount}구간 모두 인접)`,
+        `A~B 인접 검사: 인접 (G${splitContext.groupIndex + 1}, S${splitContext.segmentIndex + 1}, P${startIndex}~P${endIndex}, ${edgeCount}구간 모두 인접, 테두리 4초 하이라이트)`,
         false
       );
     } else {
@@ -1661,6 +1701,11 @@
           } else {
             baseCtx.strokeStyle = '#6b7280';
           }
+
+          if (isPointInAdjacencyHighlight(group, segment, pointIndex)) {
+            baseCtx.strokeStyle = '#ff8c00';
+          }
+
           baseCtx.lineWidth = 1;
           baseCtx.strokeRect(point.x + 0.5, point.y + 0.5, point.size - 1, point.size - 1);
 
