@@ -496,13 +496,33 @@
     if (!info) {
       btnPrevPoint.disabled = true;
       btnNextPoint.disabled = true;
+      btnPrevPoint.textContent = '⇐ (없음)';
+      btnNextPoint.textContent = '⇒ (없음)';
       return;
     }
 
+    const currentPoint = info.point;
+    const points = info.segment.points;
     const pointIndex = selectedRect.pointIndex;
-    const maxIndex = info.segment.points.length - 1;
+    const maxIndex = points.length - 1;
     btnPrevPoint.disabled = pointIndex <= 0;
     btnNextPoint.disabled = pointIndex >= maxIndex;
+
+    if (pointIndex > 0) {
+      const prevPoint = points[pointIndex - 1];
+      const prevAdjLabel = areRectsAdjacent(currentPoint, prevPoint) ? '인접' : '비인접';
+      btnPrevPoint.textContent = `⇐ (${prevAdjLabel})`;
+    } else {
+      btnPrevPoint.textContent = '⇐ (없음)';
+    }
+
+    if (pointIndex < maxIndex) {
+      const nextPoint = points[pointIndex + 1];
+      const nextAdjLabel = areRectsAdjacent(currentPoint, nextPoint) ? '인접' : '비인접';
+      btnNextPoint.textContent = `⇒ (${nextAdjLabel})`;
+    } else {
+      btnNextPoint.textContent = '⇒ (없음)';
+    }
   }
 
   function updateConnectButtonState() {
