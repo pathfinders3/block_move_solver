@@ -4,6 +4,7 @@
   const btnMerge = document.getElementById('btnMerge');
   const btnSplitSegment = document.getElementById('btnSplitSegment');
   const btnInsertStartFromPoint = document.getElementById('btnInsertStartFromPoint');
+  const btnSplitByContact = document.getElementById('btnSplitByContact');
   const btnReverseIndices = document.getElementById('btnReverseIndices');
   const btnCheckAdjRange = document.getElementById('btnCheckAdjRange');
   const btnCheckAdjForward = document.getElementById('btnCheckAdjForward');
@@ -355,6 +356,33 @@
     btnInsertStartFromPoint.disabled = !getInsertStartMergeContext();
   }
 
+  function getSplitByContactContext() {
+    if (selectedSelections.length !== 2) return null;
+
+    // 선택 순서를 유지: 첫 번째 선택이 P1, 두 번째 선택이 P2
+    const p1 = selectedSelections[0];
+    const p2 = selectedSelections[1];
+    if (p1.groupIndex !== p2.groupIndex || p1.segmentIndex !== p2.segmentIndex) return null;
+    if (p1.pointIndex === p2.pointIndex) return null;
+
+    const group = currentGroups[p1.groupIndex];
+    const segment = group && group.segments[p1.segmentIndex];
+    if (!group || !segment || !Array.isArray(segment.points)) return null;
+    if (p2.pointIndex < 0 || p2.pointIndex >= segment.points.length) return null;
+
+    return {
+      groupIndex: p1.groupIndex,
+      segmentIndex: p1.segmentIndex,
+      p1Index: p1.pointIndex,
+      p2Index: p2.pointIndex
+    };
+  }
+
+  function updateSplitByContactButtonState() {
+    if (!btnSplitByContact) return;
+    btnSplitByContact.disabled = !getSplitByContactContext();
+  }
+
   function updateReverseIndicesButtonState() {
     if (!btnReverseIndices) return;
     btnReverseIndices.disabled = !getSplitSelectionContext();
@@ -704,6 +732,7 @@
       updateMergeButtonState();
       updateSplitButtonState();
       updateInsertStartButtonState();
+      updateSplitByContactButtonState();
       updateReverseIndicesButtonState();
       updateCheckAdjRangeButtonState();
       updateCheckAdjForwardButtonState();
@@ -740,6 +769,7 @@
     updateMergeButtonState();
     updateSplitButtonState();
     updateInsertStartButtonState();
+    updateSplitByContactButtonState();
     updateReverseIndicesButtonState();
     updateCheckAdjRangeButtonState();
     updateCheckAdjForwardButtonState();
@@ -1433,6 +1463,161 @@
     );
   }
 
+  function splitPolylineByContactPoint() {
+    const context = getSplitByContactContext();
+    if (!context) {
+      setStatus('분할 실패: 같은 폴리라인에서 점 2개(P1, P2)를 선택해주세요.', true);
+      return;
+    }
+
+    const group = currentGroups[context.groupIndex];
+    const segment = group && group.segments[context.segmentIndex];
+    if (!group || !segment || !Array.isArray(segment.points)) {
+      setStatus('분할 실패: 대상 세그먼트를 찾지 못했습니다.', true);
+      return;
+    }
+
+    const points = segment.points;
+    const originalLen = points.length;
+    const p1Index = context.p1Index;
+    const p2Index = context.p2Index;
+
+    if (p1Index < 0 || p1Index >= originalLen || p2Index < 0 || p2Index >= originalLen) {
+      setStatus('분할 실패: P1/P2 인덱스가 유효하지 않습니다.', true);
+      return;
+    }
+
+    // P2에서 시작해서 연속 인접 구간을 끝까지 탐색한다.
+    let chainEnd = p2Index;
+    for (let i = p2Index + 1; i < originalLen; i++) {
+      if (areRectsAdjacent(points[i - 1], points[i])) {
+        chainEnd = i;
+      } else {
+        break;
+      }
+    }
+
+    if (p1Index >= p2Index && p1Index <= chainEnd) {
+      setStatus('분할 실패: P1은 P2부터 분리되는 연속 구간 바깥 점이어야 합니다.', true);
+      return;
+    }
+
+    const movedStart = p2Index;
+    const movedEnd = chainEnd;
+
+    const keptPoints = points
+      .slice(0, movedStart)
+      .concat(points.slice(movedEnd + 1))
+      .map(clonePoint);
+    const movedPoints = points.slice(movedStart, movedEnd + 1).map(clonePoint);
+
+    if (keptPoints.length < 2) {
+      setStatus('분할 실패: 원본 폴리라인이 2점 미만이 되어 분할할 수 없습니다.', true);
+      return;
+    }
+
+    const p3 = clonePoint(points[p1Index]);
+    p3.canConnect = true;
+    const newPolylinePoints = [p3, ...movedPoints];
+
+    const originalSegmentId = segment.id;
+    const keptSpan = movedEnd - movedStart + 1;
+
+    function mapOldToKept(oldIndex) {
+      if (oldIndex < movedStart) return oldIndex;
+      return oldIndex - keptSpan;
+    }
+
+    function classifyEndpoint(endpoint) {
+      if (!endpoint || endpoint.segmentId !== originalSegmentId) return { bucket: 'external' };
+
+      const raw = Number(endpoint.pointIndex);
+      if (!Number.isFinite(raw)) return { bucket: 'external' };
+      const idx = Math.max(0, Math.min(originalLen - 1, Math.round(raw)));
+
+      if (idx >= movedStart && idx <= movedEnd) {
+        return { bucket: 'moved', idx };
+      }
+      return { bucket: 'kept', idx };
+    }
+
+    const keptConnections = [];
+    const movedConnections = [];
+    const newSegmentId = createSegmentId();
+
+    for (const conn of group.connections || []) {
+      const fromInfo = classifyEndpoint(conn.from);
+      const toInfo = classifyEndpoint(conn.to);
+
+      const hasMoved = fromInfo.bucket === 'moved' || toInfo.bucket === 'moved';
+      if (!hasMoved) {
+        const mapped = cloneConnection(conn);
+        if (fromInfo.bucket === 'kept') {
+          mapped.from.pointIndex = mapOldToKept(fromInfo.idx);
+        }
+        if (toInfo.bucket === 'kept') {
+          mapped.to.pointIndex = mapOldToKept(toInfo.idx);
+        }
+        keptConnections.push(mapped);
+        continue;
+      }
+
+      // moved 구간과 외부/kept가 연결된 경우, 그룹 분리 시 교차 연결이 되어 지원하지 않는다.
+      if (fromInfo.bucket !== 'moved' || toInfo.bucket !== 'moved') {
+        setStatus('분할 실패: P2 이후 분리 구간에 MERGE 연결이 있어 먼저 연결 해제가 필요합니다.', true);
+        return;
+      }
+
+      // 둘 다 moved면 새 폴리라인 내부 연결로 옮긴다.
+      const mapped = cloneConnection(conn);
+      mapped.from.segmentId = newSegmentId;
+      mapped.to.segmentId = newSegmentId;
+      mapped.from.pointIndex = 1 + (fromInfo.idx - movedStart);
+      mapped.to.pointIndex = 1 + (toInfo.idx - movedStart);
+      movedConnections.push(mapped);
+    }
+
+    pushMergeUndoSnapshot();
+
+    // 원본 L1 업데이트
+    segment.points = keptPoints;
+    group.connections = keptConnections;
+    const keptP1Index = mapOldToKept(p1Index);
+    if (segment.points[keptP1Index]) {
+      segment.points[keptP1Index].canConnect = true;
+    }
+
+    // 새 L2 생성
+    const newGroup = {
+      id: createGroupId(),
+      segments: [{ id: newSegmentId, points: newPolylinePoints }],
+      connections: movedConnections
+    };
+    const newGroupIndex = context.groupIndex + 1;
+    currentGroups.splice(newGroupIndex, 0, newGroup);
+
+    selectedSelections = [
+      { groupIndex: newGroupIndex, segmentIndex: 0, pointIndex: 0 },
+      { groupIndex: newGroupIndex, segmentIndex: 0, pointIndex: 1 }
+    ];
+    selectedRect = { ...selectedSelections[0] };
+
+    renderGroups(currentGroups);
+
+    const active = currentGroups[selectedRect.groupIndex].segments[selectedRect.segmentIndex].points[selectedRect.pointIndex];
+    if (active) {
+      updateClickInfo(active.x, active.y, {
+        groupIndex: selectedRect.groupIndex,
+        segmentIndex: selectedRect.segmentIndex,
+        pointIndex: selectedRect.pointIndex,
+        point: active,
+        rect: active
+      });
+    }
+
+    setStatus(`접점 기준 분할 완료: L2 생성(P0=P3, P1=P${movedStart}) + P${movedStart + 1}..P${movedEnd} 연속 인접 구간 분리`, false);
+  }
+
   function checkAdjacencyInSelectedRange() {
     const splitContext = getSplitSelectionContext();
     if (!splitContext) {
@@ -2031,6 +2216,7 @@
     updateMergeButtonState();
     updateSplitButtonState();
     updateInsertStartButtonState();
+    updateSplitByContactButtonState();
     updateReverseIndicesButtonState();
     updateCheckAdjRangeButtonState();
     updateCheckAdjForwardButtonState();
@@ -2167,6 +2353,10 @@
 
   if (btnInsertStartFromPoint) {
     btnInsertStartFromPoint.addEventListener('click', insertStartPointFromOtherPolyline);
+  }
+
+  if (btnSplitByContact) {
+    btnSplitByContact.addEventListener('click', splitPolylineByContactPoint);
   }
 
   if (btnReverseIndices) {
