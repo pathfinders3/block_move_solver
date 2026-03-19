@@ -839,7 +839,7 @@
     selectedSelections = (snapshot.selectedSelections || []).map(item => ({ ...item }));
 
     renderGroups(currentGroups);
-    setStatus('마지막 Merge를 Ctrl+Z로 되돌렸습니다.', false);
+    setStatus('마지막 작업을 Ctrl+Z로 되돌렸습니다.', false);
   }
 
   function pointDistance(a, b) {
@@ -1269,6 +1269,8 @@
       setStatus('반전 실패: 유효한 A~B 구간이 아닙니다.', true);
       return;
     }
+
+    pushMergeUndoSnapshot();
 
     const points = segment.points;
     let left = startIndex;
