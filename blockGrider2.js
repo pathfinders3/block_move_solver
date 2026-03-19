@@ -3,6 +3,7 @@
   const btnExportJson = document.getElementById('btnExportJson');
   const btnMerge = document.getElementById('btnMerge');
   const btnSplitSegment = document.getElementById('btnSplitSegment');
+  const btnInsertStartFromPoint = document.getElementById('btnInsertStartFromPoint');
   const btnReverseIndices = document.getElementById('btnReverseIndices');
   const btnCheckAdjRange = document.getElementById('btnCheckAdjRange');
   const btnCheckAdjForward = document.getElementById('btnCheckAdjForward');
@@ -313,6 +314,45 @@
   function updateSplitButtonState() {
     if (!btnSplitSegment) return;
     btnSplitSegment.disabled = !getSplitSelectionContext();
+  }
+
+  function getInsertStartMergeContext() {
+    if (selectedSelections.length !== 2) return null;
+
+    const first = selectedSelections[0];
+    const second = selectedSelections[1];
+    const firstIsStart = first.pointIndex === 0;
+    const secondIsStart = second.pointIndex === 0;
+
+    if (firstIsStart === secondIsStart) return null;
+
+    const startSel = firstIsStart ? first : second; // B: L2의 시작점(인덱스 0)
+    const sourceSel = firstIsStart ? second : first; // A: L1의 점
+
+    if (startSel.groupIndex === sourceSel.groupIndex && startSel.segmentIndex === sourceSel.segmentIndex) {
+      return null;
+    }
+
+    const startGroup = currentGroups[startSel.groupIndex];
+    const sourceGroup = currentGroups[sourceSel.groupIndex];
+    const startSegment = startGroup && startGroup.segments[startSel.segmentIndex];
+    const sourceSegment = sourceGroup && sourceGroup.segments[sourceSel.segmentIndex];
+    const startPoint = startSegment && startSegment.points[startSel.pointIndex];
+    const sourcePoint = sourceSegment && sourceSegment.points[sourceSel.pointIndex];
+
+    if (!startGroup || !sourceGroup || !startSegment || !sourceSegment || !startPoint || !sourcePoint) {
+      return null;
+    }
+
+    return {
+      startSel: { ...startSel },
+      sourceSel: { ...sourceSel }
+    };
+  }
+
+  function updateInsertStartButtonState() {
+    if (!btnInsertStartFromPoint) return;
+    btnInsertStartFromPoint.disabled = !getInsertStartMergeContext();
   }
 
   function updateReverseIndicesButtonState() {
@@ -663,6 +703,7 @@
       }
       updateMergeButtonState();
       updateSplitButtonState();
+      updateInsertStartButtonState();
       updateReverseIndicesButtonState();
       updateCheckAdjRangeButtonState();
       updateCheckAdjForwardButtonState();
@@ -698,6 +739,7 @@
 
     updateMergeButtonState();
     updateSplitButtonState();
+    updateInsertStartButtonState();
     updateReverseIndicesButtonState();
     updateCheckAdjRangeButtonState();
     updateCheckAdjForwardButtonState();
@@ -1261,6 +1303,132 @@
 
     setStatus(
       `선 분할 완료: 기존 그룹 G${splitContext.groupIndex + 1} ${keptPoints.length}점 유지, 신규 그룹 G${newGroupIndex + 1} ${extractedPoints.length}점 생성`,
+      false
+    );
+  }
+
+  function insertStartPointFromOtherPolyline() {
+    const context = getInsertStartMergeContext();
+    if (!context) {
+      setStatus('실패: 점 2개를 선택하고, 그중 하나는 대상 선의 시작점(P0)이어야 합니다.', true);
+      return;
+    }
+
+    pushMergeUndoSnapshot();
+
+    const startSel = context.startSel;
+    const sourceSel = context.sourceSel;
+
+    let mergedGroupIndex = startSel.groupIndex;
+    let sourceSelectionInMerged = { ...sourceSel };
+
+    if (startSel.groupIndex !== sourceSel.groupIndex) {
+      const targetGroup = cloneGroup(currentGroups[startSel.groupIndex]);
+      const sourceGroup = cloneGroup(currentGroups[sourceSel.groupIndex]);
+      const sourceIdMap = remapSegmentIdsForMerge(sourceGroup);
+      const sourceSegmentId = currentGroups[sourceSel.groupIndex].segments[sourceSel.segmentIndex].id;
+      const mappedSourceSegmentId = sourceIdMap[sourceSegmentId] || sourceSegmentId;
+
+      targetGroup.segments.push(...sourceGroup.segments.map(cloneSegment));
+      targetGroup.connections.push(...sourceGroup.connections.map(cloneConnection));
+
+      const keepIndex = startSel.groupIndex;
+      const removeIndex = sourceSel.groupIndex;
+      currentGroups[keepIndex] = targetGroup;
+      currentGroups.splice(removeIndex, 1);
+
+      mergedGroupIndex = keepIndex;
+      if (removeIndex < keepIndex) {
+        mergedGroupIndex -= 1;
+      }
+
+      const mappedSegmentIndex = targetGroup.segments.findIndex(seg => seg.id === mappedSourceSegmentId);
+      if (mappedSegmentIndex < 0) {
+        setStatus('실패: 소스 세그먼트 매핑에 실패했습니다.', true);
+        return;
+      }
+
+      sourceSelectionInMerged = {
+        groupIndex: mergedGroupIndex,
+        segmentIndex: mappedSegmentIndex,
+        pointIndex: sourceSel.pointIndex
+      };
+    }
+
+    const mergedGroup = currentGroups[mergedGroupIndex];
+    if (!mergedGroup) {
+      setStatus('실패: 병합된 그룹을 찾지 못했습니다.', true);
+      return;
+    }
+
+    const targetSegment = mergedGroup.segments[startSel.segmentIndex];
+    const sourceSegment = mergedGroup.segments[sourceSelectionInMerged.segmentIndex];
+    const sourcePoint = sourceSegment && sourceSegment.points[sourceSelectionInMerged.pointIndex];
+    if (!targetSegment || !sourceSegment || !sourcePoint) {
+      setStatus('실패: 대상/소스 점을 찾지 못했습니다.', true);
+      return;
+    }
+
+    const newStartPoint = clonePoint(sourcePoint);
+    newStartPoint.canConnect = true;
+    sourcePoint.canConnect = true;
+
+    targetSegment.points.unshift(newStartPoint);
+
+    // 대상 세그먼트의 기존 연결점 인덱스는 +1 이동
+    (mergedGroup.connections || []).forEach(conn => {
+      if (conn.from.segmentId === targetSegment.id) {
+        conn.from.pointIndex += 1;
+      }
+      if (conn.to.segmentId === targetSegment.id) {
+        conn.to.pointIndex += 1;
+      }
+    });
+
+    const prevStartPoint = targetSegment.points[1];
+    const mergeDistance = prevStartPoint ? pointDistance(sourcePoint, prevStartPoint) : 0;
+    mergedGroup.connections.push({
+      id: createConnectionId(),
+      from: {
+        segmentId: sourceSegment.id,
+        pointIndex: sourceSelectionInMerged.pointIndex
+      },
+      to: {
+        segmentId: targetSegment.id,
+        pointIndex: 0
+      },
+      distance: Number(mergeDistance.toFixed(4))
+    });
+
+    const startSelection = {
+      groupIndex: mergedGroupIndex,
+      segmentIndex: startSel.segmentIndex,
+      pointIndex: 0
+    };
+    const nextSelection = {
+      groupIndex: mergedGroupIndex,
+      segmentIndex: startSel.segmentIndex,
+      pointIndex: 1
+    };
+
+    selectedSelections = [startSelection, nextSelection];
+    selectedRect = { ...startSelection };
+
+    renderGroups(currentGroups);
+
+    const activePoint = currentGroups[startSelection.groupIndex].segments[startSelection.segmentIndex].points[startSelection.pointIndex];
+    if (activePoint) {
+      updateClickInfo(activePoint.x, activePoint.y, {
+        groupIndex: startSelection.groupIndex,
+        segmentIndex: startSelection.segmentIndex,
+        pointIndex: startSelection.pointIndex,
+        point: activePoint,
+        rect: activePoint
+      });
+    }
+
+    setStatus(
+      `시작점 삽입 완료: 대상 선 시작점이 A로 교체되고 기존 시작점 B는 P1이 되었습니다. (점 +1, A와 시작점 MERGE 연결 생성)`,
       false
     );
   }
@@ -1862,6 +2030,7 @@
 
     updateMergeButtonState();
     updateSplitButtonState();
+    updateInsertStartButtonState();
     updateReverseIndicesButtonState();
     updateCheckAdjRangeButtonState();
     updateCheckAdjForwardButtonState();
@@ -1994,6 +2163,10 @@
 
   if (btnSplitSegment) {
     btnSplitSegment.addEventListener('click', splitSelectedSegmentRange);
+  }
+
+  if (btnInsertStartFromPoint) {
+    btnInsertStartFromPoint.addEventListener('click', insertStartPointFromOtherPolyline);
   }
 
   if (btnReverseIndices) {
