@@ -1797,6 +1797,12 @@
     selectedSelections = [startSelection, endSelection];
     selectedRect = { ...endSelection };
 
+    const additionalSelectedCount = Math.max(0, stopIndex - startIndex);
+    const adjacentFoundCount = firstNonAdjacentEdge
+      ? Math.max(0, firstNonAdjacentEdge.from - startIndex)
+      : Math.max(0, lastIndex - startIndex);
+    const adjacentFoundLabel = adjacentFoundCount === 0 ? '0점(❌)' : `${adjacentFoundCount}점`;
+
     renderGroups(currentGroups);
 
     const point = currentGroups[selectedRect.groupIndex].segments[selectedRect.segmentIndex].points[selectedRect.pointIndex];
@@ -1810,12 +1816,12 @@
 
     if (firstNonAdjacentEdge) {
       setStatus(
-        `증가 인접 검사: P${startIndex}부터 검사 중 비인접 구간 P${firstNonAdjacentEdge.from}->P${firstNonAdjacentEdge.to} 발견. 끝점 P${stopIndex} 자동 선택 완료.`,
+        `증가 인접 검사: P${startIndex}부터 검사 중 비인접 구간 P${firstNonAdjacentEdge.from}->P${firstNonAdjacentEdge.to} 발견. 끝점 P${stopIndex} 자동 선택 완료. 인접 발견 ${adjacentFoundLabel}, 추가 선택 ${additionalSelectedCount}점.`,
         false
       );
     } else {
       setStatus(
-        `증가 인접 검사: P${startIndex}부터 마지막 P${lastIndex}까지 모두 인접. 끝점 P${stopIndex} 자동 선택 완료.`,
+        `증가 인접 검사: P${startIndex}부터 마지막 P${lastIndex}까지 모두 인접. 끝점 P${stopIndex} 자동 선택 완료. 인접 발견 ${adjacentFoundLabel}, 추가 선택 ${additionalSelectedCount}점.`,
         false
       );
     }
