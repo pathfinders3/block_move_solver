@@ -35,9 +35,11 @@
   const MAX_UNDO_STACK = 30;
   const ADJ_RANGE_HIGHLIGHT_MS = 4000;
   const FORWARD_ADJ_ADDITIONAL_HIGHLIGHT_MS = 3000;
+  const ADJ_FIRST_FAIL_HIGHLIGHT_MS = 3000;
   const SEGMENT_HUE_PALETTE = [210, 30, 135, 280, 350, 55, 175, 305, 15, 195];
   const HIGHLIGHT_KEY_ADJ_RANGE = 'adjRange';
   const HIGHLIGHT_KEY_FORWARD_ADDITIONAL = 'forwardAdditional';
+  const HIGHLIGHT_KEY_ADJ_FIRST_FAIL = 'adjFirstFail';
 
   let groupSeq = 1;
   let segmentSeq = 1;
@@ -55,7 +57,8 @@
   let lastTabCycleIndex = -1;
   const pointRangeHighlights = {
     [HIGHLIGHT_KEY_ADJ_RANGE]: { range: null, timer: null },
-    [HIGHLIGHT_KEY_FORWARD_ADDITIONAL]: { range: null, timer: null }
+    [HIGHLIGHT_KEY_FORWARD_ADDITIONAL]: { range: null, timer: null },
+    [HIGHLIGHT_KEY_ADJ_FIRST_FAIL]: { range: null, timer: null }
   };
 
   function createGroupId() {
@@ -1034,6 +1037,14 @@
     );
   }
 
+  function startAdjacencyFirstFailHighlight(context) {
+    startNamedPointRangeHighlight(
+      HIGHLIGHT_KEY_ADJ_FIRST_FAIL,
+      context,
+      ADJ_FIRST_FAIL_HIGHLIGHT_MS
+    );
+  }
+
   function remapSegmentIdsForMerge(group) {
     const idMap = {};
     group.segments.forEach(segment => {
@@ -1688,6 +1699,12 @@
         false
       );
     } else {
+      startAdjacencyFirstFailHighlight({
+        groupIndex: splitContext.groupIndex,
+        segmentIndex: splitContext.segmentIndex,
+        startIndex: firstFail.from,
+        endIndex: firstFail.to
+      });
       const fromOrder = firstFail.from - startIndex;
       const toOrder = firstFail.to - startIndex;
       setStatus(
@@ -2121,6 +2138,10 @@
 
           if (isPointInNamedHighlightRange(HIGHLIGHT_KEY_FORWARD_ADDITIONAL, group, segment, pointIndex)) {
             baseCtx.strokeStyle = '#00e5ff';
+          }
+
+          if (isPointInNamedHighlightRange(HIGHLIGHT_KEY_ADJ_FIRST_FAIL, group, segment, pointIndex)) {
+            baseCtx.strokeStyle = '#ff9bb0';
           }
 
           baseCtx.lineWidth = 1;
