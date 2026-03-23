@@ -36,6 +36,8 @@
   const ADJ_RANGE_HIGHLIGHT_MS = 4000;
   const FORWARD_ADJ_ADDITIONAL_HIGHLIGHT_MS = 3000;
   const SEGMENT_HUE_PALETTE = [210, 30, 135, 280, 350, 55, 175, 305, 15, 195];
+  const HIGHLIGHT_KEY_ADJ_RANGE = 'adjRange';
+  const HIGHLIGHT_KEY_FORWARD_ADDITIONAL = 'forwardAdditional';
 
   let groupSeq = 1;
   let segmentSeq = 1;
@@ -51,10 +53,10 @@
   let lastCycleIndex = 0;
   let lastTabCycleKey = '';
   let lastTabCycleIndex = -1;
-  let adjacencyHighlightRange = null;
-  let adjacencyHighlightTimer = null;
-  let forwardAdjAdditionalHighlightRange = null;
-  let forwardAdjAdditionalHighlightTimer = null;
+  const pointRangeHighlights = {
+    [HIGHLIGHT_KEY_ADJ_RANGE]: { range: null, timer: null },
+    [HIGHLIGHT_KEY_FORWARD_ADDITIONAL]: { range: null, timer: null }
+  };
 
   function createGroupId() {
     return `group-${groupSeq++}`;
@@ -973,73 +975,38 @@
     return horizontalGap === 0 && verticalGap === 0;
   }
 
-  function isPointInAdjacencyHighlight(group, segment, pointIndex) {
-    if (!adjacencyHighlightRange) return false;
+  function isPointInNamedHighlightRange(highlightKey, group, segment, pointIndex) {
+    const state = pointRangeHighlights[highlightKey];
+    const range = state && state.range;
+    if (!range) return false;
     if (!group || !segment) return false;
-    if (group.id !== adjacencyHighlightRange.groupId) return false;
-    if (segment.id !== adjacencyHighlightRange.segmentId) return false;
-    return pointIndex >= adjacencyHighlightRange.startIndex && pointIndex <= adjacencyHighlightRange.endIndex;
+    if (group.id !== range.groupId) return false;
+    if (segment.id !== range.segmentId) return false;
+    return pointIndex >= range.startIndex && pointIndex <= range.endIndex;
   }
 
-  function isPointInForwardAdjAdditionalHighlight(group, segment, pointIndex) {
-    if (!forwardAdjAdditionalHighlightRange) return false;
-    if (!group || !segment) return false;
-    if (group.id !== forwardAdjAdditionalHighlightRange.groupId) return false;
-    if (segment.id !== forwardAdjAdditionalHighlightRange.segmentId) return false;
-    return (
-      pointIndex >= forwardAdjAdditionalHighlightRange.startIndex &&
-      pointIndex <= forwardAdjAdditionalHighlightRange.endIndex
-    );
-  }
-
-  function startAdjacencyRangeHighlight(context) {
-    if (!context) return;
-
+  function startNamedPointRangeHighlight(highlightKey, context, durationMs) {
+    const state = pointRangeHighlights[highlightKey];
+    if (!state || !context) return;
     const group = currentGroups[context.groupIndex];
     const segment = group && group.segments[context.segmentIndex];
     if (!group || !segment) return;
 
-    adjacencyHighlightRange = {
-      groupId: group.id,
-      segmentId: segment.id,
-      startIndex: context.startIndex,
-      endIndex: context.endIndex
-    };
-
-    if (adjacencyHighlightTimer) {
-      clearTimeout(adjacencyHighlightTimer);
-      adjacencyHighlightTimer = null;
-    }
-
-    renderGroups(currentGroups);
-
-    adjacencyHighlightTimer = setTimeout(() => {
-      adjacencyHighlightTimer = null;
-      adjacencyHighlightRange = null;
-      renderGroups(currentGroups);
-    }, ADJ_RANGE_HIGHLIGHT_MS);
-  }
-
-  function startForwardAdjAdditionalHighlight(context) {
-    const group = context && currentGroups[context.groupIndex];
-    const segment = group && group.segments[context.segmentIndex];
-    if (!group || !segment) return;
-
-    if (forwardAdjAdditionalHighlightTimer) {
-      clearTimeout(forwardAdjAdditionalHighlightTimer);
-      forwardAdjAdditionalHighlightTimer = null;
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = null;
     }
 
     const startIndex = Number.isInteger(context.startIndex) ? context.startIndex : 0;
     const endIndex = Number.isInteger(context.endIndex) ? context.endIndex : -1;
 
     if (startIndex > endIndex) {
-      forwardAdjAdditionalHighlightRange = null;
+      state.range = null;
       renderGroups(currentGroups);
       return;
     }
 
-    forwardAdjAdditionalHighlightRange = {
+    state.range = {
       groupId: group.id,
       segmentId: segment.id,
       startIndex,
@@ -1048,11 +1015,23 @@
 
     renderGroups(currentGroups);
 
-    forwardAdjAdditionalHighlightTimer = setTimeout(() => {
-      forwardAdjAdditionalHighlightTimer = null;
-      forwardAdjAdditionalHighlightRange = null;
+    state.timer = setTimeout(() => {
+      state.timer = null;
+      state.range = null;
       renderGroups(currentGroups);
-    }, FORWARD_ADJ_ADDITIONAL_HIGHLIGHT_MS);
+    }, durationMs);
+  }
+
+  function startAdjacencyRangeHighlight(context) {
+    startNamedPointRangeHighlight(HIGHLIGHT_KEY_ADJ_RANGE, context, ADJ_RANGE_HIGHLIGHT_MS);
+  }
+
+  function startForwardAdjAdditionalHighlight(context) {
+    startNamedPointRangeHighlight(
+      HIGHLIGHT_KEY_FORWARD_ADDITIONAL,
+      context,
+      FORWARD_ADJ_ADDITIONAL_HIGHLIGHT_MS
+    );
   }
 
   function remapSegmentIdsForMerge(group) {
@@ -2134,11 +2113,11 @@
             baseCtx.strokeStyle = '#6b7280';
           }
 
-          if (isPointInAdjacencyHighlight(group, segment, pointIndex)) {
+          if (isPointInNamedHighlightRange(HIGHLIGHT_KEY_ADJ_RANGE, group, segment, pointIndex)) {
             baseCtx.strokeStyle = '#ff8c00';
           }
 
-          if (isPointInForwardAdjAdditionalHighlight(group, segment, pointIndex)) {
+          if (isPointInNamedHighlightRange(HIGHLIGHT_KEY_FORWARD_ADDITIONAL, group, segment, pointIndex)) {
             baseCtx.strokeStyle = '#00e5ff';
           }
 
