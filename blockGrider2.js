@@ -2137,11 +2137,11 @@
           }
 
           if (isPointInNamedHighlightRange(HIGHLIGHT_KEY_FORWARD_ADDITIONAL, group, segment, pointIndex)) {
-            baseCtx.strokeStyle = '#00e5ff';
+            baseCtx.strokeStyle = '#237881';
           }
 
           if (isPointInNamedHighlightRange(HIGHLIGHT_KEY_ADJ_FIRST_FAIL, group, segment, pointIndex)) {
-            baseCtx.strokeStyle = '#ff9bb0';
+            baseCtx.strokeStyle = '#062949';
           }
 
           baseCtx.lineWidth = 1;
