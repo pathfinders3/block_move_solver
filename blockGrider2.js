@@ -36,10 +36,12 @@
   const ADJ_RANGE_HIGHLIGHT_MS = 4000;
   const FORWARD_ADJ_ADDITIONAL_HIGHLIGHT_MS = 3000;
   const ADJ_FIRST_FAIL_HIGHLIGHT_MS = 3000;
+  const TAB_SEGMENT_HIGHLIGHT_MS = 1000;
   const SEGMENT_HUE_PALETTE = [210, 30, 135, 280, 350, 55, 175, 305, 15, 195];
   const HIGHLIGHT_KEY_ADJ_RANGE = 'adjRange';
   const HIGHLIGHT_KEY_FORWARD_ADDITIONAL = 'forwardAdditional';
   const HIGHLIGHT_KEY_ADJ_FIRST_FAIL = 'adjFirstFail';
+  const HIGHLIGHT_KEY_TAB_SEGMENT = 'tabSegment';
 
   let groupSeq = 1;
   let segmentSeq = 1;
@@ -58,7 +60,8 @@
   const pointRangeHighlights = {
     [HIGHLIGHT_KEY_ADJ_RANGE]: { range: null, timer: null },
     [HIGHLIGHT_KEY_FORWARD_ADDITIONAL]: { range: null, timer: null },
-    [HIGHLIGHT_KEY_ADJ_FIRST_FAIL]: { range: null, timer: null }
+    [HIGHLIGHT_KEY_ADJ_FIRST_FAIL]: { range: null, timer: null },
+    [HIGHLIGHT_KEY_TAB_SEGMENT]: { range: null, timer: null }
   };
 
   function createGroupId() {
@@ -568,7 +571,7 @@
       rect: point
     });
 
-    renderGroups(currentGroups);
+    startTabSegmentHighlight(next);
     setStatus('Tab으로 MERGE 연결 상대 점으로 전환했습니다.', false);
     return true;
   }
@@ -696,7 +699,7 @@
         ? `<span class="info-badge badge-sub">후보 ${candidateIndex}/${candidateTotal}</span>`
         : '';
     const mergeBadge = isMergeConnectedPoint
-      ? '<span class="info-badge badge-main">MERGE 연결점</span>'
+      ? '<span class="info-badge badge-main">MERGE 연결점☩</span>'
       : '<span class="info-badge">일반 점</span>';
 
     clickInfo.innerHTML =
@@ -1042,6 +1045,24 @@
       HIGHLIGHT_KEY_ADJ_FIRST_FAIL,
       context,
       ADJ_FIRST_FAIL_HIGHLIGHT_MS
+    );
+  }
+
+  function startTabSegmentHighlight(selection) {
+    if (!selection) return;
+    const group = currentGroups[selection.groupIndex];
+    const segment = group && group.segments[selection.segmentIndex];
+    if (!segment || !Array.isArray(segment.points) || segment.points.length === 0) return;
+
+    startNamedPointRangeHighlight(
+      HIGHLIGHT_KEY_TAB_SEGMENT,
+      {
+        groupIndex: selection.groupIndex,
+        segmentIndex: selection.segmentIndex,
+        startIndex: 0,
+        endIndex: segment.points.length - 1
+      },
+      TAB_SEGMENT_HIGHLIGHT_MS
     );
   }
 
@@ -2114,7 +2135,7 @@
           const isMergePoint = isPointMergeConnected(group, segment.id, pointIndex);
 
           if (isMergePoint && point.canConnect) {
-            baseCtx.fillStyle = '#c4b5fd';
+            baseCtx.fillStyle = '#92afc7';
           } else if (isMergePoint) {
             baseCtx.fillStyle = 'rgba(255, 138, 0, 0.85)';
           } else if (point.canConnect) {
@@ -2144,11 +2165,15 @@
             baseCtx.strokeStyle = '#062949';
           }
 
+          if (isPointInNamedHighlightRange(HIGHLIGHT_KEY_TAB_SEGMENT, group, segment, pointIndex)) {
+            baseCtx.strokeStyle = '#6d5efc';
+          }
+
           baseCtx.lineWidth = 1;
           baseCtx.strokeRect(point.x + 0.5, point.y + 0.5, point.size - 1, point.size - 1);
 
           if (isMergePoint && point.canConnect && point.size >= 3) {
-            baseCtx.fillStyle = '#c4b5fd';
+            baseCtx.fillStyle = '#a5468d';
             baseCtx.fillRect(point.x + 1, point.y + 1, point.size - 2, point.size - 2);
           }
         });
