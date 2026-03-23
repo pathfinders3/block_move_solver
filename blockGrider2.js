@@ -1688,8 +1688,10 @@
         false
       );
     } else {
+      const fromOrder = firstFail.from - startIndex;
+      const toOrder = firstFail.to - startIndex;
       setStatus(
-        `A~B 인접 검사: 비인접 (첫 비인접 구간 P${firstFail.from}->P${firstFail.to})`,
+        `A~B 인접 검사: 비인접 (첫 비인접 구간 P${firstFail.from}(${fromOrder}번)->P${firstFail.to}(${toOrder}번), A 기준 0번 시작)`,
         true
       );
     }
