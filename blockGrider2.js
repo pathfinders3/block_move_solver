@@ -1874,7 +1874,7 @@
       endIndex: stopIndex
     });
 
-    const highlightedSummary = `<span class="status-inline-highlight">인접 발견 ${adjacentFoundLabel}, 추가 선택 ${additionalSelectedCount}점.</span>`;
+    const highlightedSummary = `<span class="status-inline-highlight">인접 발견 ${adjacentFoundLabel}, 총 추가선택 ${additionalSelectedCount}점.</span>`;
 
     if (firstNonAdjacentEdge) {
       setStatusHtml(
