@@ -304,6 +304,16 @@
       color: var(--danger);
     }
 
+    .status-inline-highlight {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 6px;
+      background: #ffeb7a;
+      color: #3f2f00;
+      border: 1px solid #d4b100;
+      font-weight: 800;
+    }
+
     textarea {
       width: 100%;
       min-height: 460px;
@@ -346,8 +356,6 @@
       <label for="scaleRange">확대 배율:</label>
       <input type="range" id="scaleRange" min="0" max="5" value="1" step="1">
       <span id="scaleDisplay">4x</span>
-      <span>|</span>
-      <span>이동: I(위) J(좌) K(아래) L(우), 5px</span>
       <span>|</span>
       <span>Merge 취소: Ctrl+Z</span>
     </div>

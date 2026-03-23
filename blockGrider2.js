@@ -34,6 +34,7 @@
   const MERGE_DISTANCE_THRESHOLD = 80;
   const MAX_UNDO_STACK = 30;
   const ADJ_RANGE_HIGHLIGHT_MS = 4000;
+  const FORWARD_ADJ_ADDITIONAL_HIGHLIGHT_MS = 3000;
   const SEGMENT_HUE_PALETTE = [210, 30, 135, 280, 350, 55, 175, 305, 15, 195];
 
   let groupSeq = 1;
@@ -52,6 +53,8 @@
   let lastTabCycleIndex = -1;
   let adjacencyHighlightRange = null;
   let adjacencyHighlightTimer = null;
+  let forwardAdjAdditionalHighlightRange = null;
+  let forwardAdjAdditionalHighlightTimer = null;
 
   function createGroupId() {
     return `group-${groupSeq++}`;
@@ -76,6 +79,11 @@
 
   function setStatus(message, isError) {
     status.textContent = message;
+    status.classList.toggle('error', !!isError);
+  }
+
+  function setStatusHtml(messageHtml, isError) {
+    status.innerHTML = messageHtml;
     status.classList.toggle('error', !!isError);
   }
 
@@ -973,6 +981,17 @@
     return pointIndex >= adjacencyHighlightRange.startIndex && pointIndex <= adjacencyHighlightRange.endIndex;
   }
 
+  function isPointInForwardAdjAdditionalHighlight(group, segment, pointIndex) {
+    if (!forwardAdjAdditionalHighlightRange) return false;
+    if (!group || !segment) return false;
+    if (group.id !== forwardAdjAdditionalHighlightRange.groupId) return false;
+    if (segment.id !== forwardAdjAdditionalHighlightRange.segmentId) return false;
+    return (
+      pointIndex >= forwardAdjAdditionalHighlightRange.startIndex &&
+      pointIndex <= forwardAdjAdditionalHighlightRange.endIndex
+    );
+  }
+
   function startAdjacencyRangeHighlight(context) {
     if (!context) return;
 
@@ -999,6 +1018,41 @@
       adjacencyHighlightRange = null;
       renderGroups(currentGroups);
     }, ADJ_RANGE_HIGHLIGHT_MS);
+  }
+
+  function startForwardAdjAdditionalHighlight(context) {
+    const group = context && currentGroups[context.groupIndex];
+    const segment = group && group.segments[context.segmentIndex];
+    if (!group || !segment) return;
+
+    if (forwardAdjAdditionalHighlightTimer) {
+      clearTimeout(forwardAdjAdditionalHighlightTimer);
+      forwardAdjAdditionalHighlightTimer = null;
+    }
+
+    const startIndex = Number.isInteger(context.startIndex) ? context.startIndex : 0;
+    const endIndex = Number.isInteger(context.endIndex) ? context.endIndex : -1;
+
+    if (startIndex > endIndex) {
+      forwardAdjAdditionalHighlightRange = null;
+      renderGroups(currentGroups);
+      return;
+    }
+
+    forwardAdjAdditionalHighlightRange = {
+      groupId: group.id,
+      segmentId: segment.id,
+      startIndex,
+      endIndex
+    };
+
+    renderGroups(currentGroups);
+
+    forwardAdjAdditionalHighlightTimer = setTimeout(() => {
+      forwardAdjAdditionalHighlightTimer = null;
+      forwardAdjAdditionalHighlightRange = null;
+      renderGroups(currentGroups);
+    }, FORWARD_ADJ_ADDITIONAL_HIGHLIGHT_MS);
   }
 
   function remapSegmentIdsForMerge(group) {
@@ -1814,14 +1868,24 @@
       rect: point
     });
 
+    // '추가 선택 N점'은 시작점 다음 점부터 자동 선택된 끝점까지의 범위다.
+    startForwardAdjAdditionalHighlight({
+      groupIndex: context.groupIndex,
+      segmentIndex: context.segmentIndex,
+      startIndex: startIndex + 1,
+      endIndex: stopIndex
+    });
+
+    const highlightedSummary = `<span class="status-inline-highlight">인접 발견 ${adjacentFoundLabel}, 추가 선택 ${additionalSelectedCount}점.</span>`;
+
     if (firstNonAdjacentEdge) {
-      setStatus(
-        `증가 인접 검사: P${startIndex}부터 검사 중 비인접 구간 P${firstNonAdjacentEdge.from}->P${firstNonAdjacentEdge.to} 발견. 끝점 P${stopIndex} 자동 선택 완료. 인접 발견 ${adjacentFoundLabel}, 추가 선택 ${additionalSelectedCount}점.`,
+      setStatusHtml(
+        `증가 인접 검사: P${startIndex}부터 검사 중 비인접 구간 P${firstNonAdjacentEdge.from}->P${firstNonAdjacentEdge.to} 발견. 끝점 P${stopIndex} 자동 선택 완료. ${highlightedSummary}`,
         false
       );
     } else {
-      setStatus(
-        `증가 인접 검사: P${startIndex}부터 마지막 P${lastIndex}까지 모두 인접. 끝점 P${stopIndex} 자동 선택 완료. 인접 발견 ${adjacentFoundLabel}, 추가 선택 ${additionalSelectedCount}점.`,
+      setStatusHtml(
+        `증가 인접 검사: P${startIndex}부터 마지막 P${lastIndex}까지 모두 인접. 끝점 P${stopIndex} 자동 선택 완료. ${highlightedSummary}`,
         false
       );
     }
@@ -2072,6 +2136,10 @@
 
           if (isPointInAdjacencyHighlight(group, segment, pointIndex)) {
             baseCtx.strokeStyle = '#ff8c00';
+          }
+
+          if (isPointInForwardAdjAdditionalHighlight(group, segment, pointIndex)) {
+            baseCtx.strokeStyle = '#00e5ff';
           }
 
           baseCtx.lineWidth = 1;
