@@ -48,6 +48,8 @@
     console.error('blockGrider3 init 실패: Canvas 2D context를 만들 수 없습니다.');
     return;
   }
+  baseCtx.imageSmoothingEnabled = false;
+  zoomCtx.imageSmoothingEnabled = false;
 
   const scaleValues = [2, 4, 8, 16, 32, 64];
   const MIN_CANVAS_SIZE = 64;
@@ -240,10 +242,46 @@
     return `hsl(${hue} 90% 70%)`;
   }
 
+  function drawPixelLineNoAA(ctx, x0, y0, x1, y1, color, thickness) {
+    let sx0 = Math.round(Number(x0));
+    let sy0 = Math.round(Number(y0));
+    const sx1 = Math.round(Number(x1));
+    const sy1 = Math.round(Number(y1));
+
+    if (![sx0, sy0, sx1, sy1].every(Number.isFinite)) return;
+
+    const brushSize = Math.max(1, Math.round(Number(thickness) || 1));
+    const offset = -Math.floor(brushSize / 2);
+
+    function plot(px, py) {
+      ctx.fillRect(px + offset, py + offset, brushSize, brushSize);
+    }
+
+    let dx = Math.abs(sx1 - sx0);
+    const stepX = sx0 < sx1 ? 1 : -1;
+    let dy = -Math.abs(sy1 - sy0);
+    const stepY = sy0 < sy1 ? 1 : -1;
+    let err = dx + dy;
+
+    ctx.fillStyle = color;
+    while (true) {
+      plot(sx0, sy0);
+      if (sx0 === sx1 && sy0 === sy1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        sx0 += stepX;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        sy0 += stepY;
+      }
+    }
+  }
+
   function drawSegmentPathLines(groups) {
     baseCtx.save();
-    baseCtx.lineJoin = 'round';
-    baseCtx.lineCap = 'round';
+    baseCtx.imageSmoothingEnabled = false;
 
     groups.forEach((group, groupIndex) => {
       (group.segments || []).forEach((segment, segmentIndex) => {
@@ -264,19 +302,12 @@
 
         if (coords.length < 2) return;
 
-        baseCtx.beginPath();
-        baseCtx.moveTo(coords[0].x, coords[0].y);
         for (let i = 1; i < coords.length; i++) {
-          baseCtx.lineTo(coords[i].x, coords[i].y);
+          const prev = coords[i - 1];
+          const curr = coords[i];
+          drawPixelLineNoAA(baseCtx, prev.x, prev.y, curr.x, curr.y, 'rgba(2, 6, 23, 0.95)', 3);
+          drawPixelLineNoAA(baseCtx, prev.x, prev.y, curr.x, curr.y, getSegmentColor(groupIndex, segmentIndex), 2);
         }
-
-        baseCtx.strokeStyle = 'rgba(2, 6, 23, 0.95)';
-        baseCtx.lineWidth = 3;
-        baseCtx.stroke();
-
-        baseCtx.strokeStyle = getSegmentColor(groupIndex, segmentIndex);
-        baseCtx.lineWidth = 1.5;
-        baseCtx.stroke();
       });
     });
 
@@ -328,14 +359,7 @@
           if (!a || !b) continue;
 
           const lineWidth = Math.max(1, Math.round(Math.min(a.size, b.size) * 0.7));
-          ctx.beginPath();
-          ctx.moveTo(a.centerX, a.centerY);
-          ctx.lineTo(b.centerX, b.centerY);
-          ctx.strokeStyle = fillStyle;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.lineWidth = lineWidth;
-          ctx.stroke();
+          drawPixelLineNoAA(ctx, a.centerX, a.centerY, b.centerX, b.centerY, fillStyle, lineWidth);
 
           connectedIndices.add(i);
           connectedIndices.add(i + 1);
