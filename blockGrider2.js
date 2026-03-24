@@ -1,6 +1,7 @@
 (function () {
   const btnLoadJson = document.getElementById('btnLoadJson');
   const btnExportJson = document.getElementById('btnExportJson');
+  const btnCopyBitmap = document.getElementById('btnCopyBitmap');
   const btnMerge = document.getElementById('btnMerge');
   const btnSplitSegment = document.getElementById('btnSplitSegment');
   const btnInsertStartFromPoint = document.getElementById('btnInsertStartFromPoint');
@@ -2426,6 +2427,39 @@
     }
   }
 
+  async function copyResultBitmapToClipboard() {
+    if (!window.ClipboardItem || !navigator.clipboard || typeof navigator.clipboard.write !== 'function') {
+      setStatus('이 브라우저는 이미지 클립보드 복사를 지원하지 않습니다.', true);
+      return;
+    }
+
+    if (baseCanvas.width <= 0 || baseCanvas.height <= 0) {
+      setStatus('복사할 결과 비트맵이 없습니다.', true);
+      return;
+    }
+
+    try {
+      const blob = await new Promise(resolve => {
+        baseCanvas.toBlob(resolve, 'image/png');
+      });
+
+      if (!blob) {
+        setStatus('비트맵 생성에 실패했습니다.', true);
+        return;
+      }
+
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': blob
+        })
+      ]);
+
+      setStatus(`결과 비트맵(${baseCanvas.width}x${baseCanvas.height})을 클립보드에 복사했습니다.`, false);
+    } catch (error) {
+      setStatus('이미지 클립보드 복사에 실패했습니다. 브라우저 권한을 확인해주세요.', true);
+    }
+  }
+
   scaleRange.addEventListener('input', drawZoomCanvas);
 
   baseCanvas.addEventListener('click', event => {
@@ -2490,6 +2524,10 @@
 
   if (btnExportJson) {
     btnExportJson.addEventListener('click', exportCurrentStructure);
+  }
+
+  if (btnCopyBitmap) {
+    btnCopyBitmap.addEventListener('click', copyResultBitmapToClipboard);
   }
 
   if (btnSegmentsShowAll) {
