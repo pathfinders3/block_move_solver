@@ -56,6 +56,7 @@
   const MAX_CANVAS_SIZE = 1024;
   const DEFAULT_DP_EPSILON = 1.5;
   const DP_AUTO_APPLY_DEBOUNCE_MS = 80;
+  const FIXED_LINE_THICKNESS = 2;
 
   let currentPayload = null;
   let dpSourcePayload = null;
@@ -305,8 +306,7 @@
         for (let i = 1; i < coords.length; i++) {
           const prev = coords[i - 1];
           const curr = coords[i];
-          drawPixelLineNoAA(baseCtx, prev.x, prev.y, curr.x, curr.y, 'rgba(2, 6, 23, 0.95)', 3);
-          drawPixelLineNoAA(baseCtx, prev.x, prev.y, curr.x, curr.y, getSegmentColor(groupIndex, segmentIndex), 2);
+          drawPixelLineNoAA(baseCtx, prev.x, prev.y, curr.x, curr.y, getSegmentColor(groupIndex, segmentIndex), FIXED_LINE_THICKNESS);
         }
       });
     });
@@ -358,8 +358,7 @@
           const b = normalized[i + 1];
           if (!a || !b) continue;
 
-          const lineWidth = Math.max(1, Math.round(Math.min(a.size, b.size) * 0.7));
-          drawPixelLineNoAA(ctx, a.centerX, a.centerY, b.centerX, b.centerY, fillStyle, lineWidth);
+          drawPixelLineNoAA(ctx, a.centerX, a.centerY, b.centerX, b.centerY, fillStyle, FIXED_LINE_THICKNESS);
 
           connectedIndices.add(i);
           connectedIndices.add(i + 1);
