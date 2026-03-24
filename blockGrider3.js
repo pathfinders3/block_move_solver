@@ -6,6 +6,7 @@
   const badgeGroups = document.getElementById('badgeGroups');
   const badgePoints = document.getElementById('badgePoints');
   const btnCopy = document.getElementById('btnCopy');
+  const btnCopyBitmap = document.getElementById('btnCopyBitmap');
   const btnReload = document.getElementById('btnReload');
   const btnSimplifyDp = document.getElementById('btnSimplifyDp');
   const btnTogglePathLines = document.getElementById('btnTogglePathLines');
@@ -24,6 +25,7 @@
     badgeGroups,
     badgePoints,
     btnCopy,
+    btnCopyBitmap,
     btnReload,
     btnSimplifyDp,
     btnTogglePathLines,
@@ -281,6 +283,127 @@
     baseCtx.restore();
   }
 
+  function normalizePoint(point) {
+    const x = Number(point && point.x);
+    const y = Number(point && point.y);
+    const size = Math.max(1, Math.round(Number(point && point.size)));
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size)) return null;
+    const px = Math.round(x);
+    const py = Math.round(y);
+    return {
+      x: px,
+      y: py,
+      size,
+      centerX: px + size / 2,
+      centerY: py + size / 2
+    };
+  }
+
+  function renderBitmapForClipboard(payload) {
+    const size = calculateCanvasSize(payload);
+    const bitmapCanvas = document.createElement('canvas');
+    bitmapCanvas.width = size;
+    bitmapCanvas.height = size;
+
+    const ctx = bitmapCanvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, size, size);
+
+    const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
+
+    groups.forEach((group, groupIndex) => {
+      (group.segments || []).forEach((segment, segmentIndex) => {
+        const points = Array.isArray(segment.points) ? segment.points : [];
+        const normalized = points.map(normalizePoint);
+        const connectedIndices = new Set();
+        const fillStyle = getSegmentColor(groupIndex, segmentIndex);
+
+        // 인덱스 순서(0-1, 1-2...)로 선을 연결한다.
+        for (let i = 0; i < normalized.length - 1; i++) {
+          const a = normalized[i];
+          const b = normalized[i + 1];
+          if (!a || !b) continue;
+
+          const lineWidth = Math.max(1, Math.round(Math.min(a.size, b.size) * 0.7));
+          ctx.beginPath();
+          ctx.moveTo(a.centerX, a.centerY);
+          ctx.lineTo(b.centerX, b.centerY);
+          ctx.strokeStyle = fillStyle;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineWidth = lineWidth;
+          ctx.stroke();
+
+          connectedIndices.add(i);
+          connectedIndices.add(i + 1);
+        }
+
+        // 선 연결에 참여하지 않은(고립된) 점만 사각형 점을 유지한다.
+        for (let i = 0; i < normalized.length; i++) {
+          const p = normalized[i];
+          if (!p || connectedIndices.has(i)) continue;
+
+          ctx.fillStyle = fillStyle;
+          ctx.fillRect(p.x, p.y, p.size, p.size);
+          ctx.strokeStyle = '#dbeafe';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(p.x + 0.5, p.y + 0.5, Math.max(1, p.size - 1), Math.max(1, p.size - 1));
+        }
+      });
+    });
+
+    return bitmapCanvas;
+  }
+
+  function canvasToBlob(canvas, type) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if (!blob) {
+          reject(new Error('toBlob failed'));
+          return;
+        }
+        resolve(blob);
+      }, type || 'image/png');
+    });
+  }
+
+  function tryLegacyImageCopy(canvas) {
+    // ClipboardItem 미지원 브라우저를 위한 레거시 복사 시도
+    const host = document.createElement('div');
+    host.contentEditable = 'true';
+    host.style.position = 'fixed';
+    host.style.left = '-99999px';
+    host.style.top = '0';
+    host.style.opacity = '0';
+
+    const img = document.createElement('img');
+    img.src = canvas.toDataURL('image/png');
+    img.width = canvas.width;
+    img.height = canvas.height;
+    host.appendChild(img);
+    document.body.appendChild(host);
+
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNode(img);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    let copied = false;
+    try {
+      copied = document.execCommand('copy');
+    } catch (error) {
+      copied = false;
+    }
+
+    selection.removeAllRanges();
+    document.body.removeChild(host);
+    return copied;
+  }
+
   function updatePathLineButtonLabel() {
     btnTogglePathLines.textContent = `경로 선 보기: ${showPathLines ? 'ON' : 'OFF'}`;
   }
@@ -452,6 +575,46 @@
       setStatus('JSON을 클립보드에 복사했습니다.', false);
     } catch (error) {
       setStatus('클립보드 복사에 실패했습니다.', true);
+    }
+  });
+
+  btnCopyBitmap.addEventListener('click', async () => {
+    setStatus('비트맵 클립보드 복사를 시도 중입니다...', false);
+
+    if (!currentPayload) {
+      setStatus('복사할 데이터가 없습니다. 먼저 데이터를 수신해주세요.', true);
+      return;
+    }
+
+    try {
+      const bitmapCanvas = renderBitmapForClipboard(currentPayload);
+      if (!bitmapCanvas) {
+        setStatus('비트맵 캔버스 생성에 실패했습니다.', true);
+        return;
+      }
+
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
+        const blob = await canvasToBlob(bitmapCanvas, 'image/png');
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'image/png': blob
+          })
+        ]);
+
+        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다.`, false);
+        return;
+      }
+
+      const copiedByLegacy = tryLegacyImageCopy(bitmapCanvas);
+      if (copiedByLegacy) {
+        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드)`, false);
+      } else {
+        setStatus('현재 브라우저는 이미지 클립보드 쓰기를 지원하지 않습니다. 크롬 최신 버전(HTTPS/localhost)에서 다시 시도해주세요.', true);
+      }
+    } catch (error) {
+      const reason = error && error.message ? error.message : String(error || 'unknown');
+      setStatus(`비트맵 클립보드 복사에 실패했습니다. (${reason})`, true);
+      console.error('bitmap copy failed:', error);
     }
   });
 
