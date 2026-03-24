@@ -2166,7 +2166,7 @@
           }
 
           if (isPointInNamedHighlightRange(HIGHLIGHT_KEY_TAB_SEGMENT, group, segment, pointIndex)) {
-            baseCtx.strokeStyle = '#6d5efc';
+            baseCtx.strokeStyle = '#397255';
           }
 
           baseCtx.lineWidth = 1;
