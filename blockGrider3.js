@@ -60,7 +60,8 @@
   const MAX_CANVAS_SIZE = 1024;
   const DEFAULT_DP_EPSILON = 1.5;
   const DP_AUTO_APPLY_DEBOUNCE_MS = 80;
-  const DEFAULT_LINE_THICKNESS = 2;
+  const DEFAULT_LINE_THICKNESS = 1;
+  const LINE_THICKNESS_STORAGE_KEY = 'blockGrider3.lineThickness';
 
   let currentPayload = null;
   let dpSourcePayload = null;
@@ -220,14 +221,36 @@
     dpToleranceDisplay.textContent = getCurrentDpTolerance().toFixed(1);
   }
 
+  function sanitizeLineThickness(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return DEFAULT_LINE_THICKNESS;
+    return Math.max(1, Math.min(5, Math.round(num)));
+  }
+
   function getCurrentLineThickness() {
-    const value = Number(lineThicknessRange.value);
-    if (!Number.isFinite(value)) return DEFAULT_LINE_THICKNESS;
-    return Math.max(1, Math.min(5, Math.round(value)));
+    return sanitizeLineThickness(lineThicknessRange.value);
   }
 
   function updateLineThicknessDisplay() {
     lineThicknessDisplay.textContent = String(getCurrentLineThickness());
+  }
+
+  function loadLineThicknessFromStorage() {
+    try {
+      const raw = localStorage.getItem(LINE_THICKNESS_STORAGE_KEY);
+      if (raw == null) return DEFAULT_LINE_THICKNESS;
+      return sanitizeLineThickness(raw);
+    } catch (error) {
+      return DEFAULT_LINE_THICKNESS;
+    }
+  }
+
+  function saveLineThicknessToStorage(value) {
+    try {
+      localStorage.setItem(LINE_THICKNESS_STORAGE_KEY, String(sanitizeLineThickness(value)));
+    } catch (error) {
+      // 저장 불가 환경(private mode 등)에서는 무시
+    }
   }
 
   function calculateCanvasSize(payload) {
@@ -683,6 +706,7 @@
   });
 
   lineThicknessRange.addEventListener('input', () => {
+    saveLineThicknessToStorage(lineThicknessRange.value);
     updateLineThicknessDisplay();
     if (!currentPayload || !showPathLines) return;
     drawBaseCanvas(currentPayload);
@@ -699,6 +723,8 @@
       // 사용자가 타이핑 중인 순간의 불완전 JSON은 무시
     }
   });
+
+  lineThicknessRange.value = String(loadLineThicknessFromStorage());
 
   updateDpToleranceDisplay();
   updateLineThicknessDisplay();
