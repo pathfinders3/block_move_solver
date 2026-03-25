@@ -275,10 +275,18 @@
     return Math.min(MAX_CANVAS_SIZE, required);
   }
 
+  /**
+   * groupIndex와 segmentIndex 조합으로 고유한 색상을 반환합니다.
+   * hue(97, 53 계수), lightness(3단계), saturation(2단계)를 함께 변화시켜
+   * 육안으로 구분 가능한 색상을 최대 ~30가지 확보합니다.
+   */
   function getSegmentColor(groupIndex, segmentIndex) {
-    const hue = (groupIndex * 71 + segmentIndex * 37) % 360;
-    return `hsl(${hue} 90% 70%)`;
+    const hue = (groupIndex * 97 + segmentIndex * 53) % 360;
+    const lightness = 55 + (groupIndex % 3) * 10;   // 55 / 65 / 75
+    const saturation = 85 + (segmentIndex % 2) * 10; // 85 / 95
+    return `hsl(${hue} ${saturation}% ${lightness}%)`;
   }
+
 
   function drawPixelLineNoAA(ctx, x0, y0, x1, y1, color, thickness) {
     let sx0 = Math.round(Number(x0));
