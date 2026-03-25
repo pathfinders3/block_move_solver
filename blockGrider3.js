@@ -17,6 +17,8 @@
   const scaleDisplay = document.getElementById('scaleDisplay');
   const dpToleranceRange = document.getElementById('dpToleranceRange');
   const dpToleranceDisplay = document.getElementById('dpToleranceDisplay');
+  const lineThicknessRange = document.getElementById('lineThicknessRange');
+  const lineThicknessDisplay = document.getElementById('lineThicknessDisplay');
 
   const required = [
     output,
@@ -35,7 +37,9 @@
     scaleRange,
     scaleDisplay,
     dpToleranceRange,
-    dpToleranceDisplay
+    dpToleranceDisplay,
+    lineThicknessRange,
+    lineThicknessDisplay
   ];
   if (required.some(el => !el)) {
     console.error('blockGrider3 init 실패: 필수 DOM 요소를 찾지 못했습니다. blockGrider3.html에서만 실행해주세요.');
@@ -56,7 +60,7 @@
   const MAX_CANVAS_SIZE = 1024;
   const DEFAULT_DP_EPSILON = 1.5;
   const DP_AUTO_APPLY_DEBOUNCE_MS = 80;
-  const FIXED_LINE_THICKNESS = 2;
+  const DEFAULT_LINE_THICKNESS = 2;
 
   let currentPayload = null;
   let dpSourcePayload = null;
@@ -216,6 +220,16 @@
     dpToleranceDisplay.textContent = getCurrentDpTolerance().toFixed(1);
   }
 
+  function getCurrentLineThickness() {
+    const value = Number(lineThicknessRange.value);
+    if (!Number.isFinite(value)) return DEFAULT_LINE_THICKNESS;
+    return Math.max(1, Math.min(5, Math.round(value)));
+  }
+
+  function updateLineThicknessDisplay() {
+    lineThicknessDisplay.textContent = String(getCurrentLineThickness());
+  }
+
   function calculateCanvasSize(payload) {
     const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
     let maxRight = MIN_CANVAS_SIZE;
@@ -283,6 +297,7 @@
   function drawSegmentPathLines(groups) {
     baseCtx.save();
     baseCtx.imageSmoothingEnabled = false;
+    const thickness = getCurrentLineThickness();
 
     groups.forEach((group, groupIndex) => {
       (group.segments || []).forEach((segment, segmentIndex) => {
@@ -306,7 +321,7 @@
         for (let i = 1; i < coords.length; i++) {
           const prev = coords[i - 1];
           const curr = coords[i];
-          drawPixelLineNoAA(baseCtx, prev.x, prev.y, curr.x, curr.y, getSegmentColor(groupIndex, segmentIndex), FIXED_LINE_THICKNESS);
+          drawPixelLineNoAA(baseCtx, prev.x, prev.y, curr.x, curr.y, getSegmentColor(groupIndex, segmentIndex), thickness);
         }
       });
     });
@@ -330,7 +345,7 @@
     };
   }
 
-  function renderBitmapForClipboard(payload) {
+  function renderBitmapForClipboard(payload, lineThickness) {
     const size = calculateCanvasSize(payload);
     const bitmapCanvas = document.createElement('canvas');
     bitmapCanvas.width = size;
@@ -344,6 +359,7 @@
     ctx.fillRect(0, 0, size, size);
 
     const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
+    const thickness = Math.max(1, Math.min(5, Math.round(Number(lineThickness) || DEFAULT_LINE_THICKNESS)));
 
     groups.forEach((group, groupIndex) => {
       (group.segments || []).forEach((segment, segmentIndex) => {
@@ -358,7 +374,7 @@
           const b = normalized[i + 1];
           if (!a || !b) continue;
 
-          drawPixelLineNoAA(ctx, a.centerX, a.centerY, b.centerX, b.centerY, fillStyle, FIXED_LINE_THICKNESS);
+          drawPixelLineNoAA(ctx, a.centerX, a.centerY, b.centerX, b.centerY, fillStyle, thickness);
 
           connectedIndices.add(i);
           connectedIndices.add(i + 1);
@@ -610,7 +626,8 @@
     }
 
     try {
-      const bitmapCanvas = renderBitmapForClipboard(currentPayload);
+      const lineThickness = getCurrentLineThickness();
+      const bitmapCanvas = renderBitmapForClipboard(currentPayload, lineThickness);
       if (!bitmapCanvas) {
         setStatus('비트맵 캔버스 생성에 실패했습니다.', true);
         return;
@@ -624,13 +641,13 @@
           })
         ]);
 
-        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다.`, false);
+        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (선 두께=${lineThickness})`, false);
         return;
       }
 
       const copiedByLegacy = tryLegacyImageCopy(bitmapCanvas);
       if (copiedByLegacy) {
-        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드)`, false);
+        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드, 선 두께=${lineThickness})`, false);
       } else {
         setStatus('현재 브라우저는 이미지 클립보드 쓰기를 지원하지 않습니다. 크롬 최신 버전(HTTPS/localhost)에서 다시 시도해주세요.', true);
       }
@@ -665,6 +682,13 @@
     scheduleAutoDpApply();
   });
 
+  lineThicknessRange.addEventListener('input', () => {
+    updateLineThicknessDisplay();
+    if (!currentPayload || !showPathLines) return;
+    drawBaseCanvas(currentPayload);
+    drawZoomCanvas();
+  });
+
   output.addEventListener('input', () => {
     try {
       const parsed = parseOutputPayload();
@@ -677,6 +701,7 @@
   });
 
   updateDpToleranceDisplay();
+  updateLineThicknessDisplay();
   updatePathLineButtonLabel();
 
   receiveFromTransferKey();
