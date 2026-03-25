@@ -7,6 +7,7 @@
   const badgePoints = document.getElementById('badgePoints');
   const btnCopy = document.getElementById('btnCopy');
   const btnCopyBitmap = document.getElementById('btnCopyBitmap');
+  const btnRestoreOriginal = document.getElementById('btnRestoreOriginal');
   const btnReload = document.getElementById('btnReload');
   const btnSimplifyDp = document.getElementById('btnSimplifyDp');
   const btnTogglePathLines = document.getElementById('btnTogglePathLines');
@@ -28,6 +29,7 @@
     badgePoints,
     btnCopy,
     btnCopyBitmap,
+    btnRestoreOriginal,
     btnReload,
     btnSimplifyDp,
     btnTogglePathLines,
@@ -64,6 +66,7 @@
   const LINE_THICKNESS_STORAGE_KEY = 'blockGrider3.lineThickness';
 
   let currentPayload = null;
+  let originalPayload = null;
   let dpSourcePayload = null;
   let dpAutoApplyTimer = null;
   let showPathLines = false;
@@ -628,6 +631,7 @@
 
     try {
       const payload = JSON.parse(text);
+      originalPayload = deepCloneJson(payload);
       dpSourcePayload = deepCloneJson(payload);
       updateMeta(payload, 'transferKey(localStorage)');
       renderPayload(payload);
@@ -637,6 +641,20 @@
       renderPayload({ version: 1, groups: [] });
       setStatus('JSON 파싱에 실패했습니다.', true);
     }
+  }
+
+  function restoreOriginalData() {
+    if (!originalPayload || !Array.isArray(originalPayload.groups)) {
+      setStatus('복원할 원본 데이터가 없습니다. 먼저 데이터를 수신해주세요.', true);
+      return;
+    }
+
+    const restored = deepCloneJson(originalPayload);
+    dpSourcePayload = deepCloneJson(originalPayload);
+    output.value = JSON.stringify(restored, null, 2);
+    updateMeta(restored, 'transferKey(localStorage)');
+    renderPayload(restored);
+    setStatus('원본 데이터로 복원했습니다.', false);
   }
 
   btnCopy.addEventListener('click', async () => {
@@ -690,6 +708,10 @@
   });
 
   btnReload.addEventListener('click', receiveFromTransferKey);
+
+  btnRestoreOriginal.addEventListener('click', () => {
+    restoreOriginalData();
+  });
 
   btnSimplifyDp.addEventListener('click', () => {
     applyDpSimplification({ refreshSourceFromTextarea: true, isAuto: false });
