@@ -8,7 +8,8 @@
  * @returns {Array<{x: number, y: number, w: number, h: number, visibleX: number, visibleY: number, visibleW: number, visibleH: number}>}
  */
 function getCornerRects(x, y, size, size2) {
-    const canvasSize = currentCanvasSize;
+    const canvasWidth = currentCanvasWidth;
+    const canvasHeight = currentCanvasHeight;
     // 원래 좌표를 계산 (음수 포함, 경계 밖도 허용)
     const corners = [
         { x: x - size2, y: y - size2 }, // 좌상
@@ -18,11 +19,11 @@ function getCornerRects(x, y, size, size2) {
     ];
     
     return corners.map(corner => {
-        // 실제로 화면(0~canvasSize-1)에 보이는 영역만 계산
+        // 실제로 화면(0~canvasWidth-1/0~canvasHeight-1)에 보이는 영역만 계산
         const visibleStartX = Math.max(0, corner.x);
         const visibleStartY = Math.max(0, corner.y);
-        const visibleEndX = Math.min(canvasSize, corner.x + size2);
-        const visibleEndY = Math.min(canvasSize, corner.y + size2);
+        const visibleEndX = Math.min(canvasWidth, corner.x + size2);
+        const visibleEndY = Math.min(canvasHeight, corner.y + size2);
         const visibleW = Math.max(0, visibleEndX - visibleStartX);
         const visibleH = Math.max(0, visibleEndY - visibleStartY);
         
@@ -96,7 +97,8 @@ function getPathRectsOverlap(x, y, size, size2, idxStart, idxEnd) {
  * @returns {number} 흰색 픽셀 개수
  */
 function countWhitePixels(ctx, x, y, size) {
-    const canvasSize = currentCanvasSize;
+    const canvasWidth = currentCanvasWidth;
+    const canvasHeight = currentCanvasHeight;
     const thresholdInput = document.getElementById('whiteThreshold');
     const thresholdValue = thresholdInput ? parseInt(thresholdInput.value, 10) : 245;
     const whiteThreshold = Number.isNaN(thresholdValue)
@@ -104,12 +106,12 @@ function countWhitePixels(ctx, x, y, size) {
         : Math.min(255, Math.max(0, thresholdValue));
 
     // 경계 밖을 범위는 0을 반환
-    if (x < 0 || y < 0 || x + size > canvasSize || y + size > canvasSize) {
+    if (x < 0 || y < 0 || x + size > canvasWidth || y + size > canvasHeight) {
         // 부분적으로 경계 안에 있는 경우 처리
         const startX = Math.max(0, x);
         const startY = Math.max(0, y);
-        const endX = Math.min(canvasSize, x + size);
-        const endY = Math.min(canvasSize, y + size);
+        const endX = Math.min(canvasWidth, x + size);
+        const endY = Math.min(canvasHeight, y + size);
         const width = endX - startX;
         const height = endY - startY;
         
@@ -157,8 +159,9 @@ function countWhitePixels(ctx, x, y, size) {
     const canvasSizeSelect = document.getElementById('canvasSizeSelect');
     const canvas1SizeLabel = document.getElementById('canvas1SizeLabel');
     const CANVAS_SIZE_STORAGE_KEY = 'blockGrider.canvasSize';
-    const ALLOWED_CANVAS_SIZES = [64, 128, 256];
-    let currentCanvasSize = parseInt(canvasSizeSelect.value, 10) || 64;
+    const ALLOWED_CANVAS_SIZES = ['64x64', '128x128', '256x256', '64x128'];
+    let currentCanvasWidth = 64;
+    let currentCanvasHeight = 64;
         
         // Range 바 요소
         const scaleRange = document.getElementById('scaleRange');
@@ -175,19 +178,35 @@ function countWhitePixels(ctx, x, y, size) {
             return ALLOWED_CANVAS_SIZES.includes(size);
         }
 
+        function parseCanvasSize(value) {
+            if (typeof value !== 'string') return null;
+            const parts = value.split('x').map(v => parseInt(v, 10));
+            if (parts.length !== 2 || parts.some(v => !Number.isFinite(v) || v <= 0)) {
+                return null;
+            }
+            return { width: parts[0], height: parts[1] };
+        }
+
+        function formatCanvasSize(width, height) {
+            return `${width}x${height}`;
+        }
+
         function getStoredCanvasSize() {
             try {
                 const storedValue = localStorage.getItem(CANVAS_SIZE_STORAGE_KEY);
-                const parsed = parseInt(storedValue, 10);
-                return isAllowedCanvasSize(parsed) ? parsed : null;
+                if (!storedValue) return null;
+                const parsed = parseCanvasSize(storedValue);
+                if (!parsed) return null;
+                const id = formatCanvasSize(parsed.width, parsed.height);
+                return ALLOWED_CANVAS_SIZES.includes(id) ? parsed : null;
             } catch (ex) {
                 return null;
             }
         }
 
-        function saveCanvasSize(size) {
+        function saveCanvasSize(width, height) {
             try {
-                localStorage.setItem(CANVAS_SIZE_STORAGE_KEY, String(size));
+                localStorage.setItem(CANVAS_SIZE_STORAGE_KEY, formatCanvasSize(width, height));
             } catch (ex) {
                 // localStorage를 사용할 수 없는 환경에서는 저장을 건너뜀
             }
@@ -195,31 +214,32 @@ function countWhitePixels(ctx, x, y, size) {
 
         function updateCanvasSizeLabel() {
             if (canvas1SizeLabel) {
-                canvas1SizeLabel.textContent = `${currentCanvasSize}x${currentCanvasSize}`;
+                canvas1SizeLabel.textContent = `${currentCanvasWidth}x${currentCanvasHeight}`;
             }
         }
 
         function clampRectsToCanvas() {
-            const maxCoord = currentCanvasSize - 1;
+            const maxXCoord = currentCanvasWidth - 1;
+            const maxYCoord = currentCanvasHeight - 1;
 
             if (selectedPixel) {
                 selectedPixel = {
-                    x: clamp(selectedPixel.x, 0, maxCoord),
-                    y: clamp(selectedPixel.y, 0, maxCoord)
+                    x: clamp(selectedPixel.x, 0, maxXCoord),
+                    y: clamp(selectedPixel.y, 0, maxYCoord)
                 };
             }
 
             if (tempYellowRect) {
-                const maxX = currentCanvasSize - tempYellowRect.size;
-                const maxY = currentCanvasSize - tempYellowRect.size;
+                const maxX = currentCanvasWidth - tempYellowRect.size;
+                const maxY = currentCanvasHeight - tempYellowRect.size;
                 tempYellowRect.x = clamp(tempYellowRect.x, 0, Math.max(0, maxX));
                 tempYellowRect.y = clamp(tempYellowRect.y, 0, Math.max(0, maxY));
             }
 
             yellowRects = yellowRects.filter(rect => {
                 return rect.x >= 0 && rect.y >= 0 &&
-                    rect.x + rect.size <= currentCanvasSize &&
-                    rect.y + rect.size <= currentCanvasSize;
+                    rect.x + rect.size <= currentCanvasWidth &&
+                    rect.y + rect.size <= currentCanvasHeight;
             });
 
             if (yellowRects.length === 0) {
@@ -229,8 +249,10 @@ function countWhitePixels(ctx, x, y, size) {
             }
         }
 
-        function applyCanvasSize(size) {
-            if (!isAllowedCanvasSize(size)) return;
+        function applyCanvasSize(width, height) {
+            const sizeId = formatCanvasSize(width, height);
+            if (!ALLOWED_CANVAS_SIZES.includes(sizeId)) return;
+
             const prevWidth = canvas1.width;
             const prevHeight = canvas1.height;
             const backupCanvas = document.createElement('canvas');
@@ -239,24 +261,25 @@ function countWhitePixels(ctx, x, y, size) {
             const backupCtx = backupCanvas.getContext('2d');
             backupCtx.drawImage(canvas1, 0, 0);
 
-            currentCanvasSize = size;
-            canvas1.width = size;
-            canvas1.height = size;
+            currentCanvasWidth = width;
+            currentCanvasHeight = height;
+            canvas1.width = width;
+            canvas1.height = height;
 
             ctx1.fillStyle = 'white';
-            ctx1.fillRect(0, 0, size, size);
+            ctx1.fillRect(0, 0, width, height);
 
-            const fitScale = Math.min(size / prevWidth, size / prevHeight);
+            const fitScale = Math.min(width / prevWidth, height / prevHeight);
             const drawW = prevWidth * fitScale;
             const drawH = prevHeight * fitScale;
-            const offsetX = (size - drawW) / 2;
-            const offsetY = (size - drawH) / 2;
+            const offsetX = (width - drawW) / 2;
+            const offsetY = (height - drawH) / 2;
             ctx1.drawImage(backupCanvas, offsetX, offsetY, drawW, drawH);
 
-            if (canvasSizeSelect.value !== String(size)) {
-                canvasSizeSelect.value = String(size);
+            if (canvasSizeSelect.value !== sizeId) {
+                canvasSizeSelect.value = sizeId;
             }
-            saveCanvasSize(size);
+            saveCanvasSize(width, height);
             updateCanvasSizeLabel();
             clampRectsToCanvas();
             updateYellowIndexDisplay();
@@ -268,18 +291,39 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         canvasSizeSelect.addEventListener('change', (e) => {
-            const nextSize = parseInt(e.target.value, 10);
-            if (!Number.isFinite(nextSize) || !isAllowedCanvasSize(nextSize)) return;
-            applyCanvasSize(nextSize);
+            const selected = e.target.value;
+            if (!ALLOWED_CANVAS_SIZES.includes(selected)) return;
+            const parsed = parseCanvasSize(selected);
+            if (!parsed) return;
+            applyCanvasSize(parsed.width, parsed.height);
         });
+
+        function setAutoSelectOnClick(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            input.addEventListener('click', () => input.select());
+            input.addEventListener('focus', () => input.select());
+        }
+
+        setAutoSelectOnClick('rectSize');
+        setAutoSelectOnClick('cornerSize');
 
         // 저장된 캔버스 크기가 있으면 초기값으로 복원
         const restoredCanvasSize = getStoredCanvasSize();
         if (restoredCanvasSize !== null) {
-            currentCanvasSize = restoredCanvasSize;
-            canvasSizeSelect.value = String(restoredCanvasSize);
-            canvas1.width = restoredCanvasSize;
-            canvas1.height = restoredCanvasSize;
+            currentCanvasWidth = restoredCanvasSize.width;
+            currentCanvasHeight = restoredCanvasSize.height;
+            const restoredId = formatCanvasSize(restoredCanvasSize.width, restoredCanvasSize.height);
+            canvasSizeSelect.value = restoredId;
+            canvas1.width = restoredCanvasSize.width;
+            canvas1.height = restoredCanvasSize.height;
+        } else {
+            // 초기값 설정
+            const initialId = parseCanvasSize(canvasSizeSelect.value) || { width: 64, height: 64 };
+            currentCanvasWidth = initialId.width;
+            currentCanvasHeight = initialId.height;
+            canvas1.width = initialId.width;
+            canvas1.height = initialId.height;
         }
         
         // Document 로드 시 임의의 점들 그리기
@@ -290,14 +334,15 @@ function countWhitePixels(ctx, x, y, size) {
         
         // Canvas1에 임의의 점들 그리기
         function drawRandomPixels() {
-            const canvasSize = currentCanvasSize;
+            const canvasWidth = currentCanvasWidth;
+            const canvasHeight = currentCanvasHeight;
             // 배경을 흰색으로 설정
             ctx1.fillStyle = 'white';
-            ctx1.fillRect(0, 0, canvasSize, canvasSize);
+            ctx1.fillRect(0, 0, canvasWidth, canvasHeight);
             
             // 임의의 점들 그리기 (약 200-300개의 픽셀)
             const baseCount = Math.floor(Math.random() * 100) + 200;
-            const densityScale = (canvasSize * canvasSize) / (64 * 64);
+            const densityScale = (canvasWidth * canvasHeight) / (64 * 64);
             const pixelCount = Math.floor(baseCount * densityScale);
             
             for (let i = 0; i < pixelCount; i++) {
@@ -326,17 +371,18 @@ function countWhitePixels(ctx, x, y, size) {
                             const img = new Image();
                             
                             img.onload = function() {
-                                const canvasSize = currentCanvasSize;
+                                const canvasWidth = currentCanvasWidth;
+                                const canvasHeight = currentCanvasHeight;
                                 // 배경을 흰색으로 설정
                                 ctx1.fillStyle = 'white';
-                                ctx1.fillRect(0, 0, canvasSize, canvasSize);
+                                ctx1.fillRect(0, 0, canvasWidth, canvasHeight);
                                 
                                 // 이미지를 현재 캔버스 크기에 맞춰서 그리기 (비율 유지)
-                                const scale = Math.min(canvasSize / img.width, canvasSize / img.height);
+                                const scale = Math.min(canvasWidth / img.width, canvasHeight / img.height);
                                 const scaledWidth = img.width * scale;
                                 const scaledHeight = img.height * scale;
-                                const offsetX = (canvasSize - scaledWidth) / 2;
-                                const offsetY = (canvasSize - scaledHeight) / 2;
+                                const offsetX = (canvasWidth - scaledWidth) / 2;
+                                const offsetY = (canvasHeight - scaledHeight) / 2;
                                 
                                 ctx1.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
                                 console.log('클립보드에서 이미지를 가져왔습니다.');
@@ -664,11 +710,12 @@ function countWhitePixels(ctx, x, y, size) {
             // IJKL 이동키 (선택 블록 이동)
             if (selectedPixel && ['i','j','k','l','I','J','K','L'].includes(e.key)) {
                 let {x, y} = selectedPixel;
-                const maxCoord = currentCanvasSize - 1;
+                const maxX = currentCanvasWidth - 1;
+                const maxY = currentCanvasHeight - 1;
                 if (e.key==='i'||e.key==='I') y = Math.max(0, y-1);
-                if (e.key==='k'||e.key==='K') y = Math.min(maxCoord, y+1);
+                if (e.key==='k'||e.key==='K') y = Math.min(maxY, y+1);
                 if (e.key==='j'||e.key==='J') x = Math.max(0, x-1);
-                if (e.key==='l'||e.key==='L') x = Math.min(maxCoord, x+1);
+                if (e.key==='l'||e.key==='L') x = Math.min(maxX, x+1);
                 selectedPixel = {x, y};
                 // 색상 구하기 (canvas1 기준)
                 let r=0,g=0,b=0, rgbText='';
@@ -718,23 +765,24 @@ function countWhitePixels(ctx, x, y, size) {
         
         // Canvas1을 Canvas2에 확대하여 복사
         function scaleCanvas() {
-            const canvasSize = currentCanvasSize;
+            const canvasWidth = currentCanvasWidth;
+            const canvasHeight = currentCanvasHeight;
             const index = parseInt(scaleRange.value);
             const scale = scaleValues[index];
             
             // Canvas2 크기 조정
-            canvas2.width = canvasSize * scale;
-            canvas2.height = canvasSize * scale;
+            canvas2.width = canvasWidth * scale;
+            canvas2.height = canvasHeight * scale;
             
             // Canvas1의 이미지 데이터 가져오기
-            const imageData = ctx1.getImageData(0, 0, canvasSize, canvasSize);
+            const imageData = ctx1.getImageData(0, 0, canvasWidth, canvasHeight);
             const data = imageData.data;
             
             // Canvas2에 픽셀별로 확대하여 그리기 (Sharp 복사)
-            for (let y = 0; y < canvasSize; y++) {
-                for (let x = 0; x < canvasSize; x++) {
+            for (let y = 0; y < canvasHeight; y++) {
+                for (let x = 0; x < canvasWidth; x++) {
                     // 원본 픽셀의 인덱스
-                    const index = (y * canvasSize + x) * 4;
+                    const index = (y * canvasWidth + x) * 4;
                     
                     // RGBA 값 가져오기
                     const r = data[index];
