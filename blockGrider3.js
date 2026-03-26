@@ -20,6 +20,7 @@
   const dpToleranceDisplay = document.getElementById('dpToleranceDisplay');
   const lineThicknessRange = document.getElementById('lineThicknessRange');
   const lineThicknessDisplay = document.getElementById('lineThicknessDisplay');
+  const colorModeSelect = document.getElementById('colorModeSelect');
 
   const required = [
     output,
@@ -41,7 +42,8 @@
     dpToleranceRange,
     dpToleranceDisplay,
     lineThicknessRange,
-    lineThicknessDisplay
+    lineThicknessDisplay,
+    colorModeSelect
   ];
   if (required.some(el => !el)) {
     console.error('blockGrider3 init 실패: 필수 DOM 요소를 찾지 못했습니다. blockGrider3.html에서만 실행해주세요.');
@@ -64,6 +66,9 @@
   const DP_AUTO_APPLY_DEBOUNCE_MS = 80;
   const DEFAULT_LINE_THICKNESS = 1;
   const LINE_THICKNESS_STORAGE_KEY = 'blockGrider3.lineThickness';
+  const COLOR_MODE_MONO = 'mono';
+  const COLOR_MODE_SEGMENT = 'segment';
+  const MONO_COLOR_GRAY = '#9ca3af';
 
   let currentPayload = null;
   let originalPayload = null;
@@ -290,6 +295,18 @@
     return `hsl(${hue} ${saturation}% ${lightness}%)`;
   }
 
+  function getCurrentColorMode() {
+    if (!colorModeSelect) return COLOR_MODE_MONO;
+    return colorModeSelect.value === COLOR_MODE_SEGMENT ? COLOR_MODE_SEGMENT : COLOR_MODE_MONO;
+  }
+
+  function getDrawColor(groupIndex, segmentIndex) {
+    if (getCurrentColorMode() === COLOR_MODE_SEGMENT) {
+      return getSegmentColor(groupIndex, segmentIndex);
+    }
+    return MONO_COLOR_GRAY;
+  }
+
 
   function drawPixelLineNoAA(ctx, x0, y0, x1, y1, color, thickness) {
     let sx0 = Math.round(Number(x0));
@@ -355,7 +372,7 @@
         for (let i = 1; i < coords.length; i++) {
           const prev = coords[i - 1];
           const curr = coords[i];
-          drawPixelLineNoAA(baseCtx, prev.x, prev.y, curr.x, curr.y, getSegmentColor(groupIndex, segmentIndex), thickness);
+          drawPixelLineNoAA(baseCtx, prev.x, prev.y, curr.x, curr.y, getDrawColor(groupIndex, segmentIndex), thickness);
         }
       });
     });
@@ -400,7 +417,7 @@
         const points = Array.isArray(segment.points) ? segment.points : [];
         const normalized = points.map(normalizePoint);
         const connectedIndices = new Set();
-        const fillStyle = getSegmentColor(groupIndex, segmentIndex);
+        const fillStyle = getDrawColor(groupIndex, segmentIndex);
 
         // 인덱스 순서(0-1, 1-2...)로 선을 연결한다.
         for (let i = 0; i < normalized.length - 1; i++) {
@@ -497,7 +514,7 @@
 
     groups.forEach((group, groupIndex) => {
       (group.segments || []).forEach((segment, segmentIndex) => {
-        const fillStyle = getSegmentColor(groupIndex, segmentIndex);
+        const fillStyle = getDrawColor(groupIndex, segmentIndex);
 
         (segment.points || []).forEach(point => {
           const x = Math.round(Number(point.x));
@@ -690,13 +707,13 @@
           })
         ]);
 
-        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (선 두께=${lineThickness})`, false);
+        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
         return;
       }
 
       const copiedByLegacy = tryLegacyImageCopy(bitmapCanvas);
       if (copiedByLegacy) {
-        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드, 선 두께=${lineThickness})`, false);
+        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드, 선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
       } else {
         setStatus('현재 브라우저는 이미지 클립보드 쓰기를 지원하지 않습니다. 크롬 최신 버전(HTTPS/localhost)에서 다시 시도해주세요.', true);
       }
@@ -739,6 +756,12 @@
     saveLineThicknessToStorage(lineThicknessRange.value);
     updateLineThicknessDisplay();
     if (!currentPayload || !showPathLines) return;
+    drawBaseCanvas(currentPayload);
+    drawZoomCanvas();
+  });
+
+  colorModeSelect.addEventListener('change', () => {
+    if (!currentPayload) return;
     drawBaseCanvas(currentPayload);
     drawZoomCanvas();
   });

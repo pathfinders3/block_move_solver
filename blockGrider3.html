@@ -196,6 +196,12 @@
       <input type="range" id="lineThicknessRange" min="1" max="5" value="1" step="1">
       <span id="lineThicknessDisplay">1</span>
       <span>|</span>
+      <label for="colorModeSelect">색상 모드:</label>
+      <select id="colorModeSelect">
+        <option value="mono" selected>단색 (Gray)</option>
+        <option value="segment">채색 (세그먼트별)</option>
+      </select>
+      <span>|</span>
       <span>비트맵 미리보기</span>
     </div>
 
@@ -224,6 +230,6 @@
     <textarea id="output" placeholder="전달된 JSON이 여기 표시됩니다."></textarea>
   </div>
 
-  <script src="blockGrider3.js?v=12"></script>
+  <script src="blockGrider3.js?v=13"></script>
 </body>
 </html>
