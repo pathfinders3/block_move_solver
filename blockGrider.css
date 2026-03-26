@@ -11,6 +11,15 @@ body {
     margin-bottom: 20px;
 }
 
+.container .canvas-section:first-child {
+    flex: 0 0 280px;
+}
+
+.container .canvas-section:last-child {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .canvas-section {
     background: #23242c;
     padding: 15px;
@@ -34,7 +43,8 @@ canvas {
 }
 
 .canvas2-wrapper {
-    max-width: 600px;
+    width: 100%;
+    max-width: none;
     max-height: 600px;
     overflow: auto;
     border: 2px solid #444;
