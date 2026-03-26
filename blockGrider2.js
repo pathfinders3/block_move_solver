@@ -1192,6 +1192,11 @@
 
     const pointA2 = mergedGroup.segments[selA.segmentIndex].points[selA.pointIndex];
     const pointB2 = shiftedSource.segments[selB.segmentIndex].points[selB.pointIndex];
+    const mergeBaseSize = Math.max(Number(pointA2.size), Number(pointB2.size));
+    const hasSizeMismatch = Number(pointA2.size) !== Number(pointB2.size);
+    pointA2.size = mergeBaseSize;
+    pointB2.size = mergeBaseSize;
+
     const dx = pointA2.x - pointB2.x;
     const dy = pointA2.y - pointB2.y;
     shiftGroup(shiftedSource, dx, dy);
@@ -1242,7 +1247,7 @@
       rect: selectedPoint
     });
     setStatus(
-      `MERGE 완료: main=${mainSegmentId}, sub=${subOriginalSegmentId} -> ${subMergedSegmentId}, 거리=${selectedDistance.toFixed(2)}`,
+      `MERGE 완료: main=${mainSegmentId}, sub=${subOriginalSegmentId} -> ${subMergedSegmentId}, 거리=${selectedDistance.toFixed(2)}, 기준 길이=${mergeBaseSize}${hasSizeMismatch ? ' (크기 자동 일치 적용)' : ' (이미 동일 크기)'}`,
       false
     );
   }
