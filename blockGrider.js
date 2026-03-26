@@ -156,6 +156,8 @@ function countWhitePixels(ctx, x, y, size) {
         const ctx2 = canvas2.getContext('2d', { willReadFrequently: true });
     const canvasSizeSelect = document.getElementById('canvasSizeSelect');
     const canvas1SizeLabel = document.getElementById('canvas1SizeLabel');
+    const CANVAS_SIZE_STORAGE_KEY = 'blockGrider.canvasSize';
+    const ALLOWED_CANVAS_SIZES = [64, 128, 256];
     let currentCanvasSize = parseInt(canvasSizeSelect.value, 10) || 64;
         
         // Range 바 요소
@@ -167,6 +169,28 @@ function countWhitePixels(ctx, x, y, size) {
 
         function clamp(value, min, max) {
             return Math.min(max, Math.max(min, value));
+        }
+
+        function isAllowedCanvasSize(size) {
+            return ALLOWED_CANVAS_SIZES.includes(size);
+        }
+
+        function getStoredCanvasSize() {
+            try {
+                const storedValue = localStorage.getItem(CANVAS_SIZE_STORAGE_KEY);
+                const parsed = parseInt(storedValue, 10);
+                return isAllowedCanvasSize(parsed) ? parsed : null;
+            } catch (ex) {
+                return null;
+            }
+        }
+
+        function saveCanvasSize(size) {
+            try {
+                localStorage.setItem(CANVAS_SIZE_STORAGE_KEY, String(size));
+            } catch (ex) {
+                // localStorage를 사용할 수 없는 환경에서는 저장을 건너뜀
+            }
         }
 
         function updateCanvasSizeLabel() {
@@ -206,6 +230,7 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         function applyCanvasSize(size) {
+            if (!isAllowedCanvasSize(size)) return;
             const prevWidth = canvas1.width;
             const prevHeight = canvas1.height;
             const backupCanvas = document.createElement('canvas');
@@ -228,6 +253,10 @@ function countWhitePixels(ctx, x, y, size) {
             const offsetY = (size - drawH) / 2;
             ctx1.drawImage(backupCanvas, offsetX, offsetY, drawW, drawH);
 
+            if (canvasSizeSelect.value !== String(size)) {
+                canvasSizeSelect.value = String(size);
+            }
+            saveCanvasSize(size);
             updateCanvasSizeLabel();
             clampRectsToCanvas();
             updateYellowIndexDisplay();
@@ -240,9 +269,18 @@ function countWhitePixels(ctx, x, y, size) {
 
         canvasSizeSelect.addEventListener('change', (e) => {
             const nextSize = parseInt(e.target.value, 10);
-            if (!Number.isFinite(nextSize)) return;
+            if (!Number.isFinite(nextSize) || !isAllowedCanvasSize(nextSize)) return;
             applyCanvasSize(nextSize);
         });
+
+        // 저장된 캔버스 크기가 있으면 초기값으로 복원
+        const restoredCanvasSize = getStoredCanvasSize();
+        if (restoredCanvasSize !== null) {
+            currentCanvasSize = restoredCanvasSize;
+            canvasSizeSelect.value = String(restoredCanvasSize);
+            canvas1.width = restoredCanvasSize;
+            canvas1.height = restoredCanvasSize;
+        }
         
         // Document 로드 시 임의의 점들 그리기
         document.addEventListener('DOMContentLoaded', () => {
