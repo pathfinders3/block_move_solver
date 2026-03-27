@@ -159,6 +159,9 @@ function countWhitePixels(ctx, x, y, size) {
     const canvasSizeSelect = document.getElementById('canvasSizeSelect');
     const canvas1SizeLabel = document.getElementById('canvas1SizeLabel');
     const CANVAS_SIZE_STORAGE_KEY = 'blockGrider.canvasSize';
+    const RECT_SIZE_STORAGE_KEY = 'blockGrider.rectSize';
+    const CORNER_SIZE_STORAGE_KEY = 'blockGrider.cornerSize';
+    const WHITE_THRESHOLD_STORAGE_KEY = 'blockGrider.whiteThreshold';
     const ALLOWED_CANVAS_SIZES = ['64x64', '128x128', '256x256', '64x128'];
     let currentCanvasWidth = 64;
     let currentCanvasHeight = 64;
@@ -210,6 +213,65 @@ function countWhitePixels(ctx, x, y, size) {
             } catch (ex) {
                 // localStorage를 사용할 수 없는 환경에서는 저장을 건너뜀
             }
+        }
+
+        function parseAndClampInputValue(input, fallbackValue) {
+            if (!input) return fallbackValue;
+
+            const parsed = parseInt(input.value, 10);
+            const fallback = Number.isFinite(fallbackValue) ? fallbackValue : 0;
+            const safeValue = Number.isNaN(parsed) ? fallback : parsed;
+            const min = parseInt(input.min, 10);
+            const max = parseInt(input.max, 10);
+            const hasMin = !Number.isNaN(min);
+            const hasMax = !Number.isNaN(max);
+
+            if (hasMin && hasMax) {
+                return clamp(safeValue, min, max);
+            }
+            if (hasMin) {
+                return Math.max(min, safeValue);
+            }
+            if (hasMax) {
+                return Math.min(max, safeValue);
+            }
+            return safeValue;
+        }
+
+        function restoreNumericInputFromStorage(inputId, storageKey, fallbackValue) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            let restored = fallbackValue;
+            try {
+                const stored = localStorage.getItem(storageKey);
+                if (stored !== null) {
+                    input.value = stored;
+                }
+                restored = parseAndClampInputValue(input, fallbackValue);
+            } catch (ex) {
+                restored = parseAndClampInputValue(input, fallbackValue);
+            }
+
+            input.value = String(restored);
+        }
+
+        function persistNumericInputToStorage(inputId, storageKey, fallbackValue) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            const persist = () => {
+                const value = parseAndClampInputValue(input, fallbackValue);
+                input.value = String(value);
+                try {
+                    localStorage.setItem(storageKey, String(value));
+                } catch (ex) {
+                    // localStorage를 사용할 수 없는 환경에서는 저장을 건너뜀
+                }
+            };
+
+            input.addEventListener('change', persist);
+            input.addEventListener('input', persist);
         }
 
         function updateCanvasSizeLabel() {
@@ -307,6 +369,13 @@ function countWhitePixels(ctx, x, y, size) {
 
         setAutoSelectOnClick('rectSize');
         setAutoSelectOnClick('cornerSize');
+
+        restoreNumericInputFromStorage('rectSize', RECT_SIZE_STORAGE_KEY, 4);
+        restoreNumericInputFromStorage('cornerSize', CORNER_SIZE_STORAGE_KEY, 4);
+        restoreNumericInputFromStorage('whiteThreshold', WHITE_THRESHOLD_STORAGE_KEY, 245);
+        persistNumericInputToStorage('rectSize', RECT_SIZE_STORAGE_KEY, 4);
+        persistNumericInputToStorage('cornerSize', CORNER_SIZE_STORAGE_KEY, 4);
+        persistNumericInputToStorage('whiteThreshold', WHITE_THRESHOLD_STORAGE_KEY, 245);
 
         // 저장된 캔버스 크기가 있으면 초기값으로 복원
         const restoredCanvasSize = getStoredCanvasSize();
