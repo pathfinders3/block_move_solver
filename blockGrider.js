@@ -709,10 +709,16 @@ function countWhitePixels(ctx, x, y, size) {
             if (!autoF9Button.dataset.baseStyle) {
                 autoF9Button.dataset.baseStyle = autoF9Button.getAttribute('style') || '';
             }
+            if (!autoF9Button.dataset.baseText) {
+                autoF9Button.dataset.baseText = autoF9Button.textContent || '자동 F9';
+            }
+
+            const fixedWidth = Math.ceil(autoF9Button.getBoundingClientRect().width);
+            autoF9Button.textContent = 'XXXX';
 
             autoF9Button.setAttribute(
                 'style',
-                `${autoF9Button.dataset.baseStyle}; background:#d9534f; border:1px solid #c9302c;`
+                `${autoF9Button.dataset.baseStyle}; width:${fixedWidth}px; background:#d9534f; border:1px solid #c9302c;`
             );
 
             if (autoF9ErrorFlashTimer !== null) {
@@ -720,6 +726,7 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             autoF9ErrorFlashTimer = setTimeout(() => {
+                autoF9Button.textContent = autoF9Button.dataset.baseText || '자동 F9';
                 autoF9Button.setAttribute('style', autoF9Button.dataset.baseStyle || '');
                 autoF9ErrorFlashTimer = null;
             }, 2000);
