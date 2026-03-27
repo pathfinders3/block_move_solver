@@ -7,6 +7,7 @@
   const btnSplitByContact = document.getElementById('btnSplitByContact');
   const btnReverseIndices = document.getElementById('btnReverseIndices');
   const btnCheckAdjRange = document.getElementById('btnCheckAdjRange');
+  const btnSplitAdjRange = document.getElementById('btnSplitAdjRange');
   const btnCheckAdjForward = document.getElementById('btnCheckAdjForward');
   const btnDisconnect = document.getElementById('btnDisconnect');
   const btnToggleConnect = document.getElementById('btnToggleConnect');
@@ -407,6 +408,11 @@
   function updateCheckAdjRangeButtonState() {
     if (!btnCheckAdjRange) return;
     btnCheckAdjRange.disabled = !getSplitSelectionContext();
+  }
+
+  function updateSplitAdjRangeButtonState() {
+    if (!btnSplitAdjRange) return;
+    btnSplitAdjRange.disabled = !getSplitSelectionContext();
   }
 
   function getForwardAdjStartContext() {
@@ -1740,6 +1746,65 @@
     }
   }
 
+  function splitAdjacentSelectedRange() {
+    const splitContext = getSplitSelectionContext();
+    if (!splitContext) {
+      setStatus('분할 실패: 같은 선(세그먼트)에서 서로 다른 두 점 A,B를 선택해주세요.', true);
+      return;
+    }
+
+    const group = currentGroups[splitContext.groupIndex];
+    const segment = group && group.segments[splitContext.segmentIndex];
+    if (!group || !segment || !Array.isArray(segment.points)) {
+      setStatus('분할 실패: 선택된 세그먼트를 찾지 못했습니다.', true);
+      return;
+    }
+
+    const startIndex = splitContext.startIndex;
+    const endIndex = splitContext.endIndex;
+    let firstFail = null;
+
+    for (let i = startIndex; i < endIndex; i++) {
+      const a = segment.points[i];
+      const b = segment.points[i + 1];
+      if (!areRectsAdjacent(a, b)) {
+        firstFail = { from: i, to: i + 1 };
+        break;
+      }
+    }
+
+    if (firstFail) {
+      startAdjacencyFirstFailHighlight({
+        groupIndex: splitContext.groupIndex,
+        segmentIndex: splitContext.segmentIndex,
+        startIndex: firstFail.from,
+        endIndex: firstFail.to
+      });
+
+      const fromOrder = firstFail.from - startIndex;
+      const toOrder = firstFail.to - startIndex;
+      setStatus(
+        `분할 실패: A~B 구간에 비인접 구간이 있습니다. (첫 비인접 P${firstFail.from}(${fromOrder}번)->P${firstFail.to}(${toOrder}번), A 기준 0번 시작)`,
+        true
+      );
+      return;
+    }
+
+    const beforeGroupCount = currentGroups.length;
+    splitSelectedSegmentRange();
+
+    if (currentGroups.length === beforeGroupCount + 1) {
+      const createdGroupIndex = splitContext.groupIndex + 1;
+      const createdGroup = currentGroups[createdGroupIndex];
+      const createdSegment = createdGroup && createdGroup.segments && createdGroup.segments[0];
+      const createdCount = createdSegment && Array.isArray(createdSegment.points) ? createdSegment.points.length : (endIndex - startIndex + 1);
+      setStatus(
+        `A~B 인접 분할 완료: G${splitContext.groupIndex + 1}의 P${startIndex}~P${endIndex}를 신규 그룹 G${createdGroupIndex + 1} (${createdCount}점)으로 분리했습니다.`,
+        false
+      );
+    }
+  }
+
   function reverseIndicesInSelectedRange() {
     const splitContext = getSplitSelectionContext();
     if (!splitContext) {
@@ -2325,6 +2390,7 @@
     updateSplitByContactButtonState();
     updateReverseIndicesButtonState();
     updateCheckAdjRangeButtonState();
+    updateSplitAdjRangeButtonState();
     updateCheckAdjForwardButtonState();
     updateSelectionInfo();
     updateConnectButtonState();
@@ -2471,6 +2537,10 @@
 
   if (btnCheckAdjRange) {
     btnCheckAdjRange.addEventListener('click', checkAdjacencyInSelectedRange);
+  }
+
+  if (btnSplitAdjRange) {
+    btnSplitAdjRange.addEventListener('click', splitAdjacentSelectedRange);
   }
 
   if (btnCheckAdjForward) {
