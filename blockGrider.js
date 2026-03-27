@@ -740,14 +740,27 @@ function countWhitePixels(ctx, x, y, size) {
                 return styleText.includes('#ff0000');
             });
 
-            if (redButtons.length !== 1) {
-                console.log(`❌ 자동 F9 조건 불만족: 빨간 테두리 후보가 1개가 아닙니다. (현재 ${redButtons.length}개)`);
+            const uniqueRedButtonMap = new Map();
+            redButtons.forEach(btn => {
+                const x = btn.getAttribute('data-x') || '';
+                const y = btn.getAttribute('data-y') || '';
+                const size = btn.getAttribute('data-size') || '';
+                const key = `${x},${y},${size}`;
+                if (!uniqueRedButtonMap.has(key)) {
+                    uniqueRedButtonMap.set(key, btn);
+                }
+            });
+
+            if (uniqueRedButtonMap.size !== 1) {
+                console.log(`❌ 자동 F9 조건 불만족: 빨간 테두리 후보(중복제거)가 1개가 아닙니다. (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`);
                 flashAutoF9ButtonError();
                 return false;
             }
 
+            const targetButton = Array.from(uniqueRedButtonMap.values())[0];
+
             // 1) 빨간 버튼 클릭으로 임시 노란색 지정
-            redButtons[0].click();
+            targetButton.click();
 
             // 2) F9 동작으로 확정
             const confirmed = confirmTempYellowRect();
