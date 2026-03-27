@@ -854,12 +854,14 @@ function countWhitePixels(ctx, x, y, size) {
         // 각도/추천 규칙에 따라 버튼 테두리 색상 결정
         function resolvePathButtonBorderColor(pt, cornerSize, angleDiff, tolerance, bestMatch) {
             if (angleDiff === null) return '';
+            const primaryCornerSize = parseInt(document.getElementById('cornerSize').value, 10) || 4;
 
             if (
                 bestMatch !== null &&
                 angleDiff <= tolerance &&
                 Math.abs(angleDiff - bestMatch.minDiff) < 0.001 &&
-                cornerSize === bestMatch.maxSize
+                cornerSize === bestMatch.maxSize &&
+                cornerSize === primaryCornerSize
             ) {
                 const isContainedInLarger = bestMatch.bestRects.some(largerRect => {
                     if (largerRect.size <= cornerSize) return false;
