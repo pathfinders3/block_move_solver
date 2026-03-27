@@ -346,8 +346,8 @@ function countWhitePixels(ctx, x, y, size) {
             const pixelCount = Math.floor(baseCount * densityScale);
             
             for (let i = 0; i < pixelCount; i++) {
-                const x = Math.floor(Math.random() * canvasSize);
-                const y = Math.floor(Math.random() * canvasSize);
+                const x = Math.floor(Math.random() * canvasWidth);
+                const y = Math.floor(Math.random() * canvasHeight);
                 
                 // 랜덤 색상 생성
                 const r = Math.floor(Math.random() * 256);
@@ -357,6 +357,9 @@ function countWhitePixels(ctx, x, y, size) {
                 ctx1.fillStyle = `rgb(${r}, ${g}, ${b})`;
                 ctx1.fillRect(x, y, 1, 1);
             }
+
+            // Canvas2 확대 뷰를 즉시 갱신
+            scaleCanvas();
         }
         
         // 클립보드에서 이미지 가져오기
@@ -703,6 +706,7 @@ function countWhitePixels(ctx, x, y, size) {
                     ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
                         if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
                     });
+                    resetRedBorderCountDisplay();
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -757,6 +761,7 @@ function countWhitePixels(ctx, x, y, size) {
                     ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
                         if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
                     });
+                    resetRedBorderCountDisplay();
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -886,7 +891,7 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         // 계산된 상태를 기반으로 버튼 HTML 생성
-        function renderPathButtonHTML(pt, idx, pathName, angle, whiteCount, isAllWhite, overlapsYellow, borderColor, angleDiff, expectedAngle) {
+        function renderPathButtonHTML(pt, idx, pathName, cornerSize, angle, whiteCount, isAllWhite, overlapsYellow, borderColor, angleDiff, expectedAngle) {
             let buttonStyle;
             let disabled;
 
@@ -908,7 +913,7 @@ function countWhitePixels(ctx, x, y, size) {
                 ? ` title="각도:${angle}°, 기준:${expectedAngle}°, 차이:${angleDiff}°"`
                 : '';
 
-            return `<button data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" data-angle="${angle}"
+            return `<button data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" data-size="${cornerSize}" data-angle="${angle}"
                                 style="padding:2px 6px; margin:2px; border-radius:3px; ${buttonStyle}" 
                                 ${angleTooltip}${disabled}>${whiteCount}${angleDiffLabel}</button>`;
         }
@@ -942,6 +947,7 @@ function countWhitePixels(ctx, x, y, size) {
                     pt,
                     idx,
                     pathName,
+                    cornerSize,
                     angle,
                     whiteCount,
                     isAllWhite,
@@ -951,6 +957,40 @@ function countWhitePixels(ctx, x, y, size) {
                     expectedAngle
                 );
             });
+        }
+
+        function setRedBorderCountDisplay(uniqueCount, totalCount) {
+            const redBorderCount = document.getElementById('redBorderCount');
+            if (!redBorderCount) return;
+            redBorderCount.textContent = `${uniqueCount}/${totalCount}개`;
+        }
+
+        function resetRedBorderCountDisplay() {
+            const redBorderCount = document.getElementById('redBorderCount');
+            if (!redBorderCount) return;
+            redBorderCount.textContent = '-/-개';
+        }
+
+        function updateRedBorderCountFromDOM() {
+            const pathWhiteContent = document.getElementById('pathWhiteContent');
+            if (!pathWhiteContent) return;
+
+            const buttons = pathWhiteContent.querySelectorAll('button');
+            let totalRedCount = 0;
+            const uniqueRedRects = new Set();
+
+            buttons.forEach(btn => {
+                const styleText = btn.getAttribute('style') || '';
+                if (!styleText.includes('#FF0000')) return;
+
+                totalRedCount += 1;
+                const x = btn.getAttribute('data-x') || '';
+                const y = btn.getAttribute('data-y') || '';
+                const size = btn.getAttribute('data-size') || '';
+                uniqueRedRects.add(`${x},${y},${size}`);
+            });
+
+            setRedBorderCountDisplay(uniqueRedRects.size, totalRedCount);
         }
 
         // 헬퍼 함수: 사각형의 각도 차이 계산 (공통 로직)
@@ -1195,6 +1235,8 @@ function countWhitePixels(ctx, x, y, size) {
             if(document.getElementById('pathWhite23_n1')) document.getElementById('pathWhite23_n1').innerHTML = whiteCounts_n1.path23.join(' ') || '-';
             if(document.getElementById('pathWhite02_n1')) document.getElementById('pathWhite02_n1').innerHTML = whiteCounts_n1.path02.join(' ') || '-';
             if(document.getElementById('pathWhite13_n1')) document.getElementById('pathWhite13_n1').innerHTML = whiteCounts_n1.path13.join(' ') || '-';
+
+            updateRedBorderCountFromDOM();
             
             // 버튼 클릭 이벤트 추가 (n 크기)
             addPathButtonClickEvents('path01_n', cornerSize);
@@ -1600,6 +1642,7 @@ function countWhitePixels(ctx, x, y, size) {
                 ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
                     if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
                 });
+                resetRedBorderCountDisplay();
             }
             // 캔버스2 다시 그림 (사각형 오버레이 위해)
             scaleCanvas();
