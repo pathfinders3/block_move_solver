@@ -700,11 +700,37 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        let autoF9ErrorFlashTimer = null;
+
+        function flashAutoF9ButtonError() {
+            const autoF9Button = document.getElementById('btnAutoF9');
+            if (!autoF9Button) return;
+
+            if (!autoF9Button.dataset.baseStyle) {
+                autoF9Button.dataset.baseStyle = autoF9Button.getAttribute('style') || '';
+            }
+
+            autoF9Button.setAttribute(
+                'style',
+                `${autoF9Button.dataset.baseStyle}; background:#d9534f; border:1px solid #c9302c;`
+            );
+
+            if (autoF9ErrorFlashTimer !== null) {
+                clearTimeout(autoF9ErrorFlashTimer);
+            }
+
+            autoF9ErrorFlashTimer = setTimeout(() => {
+                autoF9Button.setAttribute('style', autoF9Button.dataset.baseStyle || '');
+                autoF9ErrorFlashTimer = null;
+            }, 2000);
+        }
+
         // 자동 F9 한 스텝: 빨간 테두리 후보가 1개면 선택+확정을 한 번에 수행
         function runAutoF9Step() {
             const pathWhiteContent = document.getElementById('pathWhiteContent');
             if (!pathWhiteContent) {
                 console.log('❌ 경로별 흰색점 영역을 찾을 수 없습니다.');
+                flashAutoF9ButtonError();
                 return false;
             }
 
@@ -716,6 +742,7 @@ function countWhitePixels(ctx, x, y, size) {
 
             if (redButtons.length !== 1) {
                 console.log(`❌ 자동 F9 조건 불만족: 빨간 테두리 후보가 1개가 아닙니다. (현재 ${redButtons.length}개)`);
+                flashAutoF9ButtonError();
                 return false;
             }
 
