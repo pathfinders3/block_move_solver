@@ -848,10 +848,11 @@ function countWhitePixels(ctx, x, y, size) {
 
         // 각도/추천 규칙에 따라 버튼 테두리 색상 결정
         function resolvePathButtonBorderColor(pt, cornerSize, angleDiff, tolerance, bestMatch) {
-            if (angleDiff === null || angleDiff > tolerance) return '';
+            if (angleDiff === null) return '';
 
             if (
                 bestMatch !== null &&
+                angleDiff <= tolerance &&
                 Math.abs(angleDiff - bestMatch.minDiff) < 0.001 &&
                 cornerSize === bestMatch.maxSize
             ) {
@@ -867,7 +868,21 @@ function countWhitePixels(ctx, x, y, size) {
                 return isContainedInLarger ? '#FF8C00' : '#FF0000';
             }
 
-            return '#FF8C00';
+            // 허용오차 이내의 차선 후보는 오렌지
+            if (angleDiff <= tolerance) {
+                return '#FF8C00';
+            }
+
+            // 더 넓은 범위는 추가 색상으로 구분
+            if (angleDiff <= 90) {
+                return '#a39908';
+            }
+
+            if (angleDiff <= 135) {
+                return '#1867dd';
+            }
+
+            return '';
         }
 
         // 계산된 상태를 기반으로 버튼 HTML 생성
