@@ -706,7 +706,7 @@ function countWhitePixels(ctx, x, y, size) {
                     ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
                         if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
                     });
-                    resetRedBorderCountDisplay();
+                    resetPriorityBorderCountsDisplay();
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -761,7 +761,7 @@ function countWhitePixels(ctx, x, y, size) {
                     ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
                         if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
                     });
-                    resetRedBorderCountDisplay();
+                    resetPriorityBorderCountsDisplay();
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -959,38 +959,54 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
-        function setRedBorderCountDisplay(uniqueCount, totalCount) {
-            const redBorderCount = document.getElementById('redBorderCount');
-            if (!redBorderCount) return;
-            redBorderCount.textContent = `${uniqueCount}/${totalCount}개`;
+        function setBorderCountDisplay(elementId, uniqueCount, totalCount) {
+            const counter = document.getElementById(elementId);
+            if (!counter) return;
+            counter.textContent = `${uniqueCount}/${totalCount}개`;
         }
 
-        function resetRedBorderCountDisplay() {
-            const redBorderCount = document.getElementById('redBorderCount');
-            if (!redBorderCount) return;
-            redBorderCount.textContent = '-/-개';
+        function resetPriorityBorderCountsDisplay() {
+            setBorderCountDisplay('redBorderCount', '-', '-');
+            setBorderCountDisplay('orangeBorderCount', '-', '-');
+            setBorderCountDisplay('thirdBorderCount', '-', '-');
         }
 
-        function updateRedBorderCountFromDOM() {
+        function updatePriorityBorderCountsFromDOM() {
             const pathWhiteContent = document.getElementById('pathWhiteContent');
             if (!pathWhiteContent) return;
 
             const buttons = pathWhiteContent.querySelectorAll('button');
-            let totalRedCount = 0;
-            const uniqueRedRects = new Set();
+            const colorTargets = [
+                { elementId: 'redBorderCount', colorHex: '#FF0000' },
+                { elementId: 'orangeBorderCount', colorHex: '#FF8C00' },
+                { elementId: 'thirdBorderCount', colorHex: '#a39908' }
+            ];
+
+            const bucket = {};
+            colorTargets.forEach(target => {
+                bucket[target.colorHex.toLowerCase()] = { total: 0, unique: new Set() };
+            });
 
             buttons.forEach(btn => {
                 const styleText = btn.getAttribute('style') || '';
-                if (!styleText.includes('#FF0000')) return;
-
-                totalRedCount += 1;
+                const lowerStyle = styleText.toLowerCase();
                 const x = btn.getAttribute('data-x') || '';
                 const y = btn.getAttribute('data-y') || '';
                 const size = btn.getAttribute('data-size') || '';
-                uniqueRedRects.add(`${x},${y},${size}`);
+                const rectKey = `${x},${y},${size}`;
+
+                colorTargets.forEach(target => {
+                    const key = target.colorHex.toLowerCase();
+                    if (!lowerStyle.includes(key)) return;
+                    bucket[key].total += 1;
+                    bucket[key].unique.add(rectKey);
+                });
             });
 
-            setRedBorderCountDisplay(uniqueRedRects.size, totalRedCount);
+            colorTargets.forEach(target => {
+                const key = target.colorHex.toLowerCase();
+                setBorderCountDisplay(target.elementId, bucket[key].unique.size, bucket[key].total);
+            });
         }
 
         // 헬퍼 함수: 사각형의 각도 차이 계산 (공통 로직)
@@ -1236,7 +1252,7 @@ function countWhitePixels(ctx, x, y, size) {
             if(document.getElementById('pathWhite02_n1')) document.getElementById('pathWhite02_n1').innerHTML = whiteCounts_n1.path02.join(' ') || '-';
             if(document.getElementById('pathWhite13_n1')) document.getElementById('pathWhite13_n1').innerHTML = whiteCounts_n1.path13.join(' ') || '-';
 
-            updateRedBorderCountFromDOM();
+            updatePriorityBorderCountsFromDOM();
             
             // 버튼 클릭 이벤트 추가 (n 크기)
             addPathButtonClickEvents('path01_n', cornerSize);
@@ -1642,7 +1658,7 @@ function countWhitePixels(ctx, x, y, size) {
                 ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
                     if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
                 });
-                resetRedBorderCountDisplay();
+                resetPriorityBorderCountsDisplay();
             }
             // 캔버스2 다시 그림 (사각형 오버레이 위해)
             scaleCanvas();
