@@ -1032,7 +1032,7 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         // 모든 경로에서 허용오차 내 최소 각도 차이와 최대 크기 찾기
-        function findMinAngleDiffAndMaxSize(allPathRectsWithSize) {
+        function findMinAngleDiffAndMaxSize(allPathRectsWithSize, targetSize = null) {
             // allPathRectsWithSize: [{ rects, size }, ...]
             // 기대 각도: 항상 마지막으로 확정된 노란색 사각형의 각도
             let expectedAngle = null;
@@ -1054,6 +1054,7 @@ function countWhitePixels(ctx, x, y, size) {
             // 1단계: 최소 각도 차이 찾기
             allPathRectsWithSize.forEach(({ rects, size }) => {
                 if (!rects) return;
+                if (targetSize !== null && size !== targetSize) return;
                 
                 rects.forEach(pt => {
                     const diff = calculateRectAngleDiff(pt, size, baseX, baseY, expectedAngle);
@@ -1075,6 +1076,7 @@ function countWhitePixels(ctx, x, y, size) {
             
             allPathRectsWithSize.forEach(({ rects, size }) => {
                 if (!rects) return;
+                if (targetSize !== null && size !== targetSize) return;
                 
                 rects.forEach(pt => {
                     const diff = calculateRectAngleDiff(pt, size, baseX, baseY, expectedAngle);
@@ -1184,7 +1186,7 @@ function countWhitePixels(ctx, x, y, size) {
             const maxPixels_n = cornerSize * cornerSize;
             const maxPixels_n1 = cornerSize_n1 * cornerSize_n1;
             
-            // 모든 경로(n과 n-1 크기 모두)에서 최소 각도 차이와 최대 크기 찾기
+            // 빨강 기준용 best는 n 크기 후보에서만 계산
             const allPathsWithSize = [
                 { rects: paths_n.path01, size: cornerSize },
                 { rects: paths_n.path23, size: cornerSize },
@@ -1201,7 +1203,7 @@ function countWhitePixels(ctx, x, y, size) {
                 );
             }
             
-            const bestMatch = findMinAngleDiffAndMaxSize(allPathsWithSize);
+            const bestMatch = findMinAngleDiffAndMaxSize(allPathsWithSize, cornerSize);
             
             // 경로별 흰색점 개수 계산 (n 크기)
             const whiteCounts_n = {
