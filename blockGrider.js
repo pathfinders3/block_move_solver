@@ -655,8 +655,82 @@ function countWhitePixels(ctx, x, y, size) {
             }
             return null;
         }
+
+        // 임시 노란색 사각형을 확정(F9 동작)하는 공통 함수
+        function confirmTempYellowRect() {
+            if (!tempYellowRect) {
+                console.log(`❌ 확정할 임시 노란색 사각형이 없습니다.`);
+                return false;
+            }
+
+            // 원래 사각형 크기를 임시 사각형의 크기로 변경
+            const rectSizeInput = document.getElementById('rectSize');
+            const currentRectSize = parseInt(rectSizeInput.value) || 4;
+            if (currentRectSize !== tempYellowRect.size) {
+                rectSizeInput.value = tempYellowRect.size;
+                console.log(`   원래 사각형 크기 변경: ${currentRectSize} → ${tempYellowRect.size}`);
+            }
+
+            // selectedPixel을 임시 사각형 위치로 이동
+            selectedPixel = { x: tempYellowRect.x, y: tempYellowRect.y };
+
+            // 공통 함수로 노란색 사각형 추가
+            addYellowRectWithAngleCheck(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
+
+            // 경로 재계산 (새로 확정된 각도를 기준으로)
+            if (showCorners) {
+                updateCornerAndPathInfo();
+            }
+
+            console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
+
+            tempYellowRect = null; // 임시 사각형 초기화
+
+            // 각도 표시 제거
+            const angleDisplay = document.getElementById('tempYellowAngleDisplay');
+            if (angleDisplay) angleDisplay.innerHTML = '';
+
+            // 좌표 표시 초기화
+            const tempYellowXInput = document.getElementById('tempYellowX');
+            const tempYellowYInput = document.getElementById('tempYellowY');
+            if (tempYellowXInput) tempYellowXInput.value = '-';
+            if (tempYellowYInput) tempYellowYInput.value = '-';
+
+            scaleCanvas(); // 화면 갱신
+            return true;
+        }
+
+        // 자동 F9 한 스텝: 빨간 테두리 후보가 1개면 선택+확정을 한 번에 수행
+        function runAutoF9Step() {
+            const pathWhiteContent = document.getElementById('pathWhiteContent');
+            if (!pathWhiteContent) {
+                console.log('❌ 경로별 흰색점 영역을 찾을 수 없습니다.');
+                return false;
+            }
+
+            const redButtons = Array.from(pathWhiteContent.querySelectorAll('button')).filter(btn => {
+                if (btn.disabled) return false;
+                const styleText = (btn.getAttribute('style') || '').toLowerCase();
+                return styleText.includes('#ff0000');
+            });
+
+            if (redButtons.length !== 1) {
+                console.log(`❌ 자동 F9 조건 불만족: 빨간 테두리 후보가 1개가 아닙니다. (현재 ${redButtons.length}개)`);
+                return false;
+            }
+
+            // 1) 빨간 버튼 클릭으로 임시 노란색 지정
+            redButtons[0].click();
+
+            // 2) F9 동작으로 확정
+            const confirmed = confirmTempYellowRect();
+            if (confirmed) {
+                console.log('✅ 자동 F9 한 스텝 완료 (빨간 후보 1개 선택 + 확정).');
+            }
+            return confirmed;
+        }
         
-        // F2, F4, F8, F9, IJKL 키 이벤트 리스너
+        // F2, F4, F8, F9, F10, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F2') {
                 e.preventDefault();
@@ -680,45 +754,11 @@ function countWhitePixels(ctx, x, y, size) {
                 e.preventDefault();
             }
             if (e.key === 'F9') {
-                // 임시 노란색 사각형이 있으면 확정하여 배열에 추가
-                if (tempYellowRect) {
-                    // 원래 사각형 크기를 임시 사각형의 크기로 변경
-                    const rectSizeInput = document.getElementById('rectSize');
-                    const currentRectSize = parseInt(rectSizeInput.value) || 4;
-                    if (currentRectSize !== tempYellowRect.size) {
-                        rectSizeInput.value = tempYellowRect.size;
-                        console.log(`   원래 사각형 크기 변경: ${currentRectSize} → ${tempYellowRect.size}`);
-                    }
-                    
-                    // selectedPixel을 임시 사각형 위치로 이동
-                    selectedPixel = { x: tempYellowRect.x, y: tempYellowRect.y };
-
-                    // 공통 함수로 노란색 사각형 추가
-                    addYellowRectWithAngleCheck(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
-
-                    // 경로 재계산 (새로 확정된 각도를 기준으로)
-                    if (showCorners) {
-                        updateCornerAndPathInfo();
-                    }
-
-                    console.log(`   총 ${yellowRects.length}개의 노란색 사각형 저장됨`);
-                    
-                    tempYellowRect = null; // 임시 사각형 초기화
-                    
-                    // 각도 표시 제거
-                    const angleDisplay = document.getElementById('tempYellowAngleDisplay');
-                    if (angleDisplay) angleDisplay.innerHTML = '';
-                    
-                    // 좌표 표시 초기화
-                    const tempYellowXInput = document.getElementById('tempYellowX');
-                    const tempYellowYInput = document.getElementById('tempYellowY');
-                    if (tempYellowXInput) tempYellowXInput.value = '-';
-                    if (tempYellowYInput) tempYellowYInput.value = '-';
-                    
-                    scaleCanvas(); // 화면 갱신
-                } else {
-                    console.log(`❌ 확정할 임시 노란색 사각형이 없습니다.`);
-                }
+                confirmTempYellowRect();
+                e.preventDefault();
+            }
+            if (e.key === 'F10') {
+                runAutoF9Step();
                 e.preventDefault();
             }
             if (e.key === 'F4') {
@@ -1668,6 +1708,11 @@ function countWhitePixels(ctx, x, y, size) {
             } catch (err) {
                 console.error('❌ 클립보드 복사 실패:', err);
             }
+        });
+
+        // 자동 F9 버튼: 빨간 후보 1개일 때 선택+확정을 한 번에 수행
+        document.getElementById('btnAutoF9').addEventListener('click', () => {
+            runAutoF9Step();
         });
         
         // 경로별 흰색점 개수 토글 함수
