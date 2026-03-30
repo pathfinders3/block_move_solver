@@ -991,6 +991,32 @@ function countWhitePixels(ctx, x, y, size) {
                    rect1Y + rect1Size > rect2.y;
         }
 
+        // 유틸리티: 겹침 상태 분류 (none | full | partial)
+        function classifyRectOverlap(rect1X, rect1Y, rect1Size, rect2) {
+            if (!rectsOverlap(rect1X, rect1Y, rect1Size, rect2)) {
+                return 'none';
+            }
+
+            const rect1Right = rect1X + rect1Size;
+            const rect1Bottom = rect1Y + rect1Size;
+            const rect2Right = rect2.x + rect2.size;
+            const rect2Bottom = rect2.y + rect2.size;
+
+            const rect1InsideRect2 =
+                rect1X >= rect2.x &&
+                rect1Y >= rect2.y &&
+                rect1Right <= rect2Right &&
+                rect1Bottom <= rect2Bottom;
+
+            const rect2InsideRect1 =
+                rect2.x >= rect1X &&
+                rect2.y >= rect1Y &&
+                rect2Right <= rect1Right &&
+                rect2Bottom <= rect1Bottom;
+
+            return (rect1InsideRect2 || rect2InsideRect1) ? 'full' : 'partial';
+        }
+
         // 경로 후보 사각형의 각도 및 각도차 계산
         function getPathRectAngleInfo(pt, cornerSize, baseX, baseY, expectedAngle) {
             const targetX = pt.x + cornerSize / 2;
@@ -1049,11 +1075,16 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         // 계산된 상태를 기반으로 버튼 HTML 생성
-        function renderPathButtonHTML(pt, idx, pathName, cornerSize, angle, whiteCount, isAllWhite, overlapsYellow, borderColor, angleDiff, expectedAngle) {
+        function renderPathButtonHTML(pt, idx, pathName, cornerSize, angle, whiteCount, isAllWhite, overlapState, borderColor, angleDiff, expectedAngle) {
             let buttonStyle;
             let disabled;
+            let forcedTooltip = '';
 
-            if (isAllWhite && overlapsYellow) {
+            if (isAllWhite && overlapState === 'partial') {
+                buttonStyle = 'background:repeating-linear-gradient(-45deg,#f8d7da,#f8d7da 6px,#f2b7bd 6px,#f2b7bd 12px); color:#8b0000; border:3px solid #cc0000; box-shadow:0 0 0 2px #ffe3e6 inset; cursor:not-allowed; font-weight:bold;';
+                disabled = ' disabled';
+                forcedTooltip = '부분 겹침은 선택할 수 없습니다.';
+            } else if (isAllWhite && overlapState === 'full') {
                 const border = borderColor || '#000000';
                 buttonStyle = `background:#FFD700; color:#000; border:3px solid ${border}; cursor:pointer; font-weight:bold;`;
                 disabled = '';
@@ -1067,13 +1098,19 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             const angleDiffLabel = (angleDiff !== null) ? ` · Δ${angleDiff}°` : '';
-            const angleTooltip = (angleDiff !== null && expectedAngle !== null && expectedAngle !== undefined)
-                ? ` title="각도:${angle}°, 기준:${expectedAngle}°, 차이:${angleDiff}°"`
+            const defaultLabel = `${whiteCount}${angleDiffLabel}`;
+            const buttonLabel = (isAllWhite && overlapState === 'partial')
+                ? `X ${defaultLabel}`
+                : defaultLabel;
+            const angleTooltipText = (angleDiff !== null && expectedAngle !== null && expectedAngle !== undefined)
+                ? `각도:${angle}°, 기준:${expectedAngle}°, 차이:${angleDiff}°`
                 : '';
+            const titleText = [forcedTooltip, angleTooltipText].filter(Boolean).join(' | ');
+            const titleAttribute = titleText ? ` title="${titleText}"` : '';
 
             return `<button data-path="${pathName}" data-idx="${idx}" data-x="${pt.x}" data-y="${pt.y}" data-size="${cornerSize}" data-angle="${angle}"
                                 style="padding:2px 6px; margin:2px; border-radius:3px; ${buttonStyle}" 
-                                ${angleTooltip}${disabled}>${whiteCount}${angleDiffLabel}</button>`;
+                                ${titleAttribute}${disabled}>${buttonLabel}</button>`;
         }
 
         // 경로별 흰색점 개수 계산 및 버튼 HTML 생성
@@ -1093,10 +1130,18 @@ function countWhitePixels(ctx, x, y, size) {
                 const whiteCount = countWhitePixels(ctx1, pt.x, pt.y, cornerSize);
                 const isAllWhite = (whiteCount === maxPixels);
                 
-                // yellowRects와 겹치는지 확인
-                const overlapsYellow = yellowRects.some(yellowRect => 
-                    rectsOverlap(pt.x, pt.y, cornerSize, yellowRect)
-                );
+                // yellowRects와의 겹침 상태 확인 (부분 겹침은 선택 불가)
+                let overlapState = 'none';
+                yellowRects.forEach(yellowRect => {
+                    const overlapType = classifyRectOverlap(pt.x, pt.y, cornerSize, yellowRect);
+                    if (overlapType === 'partial') {
+                        overlapState = 'partial';
+                        return;
+                    }
+                    if (overlapType === 'full' && overlapState === 'none') {
+                        overlapState = 'full';
+                    }
+                });
 
                 const { angle, angleDiff } = getPathRectAngleInfo(pt, cornerSize, baseX, baseY, expectedAngle);
                 const borderColor = resolvePathButtonBorderColor(pt, cornerSize, angleDiff, tolerance, bestMatch);
@@ -1109,7 +1154,7 @@ function countWhitePixels(ctx, x, y, size) {
                     angle,
                     whiteCount,
                     isAllWhite,
-                    overlapsYellow,
+                    overlapState,
                     borderColor,
                     angleDiff,
                     expectedAngle
