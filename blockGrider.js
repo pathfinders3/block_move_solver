@@ -533,7 +533,8 @@ function countWhitePixels(ctx, x, y, size) {
         }
         
         // 노란색 사각형을 yellowRects 배열에 추가하고 각도 검사 수행
-        function addYellowRectWithAngleCheck(x, y, size) {
+        // role 기본값은 middle이며, F8에서 start를 전달할 수 있음
+        function addYellowRectWithAngleCheck(x, y, size, role = 'middle') {
             // 이전 사각형으로부터의 각도 계산
             let angle = null;
             let angleExceeded = false;
@@ -596,7 +597,8 @@ function countWhitePixels(ctx, x, y, size) {
                 angleExceeded: angleExceeded,
                 angleDiff: angleDiffValue,
                 expectedAngle: expectedAngle,
-                mergeState: mergeState
+                mergeState: mergeState,
+                role: role
             });
             
             console.log(`✅ 노란색 사각형 추가: (${x}, ${y}), 크기: ${size}x${size}, 각도: ${angle !== null ? angle + '°' : 'N/A'}`);
@@ -608,6 +610,38 @@ function countWhitePixels(ctx, x, y, size) {
             currentYellowIndex = yellowRects.length - 1;
             updateYellowIndexDisplay();
             updateYellowAngleDisplay();
+        }
+
+        // 최근 middle 사각형을 end로 변경 (기존 end는 middle로 되돌림)
+        function markLatestMiddleRectAsEnd() {
+            if (yellowRects.length === 0) {
+                console.log('❌ end로 지정할 노란색 사각형이 없습니다.');
+                return false;
+            }
+
+            let latestMiddleIndex = -1;
+            for (let i = yellowRects.length - 1; i >= 0; i--) {
+                const role = yellowRects[i].role || 'middle';
+                if (role === 'middle') {
+                    latestMiddleIndex = i;
+                    break;
+                }
+            }
+
+            if (latestMiddleIndex === -1) {
+                console.log('❌ end로 변경할 middle 사각형이 없습니다.');
+                return false;
+            }
+
+            yellowRects.forEach((rect) => {
+                if ((rect.role || 'middle') === 'end') {
+                    rect.role = 'middle';
+                }
+            });
+
+            yellowRects[latestMiddleIndex].role = 'end';
+            console.log(`✅ 최근 middle 사각형(index: ${latestMiddleIndex})을 end로 지정했습니다.`);
+            return true;
         }
         
         // 각도 표시 함수 (미리 계산된 각도 사용)
@@ -781,7 +815,7 @@ function countWhitePixels(ctx, x, y, size) {
             return confirmed;
         }
         
-        // F2, F4, F8, F9, F10, IJKL 키 이벤트 리스너
+        // F2, F4, F8, F9, F10, F11, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F2') {
                 e.preventDefault();
@@ -795,8 +829,8 @@ function countWhitePixels(ctx, x, y, size) {
                     const baseMaxPixels = rectSize * rectSize;
                     
                     if (baseWhiteCount === baseMaxPixels) {
-                        // 공통 함수로 노란색 사각형 추가
-                        addYellowRectWithAngleCheck(selectedPixel.x, selectedPixel.y, rectSize);
+                        // F8으로 찍는 점은 start role로 저장
+                        addYellowRectWithAngleCheck(selectedPixel.x, selectedPixel.y, rectSize, 'start');
                         scaleCanvas(); // 화면 갱신
                     } else {
                         console.log(`❌ 사각형이 모두 흰색이 아닙니다. (흰색: ${baseWhiteCount}/${baseMaxPixels})`);
@@ -810,6 +844,10 @@ function countWhitePixels(ctx, x, y, size) {
             }
             if (e.key === 'F10') {
                 runAutoF9Step();
+                e.preventDefault();
+            }
+            if (e.key === 'F11') {
+                markLatestMiddleRectAsEnd();
                 e.preventDefault();
             }
             if (e.key === 'F4') {
@@ -984,7 +1022,7 @@ function countWhitePixels(ctx, x, y, size) {
         // 경로 버튼 클릭: 임시 노란색 사각형 (F9로 확정 전)
         let tempYellowRect = null; // {x: number, y: number, size: number} | null
         // F9: 확정된 노란색 사각형들을 저장하는 배열
-        let yellowRects = []; // {x: number, y: number, size: number}[]
+        let yellowRects = []; // {x: number, y: number, size: number, role?: 'start'|'middle'|'end'}[]
         let currentYellowIndex = -1; // 현재 선택된 노란색 사각형 인덱스 (-1은 선택 안 됨)
 
         // 유틸리티: 두 사각형이 겹치는지 확인
@@ -1805,7 +1843,8 @@ function countWhitePixels(ctx, x, y, size) {
                 size: rect.size,
                 angle: rect.angle,
                 sharpTurn: !!rect.angleExceeded,
-                mergeState: !!mergeStates[idx]
+                mergeState: !!mergeStates[idx],
+                role: rect.role || 'middle'
             }));
 
             const jsonText = JSON.stringify(rectsForCopy, null, 2);
