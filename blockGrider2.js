@@ -101,7 +101,8 @@
       x: point.x,
       y: point.y,
       size: point.size,
-      canConnect: !!point.canConnect
+      canConnect: !!point.canConnect,
+      mergeState: !!point.mergeState
     };
   }
 
@@ -532,12 +533,18 @@
   }
 
   function cycleToConnectedMergePoint(reverse) {
-    if (!selectedRect) return false;
+    if (!selectedRect) {
+      setStatus('Tab 전환할 폴리라인이 없습니다. 먼저 점을 선택해주세요.', true);
+      return false;
+    }
 
     const prevSelected = { ...selectedRect };
 
     const peers = getConnectedSelectionsForSelection(selectedRect);
-    if (peers.length === 0) return false;
+    if (peers.length === 0) {
+      setStatus('Tab 전환할 폴리라인이 없습니다. 선택 점에 MERGE 연결 상대가 없습니다.', true);
+      return false;
+    }
 
     const cycleKey = `${selectedRect.groupIndex}-${selectedRect.segmentIndex}-${selectedRect.pointIndex}|${peers
       .map(item => `${item.groupIndex}-${item.segmentIndex}-${item.pointIndex}`)
@@ -697,6 +704,7 @@
         : null;
     const totalPoints = segment ? segment.points.length : 0;
     const isMergeConnectedPoint = isPointMergeConnected(group, segmentId, hit.pointIndex);
+    const isMergeStatePoint = !!(point && point.mergeState);
 
     const candidateIndex = cycleMeta && Number.isInteger(cycleMeta.index) ? cycleMeta.index + 1 : null;
     const candidateTotal = cycleMeta && Number.isInteger(cycleMeta.total) ? cycleMeta.total : null;
@@ -704,7 +712,7 @@
       candidateTotal && candidateTotal > 1
         ? `<span class="info-badge badge-sub">후보 ${candidateIndex}/${candidateTotal}</span>`
         : '';
-    const mergeBadge = isMergeConnectedPoint
+    const mergeBadge = (isMergeConnectedPoint || isMergeStatePoint)
       ? '<span class="info-badge badge-main">MERGE 연결점☩</span>'
       : '<span class="info-badge">일반 점</span>';
 
@@ -2146,9 +2154,10 @@
     }
 
     if (event.key === 'Tab') {
+      event.preventDefault();
       const switched = cycleToConnectedMergePoint(event.shiftKey);
-      if (switched) {
-        event.preventDefault();
+      if (!switched) {
+        setStatusHtml('<span class="status-inline-highlight">TAB 전환 대상이 없어 기본 TAB 이동을 막았습니다.</span>', true);
       }
       return;
     }
@@ -2202,7 +2211,8 @@
         const fill = getSegmentFillColor(groupIndex, segmentIndex);
 
         segment.points.forEach((point, pointIndex) => {
-          const isMergePoint = isPointMergeConnected(group, segment.id, pointIndex);
+          const isMergeConnectedPoint = isPointMergeConnected(group, segment.id, pointIndex);
+          const isMergePoint = isMergeConnectedPoint || !!point.mergeState;
 
           if (isMergePoint && point.canConnect) {
             baseCtx.fillStyle = '#92afc7';
@@ -2340,7 +2350,8 @@
         x: Math.round(x),
         y: Math.round(y),
         size: Math.round(size),
-        canConnect: typeof item.canConnect === 'boolean' ? item.canConnect : false
+        canConnect: typeof item.canConnect === 'boolean' ? item.canConnect : false,
+        mergeState: typeof item.mergeState === 'boolean' ? item.mergeState : false
       });
     }
 
