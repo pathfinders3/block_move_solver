@@ -1075,7 +1075,7 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         // 계산된 상태를 기반으로 버튼 HTML 생성
-        function renderPathButtonHTML(pt, idx, pathName, cornerSize, angle, whiteCount, isAllWhite, overlapState, borderColor, angleDiff, expectedAngle) {
+        function renderPathButtonHTML(pt, idx, pathName, cornerSize, angle, whiteCount, isAllWhite, overlapState, isPrimaryCornerSize, borderColor, angleDiff, expectedAngle) {
             let buttonStyle;
             let disabled;
             let forcedTooltip = '';
@@ -1086,7 +1086,8 @@ function countWhitePixels(ctx, x, y, size) {
                 forcedTooltip = '부분 겹침은 선택할 수 없습니다.';
             } else if (isAllWhite && overlapState === 'full') {
                 const border = borderColor || '#000000';
-                buttonStyle = `background:#FFD700; color:#000; border:3px solid ${border}; cursor:pointer; font-weight:bold;`;
+                const fullOverlapBg = isPrimaryCornerSize ? '#E0B300' : '#FFD700';
+                buttonStyle = `background:${fullOverlapBg}; color:#000; border:3px solid ${border}; cursor:pointer; font-weight:bold;`;
                 disabled = '';
             } else if (isAllWhite) {
                 const border = borderColor || '#45a049';
@@ -1122,6 +1123,7 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
+            const primaryCornerSize = parseInt(document.getElementById('cornerSize').value, 10) || 4;
             const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
             const baseX = selectedPixel.x + rectSize / 2;
             const baseY = selectedPixel.y + rectSize / 2;
@@ -1144,6 +1146,7 @@ function countWhitePixels(ctx, x, y, size) {
                 });
 
                 const { angle, angleDiff } = getPathRectAngleInfo(pt, cornerSize, baseX, baseY, expectedAngle);
+                const isPrimaryCornerSize = (cornerSize === primaryCornerSize);
                 const borderColor = resolvePathButtonBorderColor(pt, cornerSize, angleDiff, tolerance, bestMatch);
 
                 return renderPathButtonHTML(
@@ -1155,6 +1158,7 @@ function countWhitePixels(ctx, x, y, size) {
                     whiteCount,
                     isAllWhite,
                     overlapState,
+                    isPrimaryCornerSize,
                     borderColor,
                     angleDiff,
                     expectedAngle
