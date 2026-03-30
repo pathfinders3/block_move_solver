@@ -539,6 +539,9 @@ function countWhitePixels(ctx, x, y, size) {
             let angleExceeded = false;
             let angleDiffValue = null;
             let expectedAngle = null;
+            const mergeState = yellowRects.some(existingRect =>
+                classifyRectOverlap(x, y, size, existingRect) === 'full'
+            );
             
             if (yellowRects.length > 0) {
                 const prevRect = yellowRects[yellowRects.length - 1];
@@ -592,7 +595,8 @@ function countWhitePixels(ctx, x, y, size) {
                 angle: angle,
                 angleExceeded: angleExceeded,
                 angleDiff: angleDiffValue,
-                expectedAngle: expectedAngle
+                expectedAngle: expectedAngle,
+                mergeState: mergeState
             });
             
             console.log(`✅ 노란색 사각형 추가: (${x}, ${y}), 크기: ${size}x${size}, 각도: ${angle !== null ? angle + '°' : 'N/A'}`);
@@ -1086,7 +1090,7 @@ function countWhitePixels(ctx, x, y, size) {
                 forcedTooltip = '부분 겹침은 선택할 수 없습니다.';
             } else if (isAllWhite && overlapState === 'full') {
                 const border = borderColor || '#000000';
-                const fullOverlapBg = isPrimaryCornerSize ? '#E0B300' : '#FFD700';
+                const fullOverlapBg = isPrimaryCornerSize ? '#7e6502' : '#FFD700';
                 buttonStyle = `background:${fullOverlapBg}; color:#000; border:3px solid ${border}; cursor:pointer; font-weight:bold;`;
                 disabled = '';
             } else if (isAllWhite) {
@@ -1788,12 +1792,20 @@ function countWhitePixels(ctx, x, y, size) {
                 return;
             }
 
-            const rectsForCopy = yellowRects.map(rect => ({
+            const mergeStates = yellowRects.map((rect, rectIndex) =>
+                yellowRects.some((otherRect, otherIndex) => {
+                    if (rectIndex === otherIndex) return false;
+                    return classifyRectOverlap(rect.x, rect.y, rect.size, otherRect) === 'full';
+                })
+            );
+
+            const rectsForCopy = yellowRects.map((rect, idx) => ({
                 x: rect.x,
                 y: rect.y,
                 size: rect.size,
                 angle: rect.angle,
-                sharpTurn: !!rect.angleExceeded
+                sharpTurn: !!rect.angleExceeded,
+                mergeState: !!mergeStates[idx]
             }));
 
             const jsonText = JSON.stringify(rectsForCopy, null, 2);
