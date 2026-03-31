@@ -54,21 +54,12 @@
           <span style="margin-left:20px;">기준 사각형 흰색점: <span id="baseRectWhite" style="font-weight:bold;">—</span>개</span>
           <span style="margin-left:10px;" id="tempYellowAngleDisplay"></span>
           <span style="margin-left:20px;">귀퉁이 유효 픽셀수: <span id="cornerPixelsDisplay" style="font-weight:bold;color:#009900;">[—,—,—,—]</span></span>
-          <div style="margin-top:5px;">
-            <strong>📍 경로별 사각형 개수:</strong><br>
-            <span style="margin-left:20px;">→ 상단 수평 (0→1): <span id="pathCount01" style="color:#0066cc;">0</span>개</span>
-            <span style="margin-left:20px;">→ 하단 수평 (2→3): <span id="pathCount23" style="color:#0066cc;">0</span>개</span><br>
-            <span style="margin-left:20px;">↓ 좌측 수직 (0→2): <span id="pathCount02" style="color:#0066cc;">0</span>개</span>
-            <span style="margin-left:20px;">↓ 우측 수직 (1→3): <span id="pathCount13" style="color:#0066cc;">0</span>개</span>
-          </div>
           <div style="margin-top:8px;">
             <strong style="cursor:pointer; user-select:none;" onclick="togglePathWhite()" id="pathWhiteHeader">
               ⭕ 경로별 흰색점 개수: <span style="font-size:0.8em;">[▼]</span>
             </strong><br>
             <div id="pathWhiteContent" style="margin-left:20px; font-size:0.9em;">
-              <div style="margin-bottom:6px; color:#cc0000; font-weight:bold;">빨간색 점 : <span id="redBorderCount">-/-개</span></div>
-              <div style="margin-bottom:6px; color:#FF8C00; font-weight:bold;">주황색 점 : <span id="orangeBorderCount">-/-개</span></div>
-              <div style="margin-bottom:6px; color:#a39908; font-weight:bold;">3순위 점 : <span id="thirdBorderCount">-/-개</span></div>
+              <div style="margin-bottom:6px; color:#cc0000; font-weight:bold;">빨간색 점 : <span id="redBorderCount">-/-개</span> · 주황색 점 : <span id="orangeBorderCount">-/-개</span> · 3순위 점 : <span id="thirdBorderCount">-/-개</span></div>
               <div>↑ 상단 수평 (0→1) [n]: <span id="pathWhite01_n" style="color:#666;">-</span></div>
               <div style="margin-left:15px;">↑ 상단 수평 (0→1) [n-1]: <span id="pathWhite01_n1" style="color:#666;">-</span></div>
               <div>↓ 하단 수평 (2→3) [n]: <span id="pathWhite23_n" style="color:#666;">-</span></div>
