@@ -641,7 +641,43 @@ function countWhitePixels(ctx, x, y, size) {
 
             yellowRects[latestMiddleIndex].role = 'end';
             console.log(`✅ 최근 middle 사각형(index: ${latestMiddleIndex})을 end로 지정했습니다.`);
+
+            const startIndex = findLatestStartIndexForEnd(latestMiddleIndex);
+            if (startIndex !== -1) {
+                highlightPolylineRange(startIndex, latestMiddleIndex, 3000);
+                console.log(`   🔦 start(${startIndex}) ~ end(${latestMiddleIndex}) 구간을 3초간 강조합니다.`);
+            } else {
+                console.log('ℹ️ end 이전에 start가 없어 구간 하이라이트는 생략합니다.');
+            }
+
             return true;
+        }
+
+        function findLatestStartIndexForEnd(endIndex) {
+            for (let i = endIndex; i >= 0; i--) {
+                const role = yellowRects[i].role || 'middle';
+                if (role === 'start') {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function highlightPolylineRange(startIndex, endIndex, durationMs = 3000) {
+            if (startIndex < 0 || endIndex < startIndex) return;
+
+            polylineHighlightRange = { startIndex, endIndex };
+            if (polylineHighlightTimer !== null) {
+                clearTimeout(polylineHighlightTimer);
+            }
+
+            scaleCanvas();
+
+            polylineHighlightTimer = setTimeout(() => {
+                polylineHighlightRange = null;
+                polylineHighlightTimer = null;
+                scaleCanvas();
+            }, durationMs);
         }
         
         // 각도 표시 함수 (미리 계산된 각도 사용)
@@ -1024,6 +1060,8 @@ function countWhitePixels(ctx, x, y, size) {
         // F9: 확정된 노란색 사각형들을 저장하는 배열
         let yellowRects = []; // {x: number, y: number, size: number, role?: 'start'|'middle'|'end'}[]
         let currentYellowIndex = -1; // 현재 선택된 노란색 사각형 인덱스 (-1은 선택 안 됨)
+        let polylineHighlightRange = null; // {startIndex:number, endIndex:number} | null
+        let polylineHighlightTimer = null;
 
         // 유틸리티: 두 사각형이 겹치는지 확인
         function rectsOverlap(rect1X, rect1Y, rect1Size, rect2) {
@@ -2097,8 +2135,18 @@ function countWhitePixels(ctx, x, y, size) {
                     for (let i = 0; i < yellowRects.length; i++) {
                         const rect = yellowRects[i];
                         const isSelected = (i === currentYellowIndex);
+                        const isPolylineHighlighted = !!(
+                            polylineHighlightRange &&
+                            i >= polylineHighlightRange.startIndex &&
+                            i <= polylineHighlightRange.endIndex
+                        );
                         
-                        if (isSelected) {
+                        if (isPolylineHighlighted) {
+                            // F11 직후 start~end 구간 하이라이트
+                            ctx2.fillStyle = 'rgba(0, 200, 255, 0.35)';
+                            ctx2.strokeStyle = 'rgba(0, 140, 220, 0.95)';
+                            ctx2.lineWidth = Math.max(2, scale / 5);
+                        } else if (isSelected) {
                             // 선택된 사각형: 빨간색 두꺼운 테두리
                             ctx2.fillStyle = 'rgba(255, 100, 100, 0.4)';
                             ctx2.strokeStyle = 'rgba(255, 0, 0, 1.0)';
