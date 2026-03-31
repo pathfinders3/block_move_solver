@@ -34,6 +34,12 @@
                 <button id="btnAutoF9" style="padding:2px 12px; cursor:pointer; background:#8e44ad; color:white; border:1px solid #7d3c98; border-radius:3px;">자동 F9</button>
               </span>
               <span id="jumpStatusDisplay" style="margin-left:6px; font-size:1.1em; cursor:help;" title="Jmp 상태"></span>
+            <label for="polylineSelect" style="margin-left:15px;">Poly Line:</label>
+            <span id="polylineCountDisplay" style="margin-left:4px; color:#2c7; font-weight:bold; min-width:60px; display:inline-block;">-</span>
+            <select id="polylineSelect" disabled style="width:120px; vertical-align:middle;">
+              <option value="0">-</option>
+            </select>
+            <span id="polylineRangeDisplay" style="margin-left:6px; min-width:95px; display:inline-block; color:#0a7; font-weight:bold;">-</span>
             <label style="margin-left:15px;">각도 허용오차:</label>
             <input type="number" id="angleTolerance" min="0" max="180" value="30" style="width:50px; text-align:center; margin-left:5px;">
             <span style="margin-left:2px;">도</span>
@@ -75,7 +81,7 @@
           </div>
           <div id="angleGroupsContainer" style="margin-top:8px;"></div>
           <div id="angleWarningContainer" style="margin-top:8px;"></div>
-            💡 <kbd>F2</kbd>: 확대 복사 | <kbd>F4</kbd>: 귀퉁이 경로 표시 토글 | <kbd>F8</kbd>: 기준 사각형 저장 | <kbd>F9</kbd>: 임시 노란색 확정 | <kbd>F10</kbd>: 자동 F9(빨간 점 1개일 때)
+            💡 <kbd>F2</kbd>: 확대 복사 | <kbd>F4</kbd>: 귀퉁이 경로 표시 토글 | <kbd>F8</kbd>: 기준 사각형 저장 | <kbd>F9</kbd>: 임시 노란색 확정 | <kbd>F10</kbd>: 자동 F9(빨간 점 1개일 때) | <kbd>F11</kbd>: end 지정
         </div>
     </div>
     

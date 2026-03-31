@@ -169,6 +169,9 @@ function countWhitePixels(ctx, x, y, size) {
         // Range 바 요소
         const scaleRange = document.getElementById('scaleRange');
         const scaleDisplay = document.getElementById('scaleDisplay');
+        const polylineSelect = document.getElementById('polylineSelect');
+        const polylineCountDisplay = document.getElementById('polylineCountDisplay');
+        const polylineRangeDisplay = document.getElementById('polylineRangeDisplay');
         
         // 스케일 값 배열
         const scaleValues = [2, 4, 8, 16, 32, 64];
@@ -618,7 +621,7 @@ function countWhitePixels(ctx, x, y, size) {
             updateYellowAngleDisplay();
         }
 
-        // 최근 middle 사각형을 end로 변경 (기존 end는 middle로 되돌림)
+        // 최근 middle 사각형을 end로 변경
         function markLatestMiddleRectAsEnd() {
             if (yellowRects.length === 0) {
                 console.log('❌ end로 지정할 노란색 사각형이 없습니다.');
@@ -639,12 +642,6 @@ function countWhitePixels(ctx, x, y, size) {
                 return false;
             }
 
-            yellowRects.forEach((rect) => {
-                if (normalizeRole(rect.role) === 'end') {
-                    rect.role = 'middle';
-                }
-            });
-
             yellowRects[latestMiddleIndex].role = 'end';
             console.log(`✅ 최근 middle 사각형(index: ${latestMiddleIndex})을 end로 지정했습니다.`);
 
@@ -655,6 +652,9 @@ function countWhitePixels(ctx, x, y, size) {
             } else {
                 console.log('ℹ️ end 이전에 start가 없어 구간 하이라이트는 생략합니다.');
             }
+
+            // role 변경(F11) 직후 Range Bar/표시값 즉시 갱신
+            refreshPolylineRangeControl();
 
             return true;
         }
@@ -1066,7 +1066,7 @@ function countWhitePixels(ctx, x, y, size) {
         // F9: 확정된 노란색 사각형들을 저장하는 배열
         let yellowRects = []; // {x: number, y: number, size: number, role?: 'start'|'middle'|'end'}[]
         let currentYellowIndex = -1; // 현재 선택된 노란색 사각형 인덱스 (-1은 선택 안 됨)
-        let polylineHighlightRange = null; // {startIndex:number, endIndex:number} | null
+        let polylineHighlightRange = null; // 3초 하이라이트용 {startIndex:number, endIndex:number} | null
         let polylineHighlightTimer = null;
 
         // 유틸리티: 두 사각형이 겹치는지 확인
@@ -1591,6 +1591,8 @@ function countWhitePixels(ctx, x, y, size) {
             } else {
                 display.value = `${currentYellowIndex + 1}/${yellowRects.length}`;
             }
+
+            refreshPolylineRangeControl();
         }
         
         // 노란색 사각형 간 각도 표시 (저장된 angle 속성 사용)
@@ -1885,6 +1887,111 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             return polylines;
+        }
+
+        function getCurrentPolylinesFromYellowRects() {
+            const roleOnlyRects = yellowRects.map(rect => ({
+                role: normalizeRole(rect.role)
+            }));
+            return buildPolylineMetadata(roleOnlyRects);
+        }
+
+        function updatePolylineRangeDisplay(polylines) {
+            if (!polylineRangeDisplay) return;
+
+            if (!polylines || polylines.length === 0 || !polylineSelect) {
+                polylineRangeDisplay.textContent = '-';
+                return;
+            }
+
+            const selectedValue = parseInt(polylineSelect.value, 10);
+            const selectedIndex = Number.isNaN(selectedValue) ? 0 : selectedValue;
+            if (selectedIndex < 1 || selectedIndex > polylines.length) {
+                polylineRangeDisplay.textContent = '-';
+                return;
+            }
+
+            const selected = polylines[selectedIndex - 1];
+            polylineRangeDisplay.textContent = `${selected.polylineId} (${selected.startIndex}~${selected.endIndex})`;
+        }
+
+        function updatePolylineCountDisplay(polylines) {
+            if (!polylineCountDisplay) return;
+
+            if (!polylines || polylines.length === 0) {
+                polylineCountDisplay.textContent = '-';
+                return;
+            }
+
+            polylineCountDisplay.textContent = polylines
+                .map((_, idx) => `(${idx + 1})`)
+                .join(' ');
+        }
+
+        function refreshPolylineRangeControl() {
+            if (!polylineSelect) return;
+
+            const polylines = getCurrentPolylinesFromYellowRects();
+            const previousValue = parseInt(polylineSelect.value, 10);
+
+            polylineSelect.innerHTML = '';
+
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '0';
+            emptyOption.textContent = '-';
+            polylineSelect.appendChild(emptyOption);
+
+            polylines.forEach((polyline, idx) => {
+                const option = document.createElement('option');
+                option.value = String(idx + 1);
+                option.textContent = `${polyline.polylineId} (${polyline.startIndex}~${polyline.endIndex})`;
+                polylineSelect.appendChild(option);
+            });
+
+            if (polylines.length === 0) {
+                polylineSelect.value = '0';
+                polylineSelect.disabled = true;
+                updatePolylineCountDisplay(polylines);
+                updatePolylineRangeDisplay(polylines);
+                return;
+            }
+
+            polylineSelect.disabled = false;
+
+            let nextValue = Number.isNaN(previousValue) ? 0 : previousValue;
+            if (nextValue < 0) nextValue = 0;
+            if (nextValue > polylines.length) nextValue = polylines.length;
+            polylineSelect.value = String(nextValue);
+
+            updatePolylineCountDisplay(polylines);
+            updatePolylineRangeDisplay(polylines);
+        }
+
+        function getSelectedPolylineRangeFromControl() {
+            if (!polylineSelect) return null;
+
+            const polylines = getCurrentPolylinesFromYellowRects();
+            if (polylines.length === 0) return null;
+
+            const selectedValue = parseInt(polylineSelect.value, 10);
+            const selectedIndex = Number.isNaN(selectedValue) ? 0 : selectedValue;
+            if (selectedIndex < 1 || selectedIndex > polylines.length) return null;
+
+            return polylines[selectedIndex - 1];
+        }
+
+        if (polylineSelect) {
+            const handlePolylineRangeSelection = () => {
+                const polylines = getCurrentPolylinesFromYellowRects();
+                const selected = getSelectedPolylineRangeFromControl();
+                if (selected) {
+                    highlightPolylineRange(selected.startIndex, selected.endIndex, 3000);
+                }
+                updatePolylineRangeDisplay(polylines);
+                scaleCanvas();
+            };
+
+            polylineSelect.addEventListener('change', handlePolylineRangeSelection);
         }
 
         // Angle 검사 버튼: 각도별 그룹화
