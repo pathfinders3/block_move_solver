@@ -1628,25 +1628,31 @@ function countWhitePixels(ctx, x, y, size) {
             }
         }
         
-        document.getElementById('btnPrevYellow').addEventListener('click', () => {
+        document.getElementById('btnPrevYellow').addEventListener('click', (e) => {
             if (yellowRects.length === 0) return;
+
+            const step = e.shiftKey ? 5 : 1;
             if (currentYellowIndex === -1) {
-                currentYellowIndex = yellowRects.length - 1; // 마지막으로 이동
+                currentYellowIndex = yellowRects.length - 1;
             } else {
-                currentYellowIndex = (currentYellowIndex - 1 + yellowRects.length) % yellowRects.length;
+                currentYellowIndex = (currentYellowIndex - step + yellowRects.length) % yellowRects.length;
             }
+
             updateYellowIndexDisplay();
             updateYellowAngleDisplay();
             scaleCanvas();
         });
         
-        document.getElementById('btnNextYellow').addEventListener('click', () => {
+        document.getElementById('btnNextYellow').addEventListener('click', (e) => {
             if (yellowRects.length === 0) return;
+
+            const step = e.shiftKey ? 5 : 1;
             if (currentYellowIndex === -1) {
-                currentYellowIndex = 0; // 처음으로 이동
+                currentYellowIndex = 0;
             } else {
-                currentYellowIndex = (currentYellowIndex + 1) % yellowRects.length;
+                currentYellowIndex = (currentYellowIndex + step) % yellowRects.length;
             }
+
             updateYellowIndexDisplay();
             updateYellowAngleDisplay();
             scaleCanvas();
@@ -1923,9 +1929,7 @@ function countWhitePixels(ctx, x, y, size) {
                 return;
             }
 
-            polylineCountDisplay.textContent = polylines
-                .map((_, idx) => `(${idx + 1})`)
-                .join(' ');
+            polylineCountDisplay.textContent = `(${polylines.length})`;
         }
 
         function refreshPolylineRangeControl() {
