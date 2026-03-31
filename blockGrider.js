@@ -1669,6 +1669,12 @@ function countWhitePixels(ctx, x, y, size) {
             const ox = yellowRect.x;
             const oy = yellowRect.y;
             
+            // Go 버튼을 눌러 이동하는 경우 해당 yellowRect의 크기로 rectSize를 동기화
+            const rectSizeInput = document.getElementById('rectSize');
+            if (rectSizeInput) {
+                rectSizeInput.value = String(yellowRect.size);
+            }
+
             selectedPixel = { x: ox, y: oy };
             
             // 색상 구하기 (canvas1 기준)
