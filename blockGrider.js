@@ -532,9 +532,15 @@ function countWhitePixels(ctx, x, y, size) {
             return calculateCartesianAngle(dx, dy);
         }
         
+        function normalizeRole(role) {
+            if (role === 'start' || role === 'middle' || role === 'end') return role;
+            return 'middle';
+        }
+
         // 노란색 사각형을 yellowRects 배열에 추가하고 각도 검사 수행
         // role 기본값은 middle이며, F8에서 start를 전달할 수 있음
         function addYellowRectWithAngleCheck(x, y, size, role = 'middle') {
+            role = normalizeRole(role);
             // 이전 사각형으로부터의 각도 계산
             let angle = null;
             let angleExceeded = false;
@@ -621,7 +627,7 @@ function countWhitePixels(ctx, x, y, size) {
 
             let latestMiddleIndex = -1;
             for (let i = yellowRects.length - 1; i >= 0; i--) {
-                const role = yellowRects[i].role || 'middle';
+                const role = normalizeRole(yellowRects[i].role);
                 if (role === 'middle') {
                     latestMiddleIndex = i;
                     break;
@@ -634,7 +640,7 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             yellowRects.forEach((rect) => {
-                if ((rect.role || 'middle') === 'end') {
+                if (normalizeRole(rect.role) === 'end') {
                     rect.role = 'middle';
                 }
             });
@@ -655,7 +661,7 @@ function countWhitePixels(ctx, x, y, size) {
 
         function findLatestStartIndexForEnd(endIndex) {
             for (let i = endIndex; i >= 0; i--) {
-                const role = yellowRects[i].role || 'middle';
+                const role = normalizeRole(yellowRects[i].role);
                 if (role === 'start') {
                     return i;
                 }
@@ -1851,7 +1857,7 @@ function countWhitePixels(ctx, x, y, size) {
             let polylineCounter = 1;
 
             for (let i = 0; i < rects.length; i++) {
-                const role = rects[i].role || 'middle';
+                const role = normalizeRole(rects[i].role);
 
                 if (role === 'start') {
                     // 새 start가 나오면 이전 열린 구간은 폐기하고 최신 start를 기준으로 함
@@ -1919,7 +1925,7 @@ function countWhitePixels(ctx, x, y, size) {
                 angle: rect.angle,
                 sharpTurn: !!rect.angleExceeded,
                 mergeState: !!mergeStates[idx],
-                role: rect.role || 'middle'
+                role: normalizeRole(rect.role)
             }));
 
             const polylinesForCopy = buildPolylineMetadata(rectsForCopy);
