@@ -1806,6 +1806,43 @@ function countWhitePixels(ctx, x, y, size) {
             }
         }
 
+        // role(start~end) 기준으로 폴리라인 메타데이터 생성
+        function buildPolylineMetadata(rects) {
+            const polylines = [];
+            let startIndex = null;
+            let polylineCounter = 1;
+
+            for (let i = 0; i < rects.length; i++) {
+                const role = rects[i].role || 'middle';
+
+                if (role === 'start') {
+                    // 새 start가 나오면 이전 열린 구간은 폐기하고 최신 start를 기준으로 함
+                    startIndex = i;
+                    continue;
+                }
+
+                if (role === 'end' && startIndex !== null && i >= startIndex) {
+                    const pointIndices = [];
+                    for (let idx = startIndex; idx <= i; idx++) {
+                        pointIndices.push(idx);
+                    }
+
+                    polylines.push({
+                        polylineId: `PL${polylineCounter}`,
+                        startIndex: startIndex,
+                        endIndex: i,
+                        pointCount: pointIndices.length,
+                        pointIndices: pointIndices
+                    });
+
+                    polylineCounter += 1;
+                    startIndex = null;
+                }
+            }
+
+            return polylines;
+        }
+
         // Angle 검사 버튼: 각도별 그룹화
         document.getElementById('btnAngleCheck').addEventListener('click', () => {
             if (yellowRects.length === 0) {
@@ -1847,11 +1884,18 @@ function countWhitePixels(ctx, x, y, size) {
                 role: rect.role || 'middle'
             }));
 
-            const jsonText = JSON.stringify(rectsForCopy, null, 2);
+            const polylinesForCopy = buildPolylineMetadata(rectsForCopy);
+
+            const exportPayload = {
+                rects: rectsForCopy,
+                polylines: polylinesForCopy
+            };
+
+            const jsonText = JSON.stringify(exportPayload, null, 2);
 
             try {
                 await navigator.clipboard.writeText(jsonText);
-                console.log(`✅ Copy Rects 완료: ${rectsForCopy.length}개 사각형이 클립보드에 복사되었습니다.`);
+                console.log(`✅ Copy Rects 완료: 사각형 ${rectsForCopy.length}개, 폴리라인 ${polylinesForCopy.length}개가 클립보드에 복사되었습니다.`);
             } catch (err) {
                 console.error('❌ 클립보드 복사 실패:', err);
             }
