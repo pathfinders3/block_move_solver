@@ -752,6 +752,37 @@ function countWhitePixels(ctx, x, y, size) {
                 scaleCanvas();
             }, durationMs);
         }
+
+        function findLatestStartIndexBefore(endIndex) {
+            for (let i = endIndex - 1; i >= 0; i--) {
+                if (normalizeRole(yellowRects[i].role) === 'start') {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function highlightStartPointForGo(endIndex, durationMs = 2000) {
+            if (endIndex < 0 || endIndex >= yellowRects.length) return false;
+
+            const startIndex = findLatestStartIndexBefore(endIndex);
+            if (startIndex === -1) return false;
+
+            goStartHighlightIndex = startIndex;
+            if (goStartHighlightTimer !== null) {
+                clearTimeout(goStartHighlightTimer);
+            }
+
+            scaleCanvas();
+
+            goStartHighlightTimer = setTimeout(() => {
+                goStartHighlightIndex = -1;
+                goStartHighlightTimer = null;
+                scaleCanvas();
+            }, durationMs);
+
+            return true;
+        }
         
         // 각도 표시 함수 (미리 계산된 각도 사용)
         function updateTempYellowAngle(preCalculatedAngle = null) {
@@ -1258,6 +1289,8 @@ function countWhitePixels(ctx, x, y, size) {
         let currentYellowIndex = -1; // 현재 선택된 노란색 사각형 인덱스 (-1은 선택 안 됨)
         let polylineHighlightRange = null; // 3초 하이라이트용 {startIndex:number, endIndex:number} | null
         let polylineHighlightTimer = null;
+        let goStartHighlightIndex = -1; // Go에서 END 선택 시 대응 START 단일 하이라이트 인덱스
+        let goStartHighlightTimer = null;
 
         // 유틸리티: 두 사각형이 겹치는지 확인
         function rectsOverlap(rect1X, rect1Y, rect1Size, rect2) {
@@ -1889,6 +1922,16 @@ function countWhitePixels(ctx, x, y, size) {
                 updateCornerAndPathInfo();
             }
 
+            if (normalizeRole(yellowRect.role) === 'end') {
+                const highlighted = highlightStartPointForGo(currentYellowIndex, 2000);
+                if (highlighted) {
+                    console.log(`🔦 END에 대응하는 START [${goStartHighlightIndex + 1}]를 2초간 강조합니다.`);
+                } else {
+                    showRoleActionErrorMessage('이 END 이전에 대응 START가 없습니다.');
+                    console.log('ℹ️ END 이전에 대응 START가 없어 START 하이라이트를 생략합니다.');
+                }
+            }
+
             showGoMetaMessage(yellowRect, currentYellowIndex);
             
             console.log(`✅ 노란색 사각형 [${currentYellowIndex + 1}]번 위치로 이동: (${ox}, ${oy})`);
@@ -2458,15 +2501,21 @@ function countWhitePixels(ctx, x, y, size) {
                     for (let i = 0; i < yellowRects.length; i++) {
                         const rect = yellowRects[i];
                         const isSelected = (i === currentYellowIndex);
+                        const isGoStartHighlighted = (i === goStartHighlightIndex);
                         const isPolylineHighlighted = !!(
                             polylineHighlightRange &&
                             i >= polylineHighlightRange.startIndex &&
                             i <= polylineHighlightRange.endIndex
                         );
                         
-                        if (isPolylineHighlighted) {
+                        if (isGoStartHighlighted) {
+                            // Go에서 END 선택 시 대응 START 단일 강조
+                            ctx2.fillStyle = 'rgba(120, 255, 120, 0.45)';
+                            ctx2.strokeStyle = 'rgba(0, 170, 0, 0.98)';
+                            ctx2.lineWidth = Math.max(3, scale / 4);
+                        } else if (isPolylineHighlighted) {
                             // F11 직후 start~end 구간 하이라이트
-                            ctx2.fillStyle = 'rgba(0, 200, 255, 0.35)';
+                            ctx2.fillStyle = 'rgba(11, 38, 46, 0.35)';
                             ctx2.strokeStyle = 'rgba(0, 140, 220, 0.95)';
                             ctx2.lineWidth = Math.max(2, scale / 5);
                         } else if (isSelected) {
