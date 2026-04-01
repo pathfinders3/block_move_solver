@@ -29,6 +29,8 @@
             <button id="btnNextYellow" style="padding:2px 8px; cursor:pointer;">→</button>
               <span style="display:inline-flex; align-items:center; gap:3px; margin-left:8px; vertical-align:middle;">
                 <button id="btnGoToYellow" style="padding:2px 12px; cursor:pointer; background:#4CAF50; color:white; border:1px solid #45a049; border-radius:3px;">Go</button>
+                <button id="btnSetStartByIndex" style="padding:2px 10px; cursor:pointer; background:#1f77b4; color:white; border:1px solid #195f8f; border-radius:3px;">Start</button>
+                <button id="btnSetEndByIndex" style="padding:2px 10px; cursor:pointer; background:#e67e22; color:white; border:1px solid #ca6b17; border-radius:3px;">End</button>
                 <button id="btnDelAfterYellow" style="padding:2px 12px; cursor:pointer; background:#d9534f; color:white; border:1px solid #c9302c; border-radius:3px;">Del</button>
                 <button id="btnJumpSharpTurn" style="padding:2px 12px; cursor:pointer; background:#337ab7; color:white; border:1px solid #2e6da4; border-radius:3px;">Jmp</button>
                 <button id="btnAutoF9" style="padding:2px 12px; cursor:pointer; background:#8e44ad; color:white; border:1px solid #7d3c98; border-radius:3px;">자동 F9</button>
@@ -54,6 +56,7 @@
           <span style="margin-left:20px;">기준 사각형 흰색점: <span id="baseRectWhite" style="font-weight:bold;">—</span>개</span>
           <span style="margin-left:10px;" id="tempYellowAngleDisplay"></span>
           <span id="mergeStateDisplay" style="margin-left:12px; color:#bfe9ff; font-weight:bold;"></span>
+          <span id="roleActionDisplay" style="margin-left:8px; color:#d4ffd4; font-weight:bold;"></span>
           <span style="margin-left:20px;">귀퉁이 유효 픽셀수: <span id="cornerPixelsDisplay" style="font-weight:bold;color:#009900;">[—,—,—,—]</span></span>
           <div style="margin-top:8px;">
             <strong style="cursor:pointer; user-select:none;" onclick="togglePathWhite()" id="pathWhiteHeader">

@@ -659,6 +659,73 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        function setYellowRoleByIndex(index, role) {
+            if (index < 0 || index >= yellowRects.length) {
+                console.log('❌ role을 지정할 유효한 노란색 인덱스가 없습니다.');
+                showRoleActionErrorMessage('유효한 노란색 인덱스가 없습니다.');
+                return false;
+            }
+
+            const normalizedRole = normalizeRole(role);
+            const targetRect = yellowRects[index];
+
+            if (normalizedRole === 'end') {
+                let startIndex = -1;
+                for (let i = index - 1; i >= 0; i--) {
+                    if (normalizeRole(yellowRects[i].role) === 'start') {
+                        startIndex = i;
+                        break;
+                    }
+                }
+
+                if (startIndex === -1) {
+                    console.log('❌ end 지정 실패: 현재 인덱스 이전에 start가 필요합니다.');
+                    showRoleActionErrorMessage('end 지정 실패: 현재 인덱스 이전에 start가 필요합니다.');
+                    return false;
+                }
+
+                targetRect.role = 'end';
+                currentYellowIndex = index;
+                updateYellowIndexDisplay();
+                updateYellowAngleDisplay();
+                highlightPolylineRange(startIndex, index, 3000);
+                showRoleActionMessage('end', index, startIndex);
+                console.log(`✅ 인덱스 [${index + 1}]를 end로 지정했습니다. (start: ${startIndex + 1})`);
+            } else {
+                targetRect.role = normalizedRole;
+                currentYellowIndex = index;
+                updateYellowIndexDisplay();
+                updateYellowAngleDisplay();
+                showRoleActionMessage('start', index);
+                console.log(`✅ 인덱스 [${index + 1}]를 ${normalizedRole}로 지정했습니다.`);
+            }
+
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+
+            scaleCanvas();
+            return true;
+        }
+
+        function setCurrentYellowAsStart() {
+            if (currentYellowIndex === -1 || yellowRects.length === 0) {
+                console.log('❌ start로 지정할 노란색 사각형이 선택되지 않았습니다.');
+                showRoleActionErrorMessage('start로 지정할 노란색 사각형이 선택되지 않았습니다.');
+                return false;
+            }
+            return setYellowRoleByIndex(currentYellowIndex, 'start');
+        }
+
+        function setCurrentYellowAsEnd() {
+            if (currentYellowIndex === -1 || yellowRects.length === 0) {
+                console.log('❌ end로 지정할 노란색 사각형이 선택되지 않았습니다.');
+                showRoleActionErrorMessage('end로 지정할 노란색 사각형이 선택되지 않았습니다.');
+                return false;
+            }
+            return setYellowRoleByIndex(currentYellowIndex, 'end');
+        }
+
         function findLatestStartIndexForEnd(endIndex) {
             for (let i = endIndex; i >= 0; i--) {
                 const role = normalizeRole(yellowRects[i].role);
@@ -737,6 +804,7 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         let mergeStateDisplayTimer = null;
+        let roleActionDisplayTimer = null;
 
         function showMergeStateMessage(triggerKey, rect) {
             const display = document.getElementById('mergeStateDisplay');
@@ -765,6 +833,66 @@ function countWhitePixels(ctx, x, y, size) {
                 display.style.display = '';
                 mergeStateDisplayTimer = null;
             }, 3000);
+        }
+
+        function showRoleActionMessage(role, index, startIndex = null) {
+            const display = document.getElementById('roleActionDisplay');
+            if (!display) return;
+
+            if (role === 'end' && startIndex !== null) {
+                display.textContent = `✅ End 지정: [${index + 1}] (Start: [${startIndex + 1}])`;
+                display.style.color = '#fff4d6';
+                display.style.background = '#c46a1a';
+                display.style.border = '1px solid #a85b16';
+            } else {
+                display.textContent = `✅ Start 지정: [${index + 1}]`;
+                display.style.color = '#0d2d16';
+                display.style.background = '#7ee4a0';
+                display.style.border = '1px solid #55b678';
+            }
+
+            display.style.borderRadius = '4px';
+            display.style.padding = '2px 8px';
+            display.style.display = 'inline-block';
+
+            if (roleActionDisplayTimer !== null) {
+                clearTimeout(roleActionDisplayTimer);
+            }
+
+            roleActionDisplayTimer = setTimeout(() => {
+                display.textContent = '';
+                display.style.background = '';
+                display.style.border = '';
+                display.style.padding = '';
+                display.style.display = '';
+                roleActionDisplayTimer = null;
+            }, 2000);
+        }
+
+        function showRoleActionErrorMessage(message) {
+            const display = document.getElementById('roleActionDisplay');
+            if (!display) return;
+
+            display.textContent = `❌ ${message}`;
+            display.style.color = '#fff1f0';
+            display.style.background = '#b42318';
+            display.style.border = '1px solid #911b14';
+            display.style.borderRadius = '4px';
+            display.style.padding = '2px 8px';
+            display.style.display = 'inline-block';
+
+            if (roleActionDisplayTimer !== null) {
+                clearTimeout(roleActionDisplayTimer);
+            }
+
+            roleActionDisplayTimer = setTimeout(() => {
+                display.textContent = '';
+                display.style.background = '';
+                display.style.border = '';
+                display.style.padding = '';
+                display.style.display = '';
+                roleActionDisplayTimer = null;
+            }, 2000);
         }
 
         // 임시 노란색 사각형을 확정(F9 동작)하는 공통 함수
@@ -1734,6 +1862,14 @@ function countWhitePixels(ctx, x, y, size) {
             
             console.log(`✅ 노란색 사각형 [${currentYellowIndex + 1}]번 위치로 이동: (${ox}, ${oy})`);
             scaleCanvas();
+        });
+
+        document.getElementById('btnSetStartByIndex').addEventListener('click', () => {
+            setCurrentYellowAsStart();
+        });
+
+        document.getElementById('btnSetEndByIndex').addEventListener('click', () => {
+            setCurrentYellowAsEnd();
         });
 
         // Del 버튼: 현재 선택된 인덱스 이하 사각형들을 모두 삭제
