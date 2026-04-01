@@ -2543,6 +2543,13 @@ function countWhitePixels(ctx, x, y, size) {
                         ctx2.setLineDash([]);
                         ctx2.fillRect(rect.x * scale, rect.y * scale, rect.size * scale, rect.size * scale);
                         ctx2.strokeRect(rect.x * scale+0.5, rect.y * scale+0.5, rect.size * scale-1, rect.size * scale-1);
+
+                        const rectRole = normalizeRole(rect.role);
+                        if (rectRole === 'start' || rectRole === 'end') {
+                            ctx2.strokeStyle = rectRole === 'start' ? 'rgba(0, 0, 0, 0.98)' : 'rgba(120, 120, 120, 0.98)';
+                            ctx2.lineWidth = Math.max(2, scale / 5);
+                            ctx2.strokeRect(rect.x * scale+0.5, rect.y * scale+0.5, rect.size * scale-1, rect.size * scale-1);
+                        }
                     }
                 }
                 
