@@ -805,6 +805,7 @@ function countWhitePixels(ctx, x, y, size) {
 
         let mergeStateDisplayTimer = null;
         let roleActionDisplayTimer = null;
+        let goMetaDisplayTimer = null;
 
         function showMergeStateMessage(triggerKey, rect) {
             const display = document.getElementById('mergeStateDisplay');
@@ -893,6 +894,34 @@ function countWhitePixels(ctx, x, y, size) {
                 display.style.display = '';
                 roleActionDisplayTimer = null;
             }, 2000);
+        }
+
+        function showGoMetaMessage(rect, index) {
+            const display = document.getElementById('goMetaDisplay');
+            if (!display || !rect) return;
+
+            const mergeLabel = rect.mergeState ? 'MERGED' : 'NOT MERGED';
+            const roleLabel = normalizeRole(rect.role).toUpperCase();
+            display.textContent = `[Go ${index + 1}/${yellowRects.length}] ${mergeLabel} | role: ${roleLabel} | size: ${rect.size}x${rect.size}`;
+            display.style.color = '#07263a';
+            display.style.background = '#9cd2f7';
+            display.style.border = '1px solid #4b9fd8';
+            display.style.borderRadius = '4px';
+            display.style.padding = '2px 8px';
+            display.style.visibility = 'visible';
+
+            if (goMetaDisplayTimer !== null) {
+                clearTimeout(goMetaDisplayTimer);
+            }
+
+            goMetaDisplayTimer = setTimeout(() => {
+                display.textContent = '';
+                display.style.background = '';
+                display.style.border = '';
+                display.style.padding = '';
+                display.style.visibility = 'hidden';
+                goMetaDisplayTimer = null;
+            }, 3000);
         }
 
         // 임시 노란색 사각형을 확정(F9 동작)하는 공통 함수
@@ -1859,6 +1888,8 @@ function countWhitePixels(ctx, x, y, size) {
             if(showCorners && selectedPixel) {
                 updateCornerAndPathInfo();
             }
+
+            showGoMetaMessage(yellowRect, currentYellowIndex);
             
             console.log(`✅ 노란색 사각형 [${currentYellowIndex + 1}]번 위치로 이동: (${ox}, ${oy})`);
             scaleCanvas();
