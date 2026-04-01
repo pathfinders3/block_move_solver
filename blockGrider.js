@@ -736,8 +736,39 @@ function countWhitePixels(ctx, x, y, size) {
             return null;
         }
 
+        let mergeStateDisplayTimer = null;
+
+        function showMergeStateMessage(triggerKey, rect) {
+            const display = document.getElementById('mergeStateDisplay');
+            if (!display || !rect) return;
+
+            const isMerged = !!rect.mergeState;
+            const mergeLabel = isMerged ? 'TRUE' : 'FALSE';
+            const badge = isMerged ? 'MERGED' : 'NOT MERGED';
+            display.textContent = `[${triggerKey}] ${badge} | mergeState: ${mergeLabel} | size: ${rect.size}x${rect.size}`;
+            display.style.color = isMerged ? '#062b20' : '#3f2f00';
+            display.style.background = isMerged ? '#7de1ff' : '#ffd98a';
+            display.style.border = isMerged ? '1px solid #24a6cc' : '1px solid #c28a00';
+            display.style.borderRadius = '4px';
+            display.style.padding = '2px 8px';
+            display.style.display = 'inline-block';
+
+            if (mergeStateDisplayTimer !== null) {
+                clearTimeout(mergeStateDisplayTimer);
+            }
+
+            mergeStateDisplayTimer = setTimeout(() => {
+                display.textContent = '';
+                display.style.background = '';
+                display.style.border = '';
+                display.style.padding = '';
+                display.style.display = '';
+                mergeStateDisplayTimer = null;
+            }, 3000);
+        }
+
         // 임시 노란색 사각형을 확정(F9 동작)하는 공통 함수
-        function confirmTempYellowRect() {
+        function confirmTempYellowRect(triggerKey = 'F9') {
             if (!tempYellowRect) {
                 console.log(`❌ 확정할 임시 노란색 사각형이 없습니다.`);
                 return false;
@@ -756,6 +787,8 @@ function countWhitePixels(ctx, x, y, size) {
 
             // 공통 함수로 노란색 사각형 추가
             addYellowRectWithAngleCheck(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
+            const confirmedRect = yellowRects[yellowRects.length - 1];
+            showMergeStateMessage(triggerKey, confirmedRect);
 
             // 경로 재계산 (새로 확정된 각도를 기준으로)
             if (showCorners) {
@@ -850,7 +883,7 @@ function countWhitePixels(ctx, x, y, size) {
             targetButton.click();
 
             // 2) F9 동작으로 확정
-            const confirmed = confirmTempYellowRect();
+            const confirmed = confirmTempYellowRect('F10');
             if (confirmed) {
                 console.log('✅ 자동 F9 한 스텝 완료 (빨간 후보 1개 선택 + 확정).');
             }
@@ -881,7 +914,7 @@ function countWhitePixels(ctx, x, y, size) {
                 e.preventDefault();
             }
             if (e.key === 'F9') {
-                confirmTempYellowRect();
+                confirmTempYellowRect('F9');
                 e.preventDefault();
             }
             if (e.key === 'F10') {
@@ -2278,6 +2311,11 @@ function countWhitePixels(ctx, x, y, size) {
                             // 각도 허용오차 초과: 주황색
                             ctx2.fillStyle = 'rgba(34, 61, 212, 0.4)';
                             ctx2.strokeStyle = 'rgba(189, 116, 8, 0.9)';
+                            ctx2.lineWidth = Math.max(1, scale/8);
+                        } else if (rect.mergeState) {
+                            // MERGE 상태: 노란색과 구분되는 청록색
+                            ctx2.fillStyle = 'rgba(0, 200, 170, 0.35)';
+                            ctx2.strokeStyle = 'rgba(0, 130, 110, 0.95)';
                             ctx2.lineWidth = Math.max(1, scale/8);
                         } else {
                             // 일반 노란색 사각형
