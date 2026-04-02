@@ -480,11 +480,12 @@ function countWhitePixels(ctx, x, y, size) {
         document.getElementById('btnLoadClipboard').addEventListener('click', loadImageFromClipboard);
         document.getElementById('btnRandomize').addEventListener('click', drawRandomPixels);
         
-        // Range 바 값 변경 시 표시 업데이트
+        // Range 바 값 변경 시 표시 업데이트 및 Canvas2 즉시 확대 갱신
         scaleRange.addEventListener('input', (e) => {
             const index = parseInt(e.target.value);
             const scale = scaleValues[index];
             scaleDisplay.textContent = `${scale}x`;
+            scaleCanvas();
         });
         
         // 데카르트 좌표계 기준으로 dx, dy로부터 각도(0~359도) 계산
