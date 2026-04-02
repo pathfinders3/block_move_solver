@@ -960,12 +960,12 @@ function countWhitePixels(ctx, x, y, size) {
         function showGoMetaMessage(rect, index) {
             if (!rect) return;
 
-            const mergeLabel = rect.mergeState ? 'MERGED' : 'NOT MERGED';
+            const mergeLabel = rect.mergeState ? '✙MERGED' : 'NOT MERGED';
             const roleLabel = normalizeRole(rect.role).toUpperCase();
 
             goMetaDisplayTimer = showTempMessage({
                 elementId: 'goMetaDisplay',
-                text: `[Go ${index + 1}/${yellowRects.length}] ${mergeLabel} | role: ${roleLabel} | size: ${rect.size}x${rect.size}`,
+                text: `[Go ${index + 1}/${yellowRects.length}] ${mergeLabel} | ${roleLabel} | ${rect.size}x${rect.size}`,
                 className: 'status-go',
                 previousTimerId: goMetaDisplayTimer
             });
@@ -2459,9 +2459,9 @@ function countWhitePixels(ctx, x, y, size) {
 
             const matchedRects = matchedIndices.map(i => yellowRects[i]);
             const summary = matchedRects.map((rect, idx) => {
-                const mergeLabel = rect.mergeState ? 'MERGED' : 'NOT MERGED';
+                const mergeLabel = rect.mergeState ? '✙MERGED' : 'NOT MERGED';
                 const roleLabel = normalizeRole(rect.role).toUpperCase();
-                return `${idx + 1}. [${matchedIndices[idx] + 1}/${yellowRects.length}] ${mergeLabel} | role: ${roleLabel} | size: ${rect.size}x${rect.size}`;
+                return `${idx + 1}. [${matchedIndices[idx] + 1}/${yellowRects.length}] ${mergeLabel} | ${roleLabel} | size: ${rect.size}x${rect.size}`;
             }).join('  ||  ');
 
             goMetaDisplayTimer = showTempMessage({
