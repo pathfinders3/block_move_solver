@@ -871,6 +871,9 @@ function countWhitePixels(ctx, x, y, size) {
 
             display.textContent = text;
             display.className = `status-message ${className}`.trim();
+            if (elementId === 'goMetaDisplay') {
+                display.style.visibility = 'visible';
+            }
 
             if (previousTimerId !== null) {
                 clearTimeout(previousTimerId);
@@ -882,6 +885,9 @@ function countWhitePixels(ctx, x, y, size) {
                 } else {
                     display.textContent = '';
                     display.className = '';
+                    if (elementId === 'goMetaDisplay') {
+                        display.style.visibility = 'hidden';
+                    }
                 }
 
                 if (elementId === 'mergeStateDisplay') {
