@@ -1936,7 +1936,12 @@ function countWhitePixels(ctx, x, y, size) {
                 }
             }
 
-            showGoMetaMessage(yellowRect, currentYellowIndex);
+            const matchedIndices = findYellowRectIndicesByPoint(ox, oy);
+            if (matchedIndices.length > 1) {
+                showGoMetaForMatchedIndices(matchedIndices);
+            } else {
+                showGoMetaMessage(yellowRect, currentYellowIndex);
+            }
             
             console.log(`✅ 노란색 사각형 [${currentYellowIndex + 1}]번 위치로 이동: (${ox}, ${oy})`);
             scaleCanvas();
@@ -2344,17 +2349,27 @@ function countWhitePixels(ctx, x, y, size) {
             selectedPixel = { x: ox, y: oy };
 
             // 클릭된 위치에 해당하는 yellowRect 찾기 및 Go 동작
-            const targetYellowIndex = findYellowRectIndexByPoint(ox, oy);
+            const matchedIndices = findYellowRectIndicesByPoint(ox, oy);
             const clickMode = document.getElementById('yellowClickMode')?.value || 'closest';
-            if (targetYellowIndex !== -1) {
-                goToYellowRect(targetYellowIndex);
-            } else if (clickMode === 'inside') {
-                goMetaDisplayTimer = showTempMessage({
-                    elementId: 'goMetaDisplay',
-                    text: '[Go] 포함된 노란 점이 없습니다.',
-                    className: 'status-go',
-                    previousTimerId: goMetaDisplayTimer
-                });
+
+            if (matchedIndices.length > 0) {
+                // 포함된 노란 점이 하나 이상이면 모두 정보를 표시하고, 첫번째 점으로 이동
+                showGoMetaForMatchedIndices(matchedIndices);
+
+                // 첫번째 점을 실제 대상으로 이동하되, 다중 요약 메시지는 유지
+                goToYellowRect(matchedIndices[0], { preserveGoMeta: true });
+            } else {
+                const targetYellowIndex = findYellowRectIndexByPoint(ox, oy);
+                if (targetYellowIndex !== -1) {
+                    goToYellowRect(targetYellowIndex);
+                } else if (clickMode === 'inside') {
+                    goMetaDisplayTimer = showTempMessage({
+                        elementId: 'goMetaDisplay',
+                        text: '[Go] 포함된 노란 점이 없습니다.',
+                        className: 'status-go',
+                        previousTimerId: goMetaDisplayTimer
+                    });
+                }
             }
 
             // 색상 구하기 (canvas1 기준)
@@ -2415,11 +2430,38 @@ function countWhitePixels(ctx, x, y, size) {
             return closestIndex;
         }
 
-        function findYellowRectIndexByPoint(x, y) {
-            const insideIndex = yellowRects.findIndex(rect =>
-                x >= rect.x && x < rect.x + rect.size && y >= rect.y && y < rect.y + rect.size
-            );
+        function findYellowRectIndicesByPoint(x, y) {
+            return yellowRects
+                .map((rect, i) => ({ rect, i }))
+                .filter(({ rect }) =>
+                    x >= rect.x && x < rect.x + rect.size && y >= rect.y && y < rect.y + rect.size
+                )
+                .map(({ i }) => i);
+        }
 
+        function showGoMetaForMatchedIndices(matchedIndices) {
+            if (!matchedIndices || matchedIndices.length === 0) return false;
+
+            const matchedRects = matchedIndices.map(i => yellowRects[i]);
+            const summary = matchedRects.map((rect, idx) => {
+                const mergeLabel = rect.mergeState ? 'MERGED' : 'NOT MERGED';
+                const roleLabel = normalizeRole(rect.role).toUpperCase();
+                return `${idx + 1}. [${matchedIndices[idx] + 1}/${yellowRects.length}] ${mergeLabel} | role: ${roleLabel} | size: ${rect.size}x${rect.size}`;
+            }).join('  ||  ');
+
+            goMetaDisplayTimer = showTempMessage({
+                elementId: 'goMetaDisplay',
+                text: `[Go] 포함점 ${matchedIndices.length}개: ${summary}`,
+                className: 'status-go',
+                previousTimerId: goMetaDisplayTimer
+            });
+
+            return true;
+        }
+
+        function findYellowRectIndexByPoint(x, y) {
+            const insideIndices = findYellowRectIndicesByPoint(x, y);
+            const insideIndex = insideIndices.length > 0 ? insideIndices[0] : -1;
             const modeInput = document.getElementById('yellowClickMode');
             const mode = modeInput ? modeInput.value : 'closest';
 
@@ -2435,11 +2477,12 @@ function countWhitePixels(ctx, x, y, size) {
             return findClosestYellowRectIndex(x, y);
         }
 
-        function goToYellowRect(index) {
+        function goToYellowRect(index, options = {}) {
             if (index < 0 || index >= yellowRects.length) {
                 console.log('ℹ️ 클릭 위치에 해당하는 노란 점이 없습니다.');
                 return;
             }
+            const preserveGoMeta = !!options.preserveGoMeta;
             currentYellowIndex = index;
             updateYellowIndexDisplay();
             updateYellowAngleDisplay();
@@ -2454,7 +2497,9 @@ function countWhitePixels(ctx, x, y, size) {
             // info 표시
             const coordDisp = document.getElementById('coordDisplay');
             if (coordDisp) coordDisp.textContent = `${yellowRect.x}, ${yellowRect.y}`;
-            showGoMetaMessage(yellowRect, index);
+            if (!preserveGoMeta) {
+                showGoMetaMessage(yellowRect, index);
+            }
 
             if (showCorners && selectedPixel) {
                 updateCornerAndPathInfo();
