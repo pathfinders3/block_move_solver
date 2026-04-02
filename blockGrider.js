@@ -550,9 +550,18 @@ function countWhitePixels(ctx, x, y, size) {
             let angleExceeded = false;
             let angleDiffValue = null;
             let expectedAngle = null;
+            const overlappingIndices = [];
             const mergeState = yellowRects.some(existingRect =>
                 classifyRectOverlap(x, y, size, existingRect) === 'full'
             );
+
+            if (mergeState) {
+                yellowRects.forEach((existingRect, index) => {
+                    if (classifyRectOverlap(x, y, size, existingRect) === 'full') {
+                        overlappingIndices.push(index);
+                    }
+                });
+            }
             
             if (yellowRects.length > 0) {
                 const prevRect = yellowRects[yellowRects.length - 1];
@@ -610,6 +619,12 @@ function countWhitePixels(ctx, x, y, size) {
                 mergeState: mergeState,
                 role: role
             });
+
+            if (mergeState && overlappingIndices.length > 0) {
+                overlappingIndices.forEach(index => {
+                    yellowRects[index].mergeState = true;
+                });
+            }
             
             console.log(`✅ 노란색 사각형 추가: (${x}, ${y}), 크기: ${size}x${size}, 각도: ${angle !== null ? angle + '°' : 'N/A'}`);
             if (angleExceeded) {
