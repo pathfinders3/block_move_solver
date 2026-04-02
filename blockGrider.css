@@ -104,3 +104,46 @@ canvas {
     color: #ffe082;
     box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
+
+.status-message {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-weight: 600;
+}
+
+.status-merged {
+    color: #062b20;
+    background-color: #7de1ff;
+    border: 1px solid #24a6cc;
+}
+
+.status-unmerged {
+    color: #3f2f00;
+    background-color: #ffd98a;
+    border: 1px solid #c28a00;
+}
+
+.status-role-start {
+    color: #0d2d16;
+    background-color: #7ee4a0;
+    border: 1px solid #55b678;
+}
+
+.status-role-end {
+    color: #fff4d6;
+    background-color: #c46a1a;
+    border: 1px solid #a85b16;
+}
+
+.status-role-error {
+    color: #fff1f0;
+    background-color: #b42318;
+    border: 1px solid #911b14;
+}
+
+.status-go {
+    color: #07263a;
+    background-color: #9cd2f7;
+    border: 1px solid #4b9fd8;
+}

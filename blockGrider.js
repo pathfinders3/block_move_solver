@@ -865,16 +865,12 @@ function countWhitePixels(ctx, x, y, size) {
         let roleActionDisplayTimer = null;
         let goMetaDisplayTimer = null;
 
-        function showTempMessage({ elementId, text, style = {}, duration = 2000, previousTimerId = null, onClear = null }) {
+        function showTempMessage({ elementId, text, className = '', previousTimerId = null, onClear = null }) {
             const display = document.getElementById(elementId);
             if (!display) return previousTimerId;
 
             display.textContent = text;
-            Object.assign(display.style, style);
-
-            if (!('display' in style) && !('visibility' in style)) {
-                display.style.display = 'inline-block';
-            }
+            display.className = `status-message ${className}`.trim();
 
             if (previousTimerId !== null) {
                 clearTimeout(previousTimerId);
@@ -885,12 +881,7 @@ function countWhitePixels(ctx, x, y, size) {
                     onClear(display);
                 } else {
                     display.textContent = '';
-                    Object.keys(style).forEach((property) => {
-                        display.style[property] = '';
-                    });
-                    if (!('visibility' in style)) {
-                        display.style.display = '';
-                    }
+                    display.className = '';
                 }
 
                 if (elementId === 'mergeStateDisplay') {
@@ -900,7 +891,7 @@ function countWhitePixels(ctx, x, y, size) {
                 } else if (elementId === 'goMetaDisplay') {
                     goMetaDisplayTimer = null;
                 }
-            }, duration);
+            }, 3000);
 
             return timerId;
         }
@@ -915,14 +906,7 @@ function countWhitePixels(ctx, x, y, size) {
             mergeStateDisplayTimer = showTempMessage({
                 elementId: 'mergeStateDisplay',
                 text: `[${triggerKey}] ${badge} | mergeState: ${mergeLabel} | size: ${rect.size}x${rect.size}`,
-                style: {
-                    color: isMerged ? '#062b20' : '#3f2f00',
-                    background: isMerged ? '#7de1ff' : '#ffd98a',
-                    border: isMerged ? '1px solid #24a6cc' : '1px solid #c28a00',
-                    borderRadius: '4px',
-                    padding: '2px 8px'
-                },
-                duration: 3000,
+                className: isMerged ? 'status-merged' : 'status-unmerged',
                 previousTimerId: mergeStateDisplayTimer
             });
         }
@@ -930,15 +914,14 @@ function countWhitePixels(ctx, x, y, size) {
         function showRoleActionMessage(role, index, startIndex = null) {
             const isEnd = (role === 'end' && startIndex !== null);
             const text = isEnd ? `✅ End 지정: [${index + 1}] (Start: [${startIndex + 1}])` : `✅ Start 지정: [${index + 1}]`;
-            const style = isEnd
+            const styleOverrides = isEnd
                 ? { color: '#fff4d6', background: '#c46a1a', border: '1px solid #a85b16' }
                 : { color: '#0d2d16', background: '#7ee4a0', border: '1px solid #55b678' };
 
             roleActionDisplayTimer = showTempMessage({
                 elementId: 'roleActionDisplay',
                 text,
-                style: { ...style, borderRadius: '4px', padding: '2px 8px' },
-                duration: 2000,
+                className: isEnd ? 'status-role-end' : 'status-role-start',
                 previousTimerId: roleActionDisplayTimer
             });
         }
@@ -947,14 +930,7 @@ function countWhitePixels(ctx, x, y, size) {
             roleActionDisplayTimer = showTempMessage({
                 elementId: 'roleActionDisplay',
                 text: `❌ ${message}`,
-                style: {
-                    color: '#fff1f0',
-                    background: '#b42318',
-                    border: '1px solid #911b14',
-                    borderRadius: '4px',
-                    padding: '2px 8px'
-                },
-                duration: 2000,
+                className: 'status-role-error',
                 previousTimerId: roleActionDisplayTimer
             });
         }
@@ -968,23 +944,8 @@ function countWhitePixels(ctx, x, y, size) {
             goMetaDisplayTimer = showTempMessage({
                 elementId: 'goMetaDisplay',
                 text: `[Go ${index + 1}/${yellowRects.length}] ${mergeLabel} | role: ${roleLabel} | size: ${rect.size}x${rect.size}`,
-                style: {
-                    color: '#07263a',
-                    background: '#9cd2f7',
-                    border: '1px solid #4b9fd8',
-                    borderRadius: '4px',
-                    padding: '2px 8px',
-                    visibility: 'visible'
-                },
-                duration: 3000,
-                previousTimerId: goMetaDisplayTimer,
-                onClear: (display) => {
-                    display.textContent = '';
-                    display.style.background = '';
-                    display.style.border = '';
-                    display.style.padding = '';
-                    display.style.visibility = 'hidden';
-                }
+                className: 'status-go',
+                previousTimerId: goMetaDisplayTimer
             });
         }
 
