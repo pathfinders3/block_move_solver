@@ -913,7 +913,7 @@ function countWhitePixels(ctx, x, y, size) {
                 } else if (elementId === 'goMetaDisplay') {
                     goMetaDisplayTimer = null;
                 }
-            }, 3000);
+            }, 4000);
 
             return timerId;
         }
@@ -2461,8 +2461,8 @@ function countWhitePixels(ctx, x, y, size) {
             const summary = matchedRects.map((rect, idx) => {
                 const mergeLabel = rect.mergeState ? '✙MERGED' : 'NOT MERGED';
                 const roleLabel = normalizeRole(rect.role).toUpperCase();
-                return `${idx + 1}. [${matchedIndices[idx] + 1}/${yellowRects.length}] ${mergeLabel} | ${roleLabel} | size: ${rect.size}x${rect.size}`;
-            }).join('  ||  ');
+                return `[${matchedIndices[idx] + 1}/${yellowRects.length}] ${mergeLabel} | ${roleLabel} | ${rect.size}x${rect.size}`;
+            }).join('  ┋  ');
 
             goMetaDisplayTimer = showTempMessage({
                 elementId: 'goMetaDisplay',
