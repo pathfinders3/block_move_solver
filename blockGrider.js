@@ -2342,6 +2342,21 @@ function countWhitePixels(ctx, x, y, size) {
             const ox = Math.floor(cx / scale);
             const oy = Math.floor(cy / scale);
             selectedPixel = { x: ox, y: oy };
+
+            // 클릭된 위치에 해당하는 yellowRect 찾기 및 Go 동작
+            const targetYellowIndex = findYellowRectIndexByPoint(ox, oy);
+            const clickMode = document.getElementById('yellowClickMode')?.value || 'closest';
+            if (targetYellowIndex !== -1) {
+                goToYellowRect(targetYellowIndex);
+            } else if (clickMode === 'inside') {
+                goMetaDisplayTimer = showTempMessage({
+                    elementId: 'goMetaDisplay',
+                    text: '[Go] 포함된 노란 점이 없습니다.',
+                    className: 'status-go',
+                    previousTimerId: goMetaDisplayTimer
+                });
+            }
+
             // 색상 구하기 (canvas1 기준)
             let rgbText = '';
             let r=0,g=0,b=0;
@@ -2380,6 +2395,81 @@ function countWhitePixels(ctx, x, y, size) {
             // 캔버스2 다시 그림 (사각형 오버레이 위해)
             scaleCanvas();
         });
+
+        function findClosestYellowRectIndex(x, y) {
+            if (yellowRects.length === 0) return -1;
+            let closestIndex = -1;
+            let bestDistSq = Number.POSITIVE_INFINITY;
+            for (let i = 0; i < yellowRects.length; i++) {
+                const rect = yellowRects[i];
+                const cx = rect.x + rect.size / 2;
+                const cy = rect.y + rect.size / 2;
+                const dx = x - cx;
+                const dy = y - cy;
+                const d2 = dx * dx + dy * dy;
+                if (d2 < bestDistSq) {
+                    bestDistSq = d2;
+                    closestIndex = i;
+                }
+            }
+            return closestIndex;
+        }
+
+        function findYellowRectIndexByPoint(x, y) {
+            const insideIndex = yellowRects.findIndex(rect =>
+                x >= rect.x && x < rect.x + rect.size && y >= rect.y && y < rect.y + rect.size
+            );
+
+            const modeInput = document.getElementById('yellowClickMode');
+            const mode = modeInput ? modeInput.value : 'closest';
+
+            if (mode === 'inside') {
+                return insideIndex;
+            }
+
+            if (mode === 'preferInside') {
+                return insideIndex !== -1 ? insideIndex : findClosestYellowRectIndex(x, y);
+            }
+
+            // 기본은 가장 가까운 점
+            return findClosestYellowRectIndex(x, y);
+        }
+
+        function goToYellowRect(index) {
+            if (index < 0 || index >= yellowRects.length) {
+                console.log('ℹ️ 클릭 위치에 해당하는 노란 점이 없습니다.');
+                return;
+            }
+            currentYellowIndex = index;
+            updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
+
+            const yellowRect = yellowRects[index];
+            selectedPixel = { x: yellowRect.x, y: yellowRect.y };
+
+            // rectSize 동기화
+            const rectSizeInput = document.getElementById('rectSize');
+            if (rectSizeInput) rectSizeInput.value = String(yellowRect.size);
+
+            // info 표시
+            const coordDisp = document.getElementById('coordDisplay');
+            if (coordDisp) coordDisp.textContent = `${yellowRect.x}, ${yellowRect.y}`;
+            showGoMetaMessage(yellowRect, index);
+
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+
+            // END면 시작점 강조
+            if (normalizeRole(yellowRect.role) === 'end') {
+                const highlighted = highlightStartPointForGo(index, 2000);
+                if (!highlighted) {
+                    showRoleActionErrorMessage('이 END 이전에 대응 START가 없습니다.');
+                }
+            }
+
+            scaleCanvas();
+        }
 
         // scaleCanvas에 사각형 그리기 보강
         const origScaleCanvas = scaleCanvas;
