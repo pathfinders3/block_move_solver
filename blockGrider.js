@@ -659,6 +659,33 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        // F8로 새 start를 찍기 직전, 기존 마지막 점을 end로 자동 지정
+        function autoCloseLatestPointAsEndBeforeStart() {
+            if (yellowRects.length === 0) {
+                return false;
+            }
+
+            const latestIndex = yellowRects.length - 1;
+            const latestRole = normalizeRole(yellowRects[latestIndex].role);
+            if (latestRole === 'end') {
+                return false;
+            }
+
+            yellowRects[latestIndex].role = 'end';
+
+            const startIndex = findLatestStartIndexForEnd(latestIndex);
+            if (startIndex !== -1) {
+                highlightPolylineRange(startIndex, latestIndex, 3000);
+                showRoleActionMessage('end', latestIndex, startIndex);
+                console.log(`✅ 새 start 생성 전, 최근 점 [${latestIndex + 1}]을 end로 자동 지정했습니다. (start: ${startIndex + 1})`);
+            } else {
+                console.log(`ℹ️ 새 start 생성 전, 최근 점 [${latestIndex + 1}]을 end로 자동 지정했습니다.`);
+            }
+
+            refreshPolylineRangeControl();
+            return true;
+        }
+
         function setYellowRoleByIndex(index, role) {
             if (index < 0 || index >= yellowRects.length) {
                 console.log('❌ role을 지정할 유효한 노란색 인덱스가 없습니다.');
@@ -1092,6 +1119,9 @@ function countWhitePixels(ctx, x, y, size) {
                     const baseMaxPixels = rectSize * rectSize;
                     
                     if (baseWhiteCount === baseMaxPixels) {
+                        // 새 start를 찍기 전에 기존 마지막 점을 end로 자동 확정
+                        autoCloseLatestPointAsEndBeforeStart();
+
                         // F8으로 찍는 점은 start role로 저장
                         addYellowRectWithAngleCheck(selectedPixel.x, selectedPixel.y, rectSize, 'start');
                         scaleCanvas(); // 화면 갱신
