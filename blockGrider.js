@@ -865,121 +865,127 @@ function countWhitePixels(ctx, x, y, size) {
         let roleActionDisplayTimer = null;
         let goMetaDisplayTimer = null;
 
+        function showTempMessage({ elementId, text, style = {}, duration = 2000, previousTimerId = null, onClear = null }) {
+            const display = document.getElementById(elementId);
+            if (!display) return previousTimerId;
+
+            display.textContent = text;
+            Object.assign(display.style, style);
+
+            if (!('display' in style) && !('visibility' in style)) {
+                display.style.display = 'inline-block';
+            }
+
+            if (previousTimerId !== null) {
+                clearTimeout(previousTimerId);
+            }
+
+            const timerId = setTimeout(() => {
+                if (typeof onClear === 'function') {
+                    onClear(display);
+                } else {
+                    display.textContent = '';
+                    Object.keys(style).forEach((property) => {
+                        display.style[property] = '';
+                    });
+                    if (!('visibility' in style)) {
+                        display.style.display = '';
+                    }
+                }
+
+                if (elementId === 'mergeStateDisplay') {
+                    mergeStateDisplayTimer = null;
+                } else if (elementId === 'roleActionDisplay') {
+                    roleActionDisplayTimer = null;
+                } else if (elementId === 'goMetaDisplay') {
+                    goMetaDisplayTimer = null;
+                }
+            }, duration);
+
+            return timerId;
+        }
+
         function showMergeStateMessage(triggerKey, rect) {
-            const display = document.getElementById('mergeStateDisplay');
-            if (!display || !rect) return;
+            if (!rect) return;
 
             const isMerged = !!rect.mergeState;
             const mergeLabel = isMerged ? 'TRUE' : 'FALSE';
             const badge = isMerged ? 'MERGED' : 'NOT MERGED';
-            display.textContent = `[${triggerKey}] ${badge} | mergeState: ${mergeLabel} | size: ${rect.size}x${rect.size}`;
-            display.style.color = isMerged ? '#062b20' : '#3f2f00';
-            display.style.background = isMerged ? '#7de1ff' : '#ffd98a';
-            display.style.border = isMerged ? '1px solid #24a6cc' : '1px solid #c28a00';
-            display.style.borderRadius = '4px';
-            display.style.padding = '2px 8px';
-            display.style.display = 'inline-block';
 
-            if (mergeStateDisplayTimer !== null) {
-                clearTimeout(mergeStateDisplayTimer);
-            }
-
-            mergeStateDisplayTimer = setTimeout(() => {
-                display.textContent = '';
-                display.style.background = '';
-                display.style.border = '';
-                display.style.padding = '';
-                display.style.display = '';
-                mergeStateDisplayTimer = null;
-            }, 3000);
+            mergeStateDisplayTimer = showTempMessage({
+                elementId: 'mergeStateDisplay',
+                text: `[${triggerKey}] ${badge} | mergeState: ${mergeLabel} | size: ${rect.size}x${rect.size}`,
+                style: {
+                    color: isMerged ? '#062b20' : '#3f2f00',
+                    background: isMerged ? '#7de1ff' : '#ffd98a',
+                    border: isMerged ? '1px solid #24a6cc' : '1px solid #c28a00',
+                    borderRadius: '4px',
+                    padding: '2px 8px'
+                },
+                duration: 3000,
+                previousTimerId: mergeStateDisplayTimer
+            });
         }
 
         function showRoleActionMessage(role, index, startIndex = null) {
-            const display = document.getElementById('roleActionDisplay');
-            if (!display) return;
+            const isEnd = (role === 'end' && startIndex !== null);
+            const text = isEnd ? `✅ End 지정: [${index + 1}] (Start: [${startIndex + 1}])` : `✅ Start 지정: [${index + 1}]`;
+            const style = isEnd
+                ? { color: '#fff4d6', background: '#c46a1a', border: '1px solid #a85b16' }
+                : { color: '#0d2d16', background: '#7ee4a0', border: '1px solid #55b678' };
 
-            if (role === 'end' && startIndex !== null) {
-                display.textContent = `✅ End 지정: [${index + 1}] (Start: [${startIndex + 1}])`;
-                display.style.color = '#fff4d6';
-                display.style.background = '#c46a1a';
-                display.style.border = '1px solid #a85b16';
-            } else {
-                display.textContent = `✅ Start 지정: [${index + 1}]`;
-                display.style.color = '#0d2d16';
-                display.style.background = '#7ee4a0';
-                display.style.border = '1px solid #55b678';
-            }
-
-            display.style.borderRadius = '4px';
-            display.style.padding = '2px 8px';
-            display.style.display = 'inline-block';
-
-            if (roleActionDisplayTimer !== null) {
-                clearTimeout(roleActionDisplayTimer);
-            }
-
-            roleActionDisplayTimer = setTimeout(() => {
-                display.textContent = '';
-                display.style.background = '';
-                display.style.border = '';
-                display.style.padding = '';
-                display.style.display = '';
-                roleActionDisplayTimer = null;
-            }, 2000);
+            roleActionDisplayTimer = showTempMessage({
+                elementId: 'roleActionDisplay',
+                text,
+                style: { ...style, borderRadius: '4px', padding: '2px 8px' },
+                duration: 2000,
+                previousTimerId: roleActionDisplayTimer
+            });
         }
 
         function showRoleActionErrorMessage(message) {
-            const display = document.getElementById('roleActionDisplay');
-            if (!display) return;
-
-            display.textContent = `❌ ${message}`;
-            display.style.color = '#fff1f0';
-            display.style.background = '#b42318';
-            display.style.border = '1px solid #911b14';
-            display.style.borderRadius = '4px';
-            display.style.padding = '2px 8px';
-            display.style.display = 'inline-block';
-
-            if (roleActionDisplayTimer !== null) {
-                clearTimeout(roleActionDisplayTimer);
-            }
-
-            roleActionDisplayTimer = setTimeout(() => {
-                display.textContent = '';
-                display.style.background = '';
-                display.style.border = '';
-                display.style.padding = '';
-                display.style.display = '';
-                roleActionDisplayTimer = null;
-            }, 2000);
+            roleActionDisplayTimer = showTempMessage({
+                elementId: 'roleActionDisplay',
+                text: `❌ ${message}`,
+                style: {
+                    color: '#fff1f0',
+                    background: '#b42318',
+                    border: '1px solid #911b14',
+                    borderRadius: '4px',
+                    padding: '2px 8px'
+                },
+                duration: 2000,
+                previousTimerId: roleActionDisplayTimer
+            });
         }
 
         function showGoMetaMessage(rect, index) {
-            const display = document.getElementById('goMetaDisplay');
-            if (!display || !rect) return;
+            if (!rect) return;
 
             const mergeLabel = rect.mergeState ? 'MERGED' : 'NOT MERGED';
             const roleLabel = normalizeRole(rect.role).toUpperCase();
-            display.textContent = `[Go ${index + 1}/${yellowRects.length}] ${mergeLabel} | role: ${roleLabel} | size: ${rect.size}x${rect.size}`;
-            display.style.color = '#07263a';
-            display.style.background = '#9cd2f7';
-            display.style.border = '1px solid #4b9fd8';
-            display.style.borderRadius = '4px';
-            display.style.padding = '2px 8px';
-            display.style.visibility = 'visible';
 
-            if (goMetaDisplayTimer !== null) {
-                clearTimeout(goMetaDisplayTimer);
-            }
-
-            goMetaDisplayTimer = setTimeout(() => {
-                display.textContent = '';
-                display.style.background = '';
-                display.style.border = '';
-                display.style.padding = '';
-                display.style.visibility = 'hidden';
-                goMetaDisplayTimer = null;
-            }, 3000);
+            goMetaDisplayTimer = showTempMessage({
+                elementId: 'goMetaDisplay',
+                text: `[Go ${index + 1}/${yellowRects.length}] ${mergeLabel} | role: ${roleLabel} | size: ${rect.size}x${rect.size}`,
+                style: {
+                    color: '#07263a',
+                    background: '#9cd2f7',
+                    border: '1px solid #4b9fd8',
+                    borderRadius: '4px',
+                    padding: '2px 8px',
+                    visibility: 'visible'
+                },
+                duration: 3000,
+                previousTimerId: goMetaDisplayTimer,
+                onClear: (display) => {
+                    display.textContent = '';
+                    display.style.background = '';
+                    display.style.border = '';
+                    display.style.padding = '';
+                    display.style.visibility = 'hidden';
+                }
+            });
         }
 
         // 임시 노란색 사각형을 확정(F9 동작)하는 공통 함수
