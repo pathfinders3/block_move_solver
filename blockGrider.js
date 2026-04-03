@@ -1173,18 +1173,33 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         function showRectPixelStats(message) {
-            const statsDisplay = document.getElementById('rectStatsDisplay');
-            if (!statsDisplay) return;
-            statsDisplay.textContent = message;
+            roleActionDisplayTimer = showTempMessage({
+                elementId: 'roleActionDisplay',
+                text: message,
+                className: 'status-go',
+                previousTimerId: roleActionDisplayTimer
+            });
         }
 
         function computeSelectedRectPixelStats() {
-            if (currentYellowIndex === -1 || yellowRects.length === 0) {
-                showRectPixelStats('❌ 선택된 노란색 사각형이 없습니다.');
+            let rect = null;
+
+            if (currentYellowIndex !== -1 && yellowRects.length > 0) {
+                rect = yellowRects[currentYellowIndex];
+            } else if (selectedPixel) {
+                const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
+                rect = {
+                    x: selectedPixel.x,
+                    y: selectedPixel.y,
+                    size: rectSize
+                };
+            }
+
+            if (!rect) {
+                showRectPixelStats('❌ 선택된 노란색 사각형 또는 위치가 없습니다.');
                 return;
             }
 
-            const rect = yellowRects[currentYellowIndex];
             const x0 = Math.max(0, rect.x);
             const y0 = Math.max(0, rect.y);
             const x1 = Math.min(currentCanvasWidth, rect.x + rect.size);
