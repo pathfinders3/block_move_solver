@@ -1031,11 +1031,11 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             const fixedWidth = Math.ceil(autoF9Button.getBoundingClientRect().width);
-            autoF9Button.textContent = 'XXXX';
+            autoF9Button.textContent = 'NO RECT';
 
             autoF9Button.setAttribute(
                 'style',
-                `${autoF9Button.dataset.baseStyle}; width:${fixedWidth}px; background:#d9534f; border:1px solid #c9302c;`
+                `${autoF9Button.dataset.baseStyle}; width:${fixedWidth}px; background:#d9534f; border:3px solid #ffdc00; box-shadow: 0 0 4px 2px rgba(255,220,0,0.8); color:white; font-weight:bold;`
             );
 
             if (autoF9ErrorFlashTimer !== null) {
