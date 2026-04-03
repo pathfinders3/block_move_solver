@@ -547,10 +547,60 @@ function countWhitePixels(ctx, x, y, size) {
             return 'middle';
         }
 
+        function isValidPolylineId(polylineId) {
+            return typeof polylineId === 'string' && polylineId.trim().length > 0;
+        }
+
+        function createPolylineId() {
+            const nextId = `PL${polylineIdSeq}`;
+            polylineIdSeq += 1;
+            return nextId;
+        }
+
+        function ensureActivePolylineId() {
+            if (!isValidPolylineId(activePolylineId)) {
+                activePolylineId = createPolylineId();
+            }
+            return activePolylineId;
+        }
+
+        function getNextPointOrder(polylineId) {
+            let count = 0;
+            for (let i = 0; i < yellowRects.length; i++) {
+                if (yellowRects[i].polylineId === polylineId) {
+                    count += 1;
+                }
+            }
+            return count + 1;
+        }
+
+        function parseAddRectOptions(roleOrOptions = 'middle', polylineIdArg = null) {
+            let role = 'middle';
+            let polylineId = null;
+
+            if (typeof roleOrOptions === 'string') {
+                role = normalizeRole(roleOrOptions);
+            } else if (roleOrOptions && typeof roleOrOptions === 'object') {
+                role = normalizeRole(roleOrOptions.role);
+                if (isValidPolylineId(roleOrOptions.polylineId)) {
+                    polylineId = roleOrOptions.polylineId;
+                }
+            }
+
+            if (isValidPolylineId(polylineIdArg)) {
+                polylineId = polylineIdArg;
+            }
+
+            return { role, polylineId };
+        }
+
         // 노란색 사각형을 yellowRects 배열에 추가하고 각도 검사 수행
         // role 기본값은 middle이며, F8에서 start를 전달할 수 있음
-        function addYellowRectWithAngleCheck(x, y, size, role = 'middle') {
-            role = normalizeRole(role);
+        function addYellowRectWithAngleCheck(x, y, size, roleOrOptions = 'middle', polylineIdArg = null) {
+            const options = parseAddRectOptions(roleOrOptions, polylineIdArg);
+            const role = options.role;
+            const assignedPolylineId = options.polylineId || ensureActivePolylineId();
+            const pointOrder = getNextPointOrder(assignedPolylineId);
             // 이전 사각형으로부터의 각도 계산
             let angle = null;
             let angleExceeded = false;
@@ -623,8 +673,12 @@ function countWhitePixels(ctx, x, y, size) {
                 angleDiff: angleDiffValue,
                 expectedAngle: expectedAngle,
                 mergeState: mergeState,
-                role: role
+                role: role,
+                polylineId: assignedPolylineId,
+                pointOrder: pointOrder
             });
+
+            activePolylineId = assignedPolylineId;
 
             if (mergeState && overlappingIndices.length > 0) {
                 overlappingIndices.forEach(index => {
@@ -641,6 +695,7 @@ function countWhitePixels(ctx, x, y, size) {
             currentYellowIndex = yellowRects.length - 1;
             updateYellowIndexDisplay();
             updateYellowAngleDisplay();
+            refreshPolylineRangeControl();
         }
 
         // 최근 middle 사각형을 end로 변경
@@ -665,6 +720,9 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             yellowRects[latestMiddleIndex].role = 'end';
+            if (yellowRects[latestMiddleIndex].polylineId === activePolylineId) {
+                activePolylineId = null;
+            }
             console.log(`✅ 최근 middle 사각형(index: ${latestMiddleIndex})을 end로 지정했습니다.`);
 
             const startIndex = findLatestStartIndexForEnd(latestMiddleIndex);
@@ -694,6 +752,9 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             yellowRects[latestIndex].role = 'end';
+            if (yellowRects[latestIndex].polylineId === activePolylineId) {
+                activePolylineId = null;
+            }
 
             const startIndex = findLatestStartIndexForEnd(latestIndex);
             if (startIndex !== -1) {
@@ -734,6 +795,9 @@ function countWhitePixels(ctx, x, y, size) {
                 }
 
                 targetRect.role = 'end';
+                if (targetRect.polylineId === activePolylineId) {
+                    activePolylineId = null;
+                }
                 currentYellowIndex = index;
                 updateYellowIndexDisplay();
                 updateYellowAngleDisplay();
@@ -742,6 +806,10 @@ function countWhitePixels(ctx, x, y, size) {
                 console.log(`✅ 인덱스 [${index + 1}]를 end로 지정했습니다. (start: ${startIndex + 1})`);
             } else {
                 targetRect.role = normalizedRole;
+                if (normalizedRole === 'start' && !isValidPolylineId(targetRect.polylineId)) {
+                    targetRect.polylineId = createPolylineId();
+                    targetRect.pointOrder = 1;
+                }
                 currentYellowIndex = index;
                 updateYellowIndexDisplay();
                 updateYellowAngleDisplay();
@@ -753,6 +821,7 @@ function countWhitePixels(ctx, x, y, size) {
                 updateCornerAndPathInfo();
             }
 
+            refreshPolylineRangeControl();
             scaleCanvas();
             return true;
         }
@@ -1125,6 +1194,13 @@ function countWhitePixels(ctx, x, y, size) {
 
             updateYellowIndexDisplay();
             updateYellowAngleDisplay();
+            if (yellowRects.length === 0) {
+                activePolylineId = null;
+            } else {
+                const lastRect = yellowRects[yellowRects.length - 1];
+                activePolylineId = normalizeRole(lastRect.role) === 'end' ? null : (lastRect.polylineId || null);
+            }
+            refreshPolylineRangeControl();
 
             if (showCorners && selectedPixel) {
                 updateCornerAndPathInfo();
@@ -1165,9 +1241,16 @@ function countWhitePixels(ctx, x, y, size) {
             yellowRects = cloneYellowRectsState(prev.yellowRects);
             currentYellowIndex = prev.currentYellowIndex;
             selectedPixel = prev.selectedPixel ? { ...prev.selectedPixel } : selectedPixel;
+            if (yellowRects.length === 0) {
+                activePolylineId = null;
+            } else {
+                const lastRect = yellowRects[yellowRects.length - 1];
+                activePolylineId = normalizeRole(lastRect.role) === 'end' ? null : (lastRect.polylineId || null);
+            }
 
             updateYellowIndexDisplay();
             updateYellowAngleDisplay();
+            refreshPolylineRangeControl();
 
             if (showCorners && selectedPixel) {
                 updateCornerAndPathInfo();
@@ -1328,7 +1411,12 @@ function countWhitePixels(ctx, x, y, size) {
                         autoCloseLatestPointAsEndBeforeStart();
 
                         // F8으로 찍는 점은 start role로 저장
-                        addYellowRectWithAngleCheck(selectedPixel.x, selectedPixel.y, rectSize, 'start');
+                        const nextPolylineId = createPolylineId();
+                        activePolylineId = nextPolylineId;
+                        addYellowRectWithAngleCheck(selectedPixel.x, selectedPixel.y, rectSize, {
+                            role: 'start',
+                            polylineId: nextPolylineId
+                        });
                         scaleCanvas(); // 화면 갱신
                     } else {
                         console.log(`❌ 사각형이 모두 흰색이 아닙니다. (흰색: ${baseWhiteCount}/${baseMaxPixels})`);
@@ -1521,6 +1609,8 @@ function countWhitePixels(ctx, x, y, size) {
         let tempYellowRect = null; // {x: number, y: number, size: number} | null
         // F9: 확정된 노란색 사각형들을 저장하는 배열
         let yellowRects = []; // {x: number, y: number, size: number, role?: 'start'|'middle'|'end'}[]
+        let polylineIdSeq = 1;
+        let activePolylineId = null;
         let currentYellowIndex = -1; // 현재 선택된 노란색 사각형 인덱스 (-1은 선택 안 됨)
         let polylineHighlightRange = null; // 3초 하이라이트용 {startIndex:number, endIndex:number} | null
         let polylineHighlightTimer = null;
@@ -2352,7 +2442,7 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         // role(start~end) 기준으로 폴리라인 메타데이터 생성
-        function buildPolylineMetadata(rects) {
+        function buildPolylineMetadataByRole(rects) {
             const polylines = [];
             let startIndex = null;
             let polylineCounter = 1;
@@ -2388,11 +2478,53 @@ function countWhitePixels(ctx, x, y, size) {
             return polylines;
         }
 
+        function buildPolylineMetadata(rects) {
+            if (!Array.isArray(rects) || rects.length === 0) return [];
+
+            const hasPolylineId = rects.some(rect => isValidPolylineId(rect.polylineId));
+            if (!hasPolylineId) {
+                return buildPolylineMetadataByRole(rects);
+            }
+
+            const byId = new Map();
+            for (let i = 0; i < rects.length; i++) {
+                const rect = rects[i] || {};
+                if (!isValidPolylineId(rect.polylineId)) continue;
+
+                const id = rect.polylineId;
+                if (!byId.has(id)) {
+                    byId.set(id, {
+                        polylineId: id,
+                        startIndex: i,
+                        endIndex: i,
+                        pointIndices: [i]
+                    });
+                    continue;
+                }
+
+                const item = byId.get(id);
+                item.pointIndices.push(i);
+                if (i < item.startIndex) item.startIndex = i;
+                if (i > item.endIndex) item.endIndex = i;
+            }
+
+            return Array.from(byId.values())
+                .sort((a, b) => a.startIndex - b.startIndex)
+                .map(item => ({
+                    polylineId: item.polylineId,
+                    startIndex: item.startIndex,
+                    endIndex: item.endIndex,
+                    pointCount: item.pointIndices.length,
+                    pointIndices: item.pointIndices.slice()
+                }));
+        }
+
         function getCurrentPolylinesFromYellowRects() {
-            const roleOnlyRects = yellowRects.map(rect => ({
-                role: normalizeRole(rect.role)
+            const polylineAwareRects = yellowRects.map(rect => ({
+                role: normalizeRole(rect.role),
+                polylineId: rect.polylineId
             }));
-            return buildPolylineMetadata(roleOnlyRects);
+            return buildPolylineMetadata(polylineAwareRects);
         }
 
         function updatePolylineRangeDisplay(polylines) {
@@ -2481,7 +2613,7 @@ function countWhitePixels(ctx, x, y, size) {
             const polylines = getCurrentPolylinesFromYellowRects();
             for (let i = 0; i < polylines.length; i++) {
                 const range = polylines[i];
-                if (index >= range.startIndex && index <= range.endIndex) {
+                if (Array.isArray(range.pointIndices) && range.pointIndices.includes(index)) {
                     return range;
                 }
             }
@@ -2565,15 +2697,29 @@ function countWhitePixels(ctx, x, y, size) {
                 })
             );
 
-            const rectsForCopy = yellowRects.map((rect, idx) => ({
-                x: rect.x,
-                y: rect.y,
-                size: rect.size,
-                angle: rect.angle,
-                sharpTurn: !!rect.angleExceeded,
-                mergeState: !!mergeStates[idx],
-                role: normalizeRole(rect.role)
-            }));
+            const exportPointOrderMap = new Map();
+            const rectsForCopy = yellowRects.map((rect, idx) => {
+                const polylineId = isValidPolylineId(rect.polylineId) ? rect.polylineId : null;
+                let pointOrder = null;
+
+                if (polylineId) {
+                    const nextOrder = (exportPointOrderMap.get(polylineId) || 0) + 1;
+                    exportPointOrderMap.set(polylineId, nextOrder);
+                    pointOrder = nextOrder;
+                }
+
+                return {
+                    x: rect.x,
+                    y: rect.y,
+                    size: rect.size,
+                    angle: rect.angle,
+                    sharpTurn: !!rect.angleExceeded,
+                    mergeState: !!mergeStates[idx],
+                    role: normalizeRole(rect.role),
+                    polylineId,
+                    pointOrder
+                };
+            });
 
             const polylinesForCopy = buildPolylineMetadata(rectsForCopy);
 
