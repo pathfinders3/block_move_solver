@@ -459,8 +459,14 @@ function countWhitePixels(ctx, x, y, size) {
                                 const offsetX = (canvasWidth - scaledWidth) / 2;
                                 const offsetY = (canvasHeight - scaledHeight) / 2;
                                 
+                                // 빈 영역을 검은색으로 채움
+                                ctx1.fillStyle = 'black';
+                                ctx1.fillRect(0, 0, canvasWidth, canvasHeight);
+                                
+                                // 이미지를 현재 캔버스 크기에 맞춰서 그리기 (비율 유지)
                                 ctx1.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
                                 console.log('클립보드에서 이미지를 가져왔습니다.');
+                                scaleCanvas();
                             };
                             
                             img.src = URL.createObjectURL(blob);
