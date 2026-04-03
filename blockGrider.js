@@ -1094,8 +1094,59 @@ function countWhitePixels(ctx, x, y, size) {
             return confirmed;
         }
         
-        // F2, F4, F8, F9, F10, F11, IJKL 키 이벤트 리스너
+        function deleteYellowRectsFromCurrentToEnd(triggerLabel = 'Del 버튼') {
+            if (currentYellowIndex === -1 || yellowRects.length === 0) {
+                console.log('❌ 삭제할 노란색 사각형이 선택되지 않았습니다.');
+                return false;
+            }
+
+            const deleteStart = currentYellowIndex;
+            const deleteCount = yellowRects.length - deleteStart;
+
+            if (deleteCount <= 0) {
+                console.log('ℹ️ 선택된 사각형 뒤에 삭제할 항목이 없습니다.');
+                return false;
+            }
+
+            yellowRects.splice(deleteStart, deleteCount);
+
+            // 삭제 후 현재 인덱스가 범위를 벗어나지 않도록 보정
+            if (currentYellowIndex >= yellowRects.length) {
+                currentYellowIndex = yellowRects.length - 1;
+            }
+
+            updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
+
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+
+            console.log(`✅ [${triggerLabel}] 노란색 사각형 ${deleteCount}개 삭제됨 (선택 인덱스 이후).`);
+            scaleCanvas();
+            return true;
+        }
+
+        // F2, F4, F8, F9, F10, F11, DEL, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
+            const activeElement = document.activeElement;
+            const isTypingTarget = !!(
+                activeElement &&
+                (
+                    activeElement.tagName === 'INPUT' ||
+                    activeElement.tagName === 'TEXTAREA' ||
+                    activeElement.tagName === 'SELECT' ||
+                    activeElement.isContentEditable
+                )
+            );
+
+            if (e.key === 'Delete' && !isTypingTarget) {
+                const deleted = deleteYellowRectsFromCurrentToEnd('DEL 키');
+                if (deleted) {
+                    e.preventDefault();
+                }
+            }
+
             if (e.key === 'F2') {
                 e.preventDefault();
                 scaleCanvas();
@@ -2004,35 +2055,7 @@ function countWhitePixels(ctx, x, y, size) {
 
         // Del 버튼: 현재 선택된 인덱스 이하 사각형들을 모두 삭제
         document.getElementById('btnDelAfterYellow').addEventListener('click', () => {
-            if (currentYellowIndex === -1 || yellowRects.length === 0) {
-                console.log('❌ 삭제할 노란색 사각형이 선택되지 않았습니다.');
-                return;
-            }
-
-            const deleteStart = currentYellowIndex;
-            const deleteCount = yellowRects.length - deleteStart;
-
-            if (deleteCount <= 0) {
-                console.log('ℹ️ 선택된 사각형 뒤에 삭제할 항목이 없습니다.');
-                return;
-            }
-
-            yellowRects.splice(deleteStart, deleteCount);
-
-            // 삭제 후 현재 인덱스가 범위를 벗어나지 않도록 보정
-            if (currentYellowIndex >= yellowRects.length) {
-                currentYellowIndex = yellowRects.length - 1;
-            }
-
-            updateYellowIndexDisplay();
-            updateYellowAngleDisplay();
-
-            if (showCorners && selectedPixel) {
-                updateCornerAndPathInfo();
-            }
-
-            console.log(`✅ 노란색 사각형 ${deleteCount}개 삭제됨 (선택 인덱스 이후).`);
-            scaleCanvas();
+            deleteYellowRectsFromCurrentToEnd('Del 버튼');
         });
 
         // Jmp 버튼: 현재 인덱스 이후에서 첫 급격 꺾임 지점으로 이동
