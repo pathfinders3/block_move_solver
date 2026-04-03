@@ -1172,6 +1172,30 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        function adjustCornerSize(delta) {
+            const cornerSizeInput = document.getElementById('cornerSize');
+            if (!cornerSizeInput) return;
+
+            const minValue = Number.isFinite(parseInt(cornerSizeInput.min, 10)) ? parseInt(cornerSizeInput.min, 10) : 1;
+            const maxValue = Number.isFinite(parseInt(cornerSizeInput.max, 10)) ? parseInt(cornerSizeInput.max, 10) : 32;
+            const currentValue = parseInt(cornerSizeInput.value, 10) || minValue;
+            let nextValue = currentValue + delta;
+
+            if (nextValue < minValue) nextValue = minValue;
+            if (nextValue > maxValue) nextValue = maxValue;
+
+            if (nextValue === currentValue) return;
+
+            cornerSizeInput.value = String(nextValue);
+            console.log(`🎚️ 귀퉁이 크기 조정: ${currentValue} → ${nextValue}`);
+
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+
+            scaleCanvas();
+        }
+
         // F2, F4, F8, F9, F10, F11, DEL, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             const activeElement = document.activeElement;
@@ -1203,6 +1227,16 @@ function countWhitePixels(ctx, x, y, size) {
                 if (deleted) {
                     e.preventDefault();
                 }
+            }
+
+            if (!isTypingTarget && (e.key === '[' || e.key === '{')) {
+                adjustCornerSize(-1);
+                e.preventDefault();
+            }
+
+            if (!isTypingTarget && (e.key === ']' || e.key === '}')) {
+                adjustCornerSize(1);
+                e.preventDefault();
             }
 
             if (e.key === 'F2') {
