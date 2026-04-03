@@ -1182,23 +1182,17 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         function computeSelectedRectPixelStats() {
-            let rect = null;
-
-            if (currentYellowIndex !== -1 && yellowRects.length > 0) {
-                rect = yellowRects[currentYellowIndex];
-            } else if (selectedPixel) {
-                const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
-                rect = {
-                    x: selectedPixel.x,
-                    y: selectedPixel.y,
-                    size: rectSize
-                };
-            }
-
-            if (!rect) {
-                showRectPixelStats('❌ 선택된 노란색 사각형 또는 위치가 없습니다.');
+            if (!selectedPixel) {
+                showRectPixelStats('❌ 마우스로 선택된 위치가 없습니다.');
                 return;
             }
+
+            const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
+            const rect = {
+                x: selectedPixel.x,
+                y: selectedPixel.y,
+                size: rectSize
+            };
 
             const x0 = Math.max(0, rect.x);
             const y0 = Math.max(0, rect.y);
