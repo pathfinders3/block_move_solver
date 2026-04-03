@@ -1899,6 +1899,38 @@ function countWhitePixels(ctx, x, y, size) {
             updateYellowAngleDisplay();
             scaleCanvas();
         });
+
+        document.getElementById('btnHighlightToStart').addEventListener('click', () => {
+            if (currentYellowIndex === -1 || yellowRects.length === 0) {
+                console.log('❌ 하이라이트할 현재 노란색 사각형이 선택되지 않았습니다.');
+                return;
+            }
+
+            const range = resolveStartToCurrentRange(currentYellowIndex);
+            if (!range) {
+                console.log('❌ 현재 점 이전에 연결 가능한 start가 없습니다.');
+                return;
+            }
+
+            highlightPolylineRange(range.startIndex, range.endIndex, 4000);
+            console.log(`🔦 현재 [${currentYellowIndex + 1}]에서 시작점 [${range.startIndex + 1}]까지 4초 하이라이트.`);
+        });
+
+        document.getElementById('btnHighlightToEnd').addEventListener('click', () => {
+            if (currentYellowIndex === -1 || yellowRects.length === 0) {
+                console.log('❌ 하이라이트할 현재 노란색 사각형이 선택되지 않았습니다.');
+                return;
+            }
+
+            const range = resolveCurrentToEndRange(currentYellowIndex);
+            if (!range) {
+                console.log('❌ 현재 점 이후에 연결 가능한 end가 없습니다.');
+                return;
+            }
+
+            highlightPolylineRange(range.startIndex, range.endIndex, 4000);
+            console.log(`🔦 현재 [${currentYellowIndex + 1}]에서 끝점 [${range.endIndex + 1}]까지 4초 하이라이트.`);
+        });
         
         // Go 버튼: 현재 선택된 노란색 사각형 위치로 이동
         document.getElementById('btnGoToYellow').addEventListener('click', () => {
@@ -2257,6 +2289,49 @@ function countWhitePixels(ctx, x, y, size) {
             return polylines[selectedIndex - 1];
         }
 
+        function findPolylineRangeContainingIndex(index) {
+            const polylines = getCurrentPolylinesFromYellowRects();
+            for (let i = 0; i < polylines.length; i++) {
+                const range = polylines[i];
+                if (index >= range.startIndex && index <= range.endIndex) {
+                    return range;
+                }
+            }
+            return null;
+        }
+
+        function resolveStartToCurrentRange(currentIndex) {
+            const containing = findPolylineRangeContainingIndex(currentIndex);
+            if (containing) {
+                return {
+                    startIndex: containing.startIndex,
+                    endIndex: currentIndex
+                };
+            }
+
+            const startIndex = findLatestStartIndexForEnd(currentIndex);
+            if (startIndex === -1) return null;
+            return { startIndex, endIndex: currentIndex };
+        }
+
+        function resolveCurrentToEndRange(currentIndex) {
+            const containing = findPolylineRangeContainingIndex(currentIndex);
+            if (containing) {
+                return {
+                    startIndex: currentIndex,
+                    endIndex: containing.endIndex
+                };
+            }
+
+            for (let i = currentIndex; i < yellowRects.length; i++) {
+                if (normalizeRole(yellowRects[i].role) === 'end') {
+                    return { startIndex: currentIndex, endIndex: i };
+                }
+            }
+
+            return null;
+        }
+
         if (polylineSelect) {
             const handlePolylineRangeSelection = () => {
                 const polylines = getCurrentPolylinesFromYellowRects();
@@ -2466,7 +2541,7 @@ function countWhitePixels(ctx, x, y, size) {
 
             goMetaDisplayTimer = showTempMessage({
                 elementId: 'goMetaDisplay',
-                text: `[Go] 포함점 ${matchedIndices.length}개: ${summary}`,
+                text: `점 ${matchedIndices.length}개: ${summary}`,
                 className: 'status-go',
                 previousTimerId: goMetaDisplayTimer
             });
