@@ -1108,6 +1108,8 @@ function countWhitePixels(ctx, x, y, size) {
                 return false;
             }
 
+            pushDeleteUndoState(triggerLabel);
+
             yellowRects.splice(deleteStart, deleteCount);
 
             // 삭제 후 현재 인덱스가 범위를 벗어나지 않도록 보정
@@ -1127,6 +1129,49 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        const deleteUndoStack = [];
+        const MAX_DELETE_UNDO_STACK = 50;
+
+        function cloneYellowRectsState(rects) {
+            return rects.map(rect => ({ ...rect }));
+        }
+
+        function pushDeleteUndoState(triggerLabel = 'Del') {
+            deleteUndoStack.push({
+                triggerLabel,
+                yellowRects: cloneYellowRectsState(yellowRects),
+                currentYellowIndex,
+                selectedPixel: selectedPixel ? { ...selectedPixel } : null
+            });
+
+            if (deleteUndoStack.length > MAX_DELETE_UNDO_STACK) {
+                deleteUndoStack.shift();
+            }
+        }
+
+        function undoLastDelete(triggerLabel = 'Ctrl+Z') {
+            if (deleteUndoStack.length === 0) {
+                console.log(`ℹ️ [${triggerLabel}] 되돌릴 삭제 이력이 없습니다.`);
+                return false;
+            }
+
+            const prev = deleteUndoStack.pop();
+            yellowRects = cloneYellowRectsState(prev.yellowRects);
+            currentYellowIndex = prev.currentYellowIndex;
+            selectedPixel = prev.selectedPixel ? { ...prev.selectedPixel } : selectedPixel;
+
+            updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
+
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+
+            console.log(`↩️ [${triggerLabel}] 삭제 되돌리기 완료 (${prev.triggerLabel}).`);
+            scaleCanvas();
+            return true;
+        }
+
         // F2, F4, F8, F9, F10, F11, DEL, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             const activeElement = document.activeElement;
@@ -1139,6 +1184,19 @@ function countWhitePixels(ctx, x, y, size) {
                     activeElement.isContentEditable
                 )
             );
+
+            const isUndoCommand =
+                (e.key === 'z' || e.key === 'Z') &&
+                (e.ctrlKey || e.metaKey) &&
+                !e.shiftKey &&
+                !e.altKey;
+
+            if (isUndoCommand && !isTypingTarget) {
+                const undone = undoLastDelete(e.metaKey ? 'Cmd+Z' : 'Ctrl+Z');
+                if (undone) {
+                    e.preventDefault();
+                }
+            }
 
             if (e.key === 'Delete' && !isTypingTarget) {
                 const deleted = deleteYellowRectsFromCurrentToEnd('DEL 키');
