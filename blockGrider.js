@@ -1172,6 +1172,59 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        function showRectPixelStats(message) {
+            const statsDisplay = document.getElementById('rectStatsDisplay');
+            if (!statsDisplay) return;
+            statsDisplay.textContent = message;
+        }
+
+        function computeSelectedRectPixelStats() {
+            if (currentYellowIndex === -1 || yellowRects.length === 0) {
+                showRectPixelStats('❌ 선택된 노란색 사각형이 없습니다.');
+                return;
+            }
+
+            const rect = yellowRects[currentYellowIndex];
+            const x0 = Math.max(0, rect.x);
+            const y0 = Math.max(0, rect.y);
+            const x1 = Math.min(currentCanvasWidth, rect.x + rect.size);
+            const y1 = Math.min(currentCanvasHeight, rect.y + rect.size);
+            const width = x1 - x0;
+            const height = y1 - y0;
+
+            if (width <= 0 || height <= 0) {
+                showRectPixelStats('❌ 선택된 사각형이 캔버스 밖입니다.');
+                return;
+            }
+
+            try {
+                const imageData = ctx1.getImageData(x0, y0, width, height);
+                const data = imageData.data;
+                let minVal = 255;
+                let maxVal = 0;
+                let sum = 0;
+                let count = 0;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const value = Math.round((r + g + b) / 3);
+
+                    minVal = Math.min(minVal, value);
+                    maxVal = Math.max(maxVal, value);
+                    sum += value;
+                    count += 1;
+                }
+
+                const avgVal = count > 0 ? (sum / count) : 0;
+                showRectPixelStats(`F1: 선택 사각형 픽셀값 min ${minVal}, max ${maxVal}, avg ${avgVal.toFixed(1)}`);
+            } catch (err) {
+                console.error('픽셀값 계산 오류:', err);
+                showRectPixelStats('❌ 픽셀값 계산 중 오류가 발생했습니다.');
+            }
+        }
+
         function adjustCornerSize(delta) {
             const cornerSizeInput = document.getElementById('cornerSize');
             if (!cornerSizeInput) return;
@@ -1220,6 +1273,11 @@ function countWhitePixels(ctx, x, y, size) {
                 if (undone) {
                     e.preventDefault();
                 }
+            }
+
+            if (!isTypingTarget && e.key === 'F1') {
+                computeSelectedRectPixelStats();
+                e.preventDefault();
             }
 
             if (e.key === 'Delete' && !isTypingTarget) {
