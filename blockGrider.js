@@ -780,19 +780,7 @@ function countWhitePixels(ctx, x, y, size) {
             const targetRect = yellowRects[index];
 
             if (normalizedRole === 'end') {
-                let startIndex = -1;
-                for (let i = index - 1; i >= 0; i--) {
-                    if (normalizeRole(yellowRects[i].role) === 'start') {
-                        startIndex = i;
-                        break;
-                    }
-                }
-
-                if (startIndex === -1) {
-                    console.log('❌ end 지정 실패: 현재 인덱스 이전에 start가 필요합니다.');
-                    showRoleActionErrorMessage('end 지정 실패: 현재 인덱스 이전에 start가 필요합니다.');
-                    return false;
-                }
+                const startIndex = findLatestStartIndexForEnd(index);
 
                 targetRect.role = 'end';
                 if (targetRect.polylineId === activePolylineId) {
@@ -801,9 +789,14 @@ function countWhitePixels(ctx, x, y, size) {
                 currentYellowIndex = index;
                 updateYellowIndexDisplay();
                 updateYellowAngleDisplay();
-                highlightPolylineRange(startIndex, index, 3000);
-                showRoleActionMessage('end', index, startIndex);
-                console.log(`✅ 인덱스 [${index + 1}]를 end로 지정했습니다. (start: ${startIndex + 1})`);
+                if (startIndex !== -1) {
+                    highlightPolylineRange(startIndex, index, 3000);
+                    showRoleActionMessage('end', index, startIndex);
+                    console.log(`✅ 인덱스 [${index + 1}]를 end로 지정했습니다. (start: ${startIndex + 1})`);
+                } else {
+                    showRoleActionMessage('end', index, null);
+                    console.log(`✅ 인덱스 [${index + 1}]를 end로 지정했습니다.`);
+                }
             } else {
                 targetRect.role = normalizedRole;
                 if (normalizedRole === 'start' && !isValidPolylineId(targetRect.polylineId)) {
@@ -845,6 +838,11 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         function findLatestStartIndexForEnd(endIndex) {
+            const containing = findPolylineRangeContainingIndex(endIndex);
+            if (containing && Number.isFinite(containing.startIndex)) {
+                return containing.startIndex;
+            }
+
             for (let i = endIndex; i >= 0; i--) {
                 const role = normalizeRole(yellowRects[i].role);
                 if (role === 'start') {
@@ -872,12 +870,50 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         function findLatestStartIndexBefore(endIndex) {
+            const containing = findPolylineRangeContainingIndex(endIndex);
+            if (containing && Number.isFinite(containing.startIndex)) {
+                return containing.startIndex;
+            }
+
             for (let i = endIndex - 1; i >= 0; i--) {
                 if (normalizeRole(yellowRects[i].role) === 'start') {
                     return i;
                 }
             }
             return -1;
+        }
+
+        function getPolylineTerminalInfo(index) {
+            if (index < 0 || index >= yellowRects.length) {
+                return {
+                    isStart: false,
+                    isEnd: false,
+                    label: 'MIDDLE'
+                };
+            }
+
+            const containing = findPolylineRangeContainingIndex(index);
+            if (containing) {
+                const isStart = containing.startIndex === index;
+                const isEnd = containing.endIndex === index;
+                let label = 'MIDDLE';
+                if (isStart && isEnd) {
+                    label = 'START|END';
+                } else if (isStart) {
+                    label = 'START';
+                } else if (isEnd) {
+                    label = 'END';
+                }
+
+                return { isStart, isEnd, label };
+            }
+
+            const role = normalizeRole(yellowRects[index].role);
+            return {
+                isStart: role === 'start',
+                isEnd: role === 'end',
+                label: role === 'start' ? 'START' : (role === 'end' ? 'END' : 'MIDDLE')
+            };
         }
 
         function highlightStartPointForGo(endIndex, durationMs = 2000) {
@@ -1036,11 +1072,14 @@ function countWhitePixels(ctx, x, y, size) {
             if (!rect) return;
 
             const mergeLabel = rect.mergeState ? '✙MERGED' : 'NOT MERGED';
-            const roleLabel = normalizeRole(rect.role).toUpperCase();
+            const terminal = getPolylineTerminalInfo(index);
+            const polylineLabel = isValidPolylineId(rect.polylineId)
+                ? `${rect.polylineId}:${Number.isFinite(rect.pointOrder) ? rect.pointOrder : '-'}`
+                : 'NONE';
 
             goMetaDisplayTimer = showTempMessage({
                 elementId: 'goMetaDisplay',
-                text: `[Go ${index + 1}/${yellowRects.length}] ${mergeLabel} | ${roleLabel} | ${rect.size}x${rect.size}`,
+                text: `[Go ${index + 1}/${yellowRects.length}] ${mergeLabel} | ${terminal.label} | ${rect.size}x${rect.size} | P:${polylineLabel}`,
                 className: 'status-go',
                 previousTimerId: goMetaDisplayTimer
             });
@@ -2137,7 +2176,8 @@ function countWhitePixels(ctx, x, y, size) {
                 display.value = '-';
                 currentYellowIndex = -1;
             } else {
-                display.value = `${currentYellowIndex + 1}/${yellowRects.length}`;
+                const terminal = getPolylineTerminalInfo(currentYellowIndex);
+                display.value = `${currentYellowIndex + 1}/${yellowRects.length} (${terminal.label})`;
             }
 
             refreshPolylineRangeControl();
@@ -2279,7 +2319,11 @@ function countWhitePixels(ctx, x, y, size) {
                 updateCornerAndPathInfo();
             }
 
-            if (normalizeRole(yellowRect.role) === 'end') {
+            const containing = findPolylineRangeContainingIndex(currentYellowIndex);
+            const isPolylineEnd = !!(containing && containing.endIndex === currentYellowIndex);
+            const shouldHighlightStart = isPolylineEnd || normalizeRole(yellowRect.role) === 'end';
+
+            if (shouldHighlightStart) {
                 const highlighted = highlightStartPointForGo(currentYellowIndex, 2000);
                 if (highlighted) {
                     console.log(`🔦 END에 대응하는 START [${goStartHighlightIndex + 1}]를 2초간 강조합니다.`);
@@ -2869,8 +2913,11 @@ function countWhitePixels(ctx, x, y, size) {
             const matchedRects = matchedIndices.map(i => yellowRects[i]);
             const summary = matchedRects.map((rect, idx) => {
                 const mergeLabel = rect.mergeState ? '✙MERGED' : 'NOT MERGED';
-                const roleLabel = normalizeRole(rect.role).toUpperCase();
-                return `[${matchedIndices[idx] + 1}/${yellowRects.length}] ${mergeLabel} | ${roleLabel} | ${rect.size}x${rect.size}`;
+                const terminal = getPolylineTerminalInfo(matchedIndices[idx]);
+                const polylineLabel = isValidPolylineId(rect.polylineId)
+                    ? `${rect.polylineId}:${Number.isFinite(rect.pointOrder) ? rect.pointOrder : '-'}`
+                    : 'NONE';
+                return `[${matchedIndices[idx] + 1}/${yellowRects.length}] ${mergeLabel} | ${terminal.label} | ${rect.size}x${rect.size} | P:${polylineLabel}`;
             }).join('  ┋  ');
 
             goMetaDisplayTimer = showTempMessage({
@@ -2930,7 +2977,11 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             // END면 시작점 강조
-            if (normalizeRole(yellowRect.role) === 'end') {
+            const containing = findPolylineRangeContainingIndex(index);
+            const isPolylineEnd = !!(containing && containing.endIndex === index);
+            const shouldHighlightStart = isPolylineEnd || normalizeRole(yellowRect.role) === 'end';
+
+            if (shouldHighlightStart) {
                 const highlighted = highlightStartPointForGo(index, 2000);
                 if (!highlighted) {
                     showRoleActionErrorMessage('이 END 이전에 대응 START가 없습니다.');
@@ -3107,9 +3158,10 @@ function countWhitePixels(ctx, x, y, size) {
                         ctx2.fillRect(rect.x * scale, rect.y * scale, rect.size * scale, rect.size * scale);
                         ctx2.strokeRect(rect.x * scale+0.5, rect.y * scale+0.5, rect.size * scale-1, rect.size * scale-1);
 
-                        const rectRole = normalizeRole(rect.role);
-                        if (rectRole === 'start' || rectRole === 'end') {
-                            ctx2.strokeStyle = rectRole === 'start' ? 'rgba(0, 0, 0, 0.98)' : 'rgba(120, 120, 120, 0.98)';
+                        const terminal = getPolylineTerminalInfo(i);
+                        if (terminal.isStart || terminal.isEnd) {
+                            // START는 검정, END는 회색, 둘 다이면 START를 우선 표시
+                            ctx2.strokeStyle = terminal.isStart ? 'rgba(0, 0, 0, 0.98)' : 'rgba(120, 120, 120, 0.98)';
                             ctx2.lineWidth = Math.max(2, scale / 5);
                             ctx2.strokeRect(rect.x * scale+0.5, rect.y * scale+0.5, rect.size * scale-1, rect.size * scale-1);
                         }
