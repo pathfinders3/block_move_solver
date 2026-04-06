@@ -1184,7 +1184,7 @@ function countWhitePixels(ctx, x, y, size) {
             }, 2000);
         }
 
-        // 자동 F9 한 스텝: 빨간 테두리 후보가 1개면 선택+확정을 한 번에 수행
+        // 자동 F9 한 스텝: 빨간 테두리 1개 우선, 없으면 주황 테두리 1개를 대체 선택
         function runAutoF9Step() {
             const pathWhiteContent = document.getElementById('pathWhiteContent');
             if (!pathWhiteContent) {
@@ -1193,30 +1193,54 @@ function countWhitePixels(ctx, x, y, size) {
                 return false;
             }
 
-            const redButtons = Array.from(pathWhiteContent.querySelectorAll('button')).filter(btn => {
-                if (btn.disabled) return false;
+            const allButtons = Array.from(pathWhiteContent.querySelectorAll('button')).filter(btn => !btn.disabled);
+            const uniqueByRect = (buttons) => {
+                const uniqueButtonMap = new Map();
+                buttons.forEach(btn => {
+                    const x = btn.getAttribute('data-x') || '';
+                    const y = btn.getAttribute('data-y') || '';
+                    const size = btn.getAttribute('data-size') || '';
+                    const key = `${x},${y},${size}`;
+                    if (!uniqueButtonMap.has(key)) {
+                        uniqueButtonMap.set(key, btn);
+                    }
+                });
+                return uniqueButtonMap;
+            };
+
+            const redButtons = allButtons.filter(btn => {
                 const styleText = (btn.getAttribute('style') || '').toLowerCase();
                 return styleText.includes('#ff0000');
             });
-
-            const uniqueRedButtonMap = new Map();
-            redButtons.forEach(btn => {
-                const x = btn.getAttribute('data-x') || '';
-                const y = btn.getAttribute('data-y') || '';
-                const size = btn.getAttribute('data-size') || '';
-                const key = `${x},${y},${size}`;
-                if (!uniqueRedButtonMap.has(key)) {
-                    uniqueRedButtonMap.set(key, btn);
-                }
+            const orangeButtons = allButtons.filter(btn => {
+                const styleText = (btn.getAttribute('style') || '').toLowerCase();
+                return styleText.includes('#ff8c00');
             });
 
-            if (uniqueRedButtonMap.size !== 1) {
-                console.log(`❌ 자동 F9 조건 불만족: 빨간 테두리 후보(중복제거)가 1개가 아닙니다. (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`);
+            const uniqueRedButtonMap = uniqueByRect(redButtons);
+            const uniqueOrangeButtonMap = uniqueByRect(orangeButtons);
+
+            let targetButton = null;
+            let selectedBorderLabel = '';
+
+            if (uniqueRedButtonMap.size === 1) {
+                targetButton = Array.from(uniqueRedButtonMap.values())[0];
+                selectedBorderLabel = '빨간';
+            } else if (uniqueRedButtonMap.size === 0 && uniqueOrangeButtonMap.size === 1) {
+                targetButton = Array.from(uniqueOrangeButtonMap.values())[0];
+                selectedBorderLabel = '주황';
+            }
+
+            if (!targetButton) {
+                const reason =
+                    uniqueRedButtonMap.size > 0
+                        ? `빨간 테두리 후보(중복제거) 수가 1개가 아님 (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`
+                        : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`;
+                showRoleActionErrorMessage(`자동 F9 조건 불만족: ${reason}`);
+                console.log(`❌ 자동 F9 조건 불만족: ${reason}`);
                 flashAutoF9ButtonError();
                 return false;
             }
-
-            const targetButton = Array.from(uniqueRedButtonMap.values())[0];
 
             const targetX = parseInt(targetButton.getAttribute('data-x'), 10);
             const targetY = parseInt(targetButton.getAttribute('data-y'), 10);
@@ -1238,13 +1262,13 @@ function countWhitePixels(ctx, x, y, size) {
                 return false;
             }
 
-            // 1) 빨간 버튼 클릭으로 임시 노란색 지정
+            // 1) 우선순위(빨강>주황)에 따라 선택된 버튼 클릭으로 임시 노란색 지정
             targetButton.click();
 
             // 2) F9 동작으로 확정
             const confirmed = confirmTempYellowRect('F10');
             if (confirmed) {
-                console.log('✅ 자동 F9 한 스텝 완료 (빨간 후보 1개 선택 + 확정).');
+                console.log(`✅ 자동 F9 한 스텝 완료 (${selectedBorderLabel} 후보 1개 선택 + 확정).`);
             }
             return confirmed;
         }
