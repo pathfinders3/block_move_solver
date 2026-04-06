@@ -1085,10 +1085,31 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
+        function isAllWhiteRect(x, y, size) {
+            const whiteCount = countWhitePixels(ctx1, x, y, size);
+            const maxPixels = size * size;
+            return {
+                ok: whiteCount === maxPixels,
+                whiteCount,
+                maxPixels
+            };
+        }
+
         // 임시 노란색 사각형을 확정(F9 동작)하는 공통 함수
         function confirmTempYellowRect(triggerKey = 'F9') {
             if (!tempYellowRect) {
                 console.log(`❌ 확정할 임시 노란색 사각형이 없습니다.`);
+                return false;
+            }
+
+            const whiteCheck = isAllWhiteRect(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
+            if (!whiteCheck.ok) {
+                const message = `[${triggerKey}] 흰색 사각형만 추가 가능 (${whiteCheck.whiteCount}/${whiteCheck.maxPixels})`;
+                showRoleActionErrorMessage(message);
+                console.log(
+                    `❌ [${triggerKey}] 흰색 사각형만 추가할 수 있습니다. ` +
+                    `(흰색: ${whiteCheck.whiteCount}/${whiteCheck.maxPixels}, 좌표: ${tempYellowRect.x},${tempYellowRect.y}, 크기: ${tempYellowRect.size})`
+                );
                 return false;
             }
 
@@ -1196,6 +1217,26 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             const targetButton = Array.from(uniqueRedButtonMap.values())[0];
+
+            const targetX = parseInt(targetButton.getAttribute('data-x'), 10);
+            const targetY = parseInt(targetButton.getAttribute('data-y'), 10);
+            const targetSize = parseInt(targetButton.getAttribute('data-size'), 10);
+            if (!Number.isFinite(targetX) || !Number.isFinite(targetY) || !Number.isFinite(targetSize)) {
+                console.log('❌ 자동 F9 후보의 좌표/크기 데이터가 올바르지 않습니다.');
+                flashAutoF9ButtonError();
+                return false;
+            }
+
+            const whiteCheck = isAllWhiteRect(targetX, targetY, targetSize);
+            if (!whiteCheck.ok) {
+                showRoleActionErrorMessage(`자동 F9 실패: 흰색 사각형 아님 (${whiteCheck.whiteCount}/${whiteCheck.maxPixels})`);
+                console.log(
+                    `❌ 자동 F9 후보가 흰색 사각형이 아닙니다. ` +
+                    `(흰색: ${whiteCheck.whiteCount}/${whiteCheck.maxPixels}, 좌표: ${targetX},${targetY}, 크기: ${targetSize})`
+                );
+                flashAutoF9ButtonError();
+                return false;
+            }
 
             // 1) 빨간 버튼 클릭으로 임시 노란색 지정
             targetButton.click();
@@ -1458,6 +1499,7 @@ function countWhitePixels(ctx, x, y, size) {
                         });
                         scaleCanvas(); // 화면 갱신
                     } else {
+                        showRoleActionErrorMessage(`사각형이 모두 흰색이 아닙니다. (${baseWhiteCount}/${baseMaxPixels})`);
                         console.log(`❌ 사각형이 모두 흰색이 아닙니다. (흰색: ${baseWhiteCount}/${baseMaxPixels})`);
                     }
                 }
