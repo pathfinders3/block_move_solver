@@ -113,9 +113,9 @@ canvas {
 }
 
 .status-merged {
-    color: #062b20;
-    background-color: #7de1ff;
-    border: 1px solid #24a6cc;
+    color: #ffffff;
+    background-color: #001f4d;
+    border: 1px solid #003780;
 }
 
 .status-unmerged {
