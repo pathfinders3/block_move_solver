@@ -1515,6 +1515,7 @@ function countWhitePixels(ctx, x, y, size) {
                     pathRects23_n1 = [];
                     pathRects02_n1 = [];
                     pathRects13_n1 = [];
+                    recommendedPathRects = [];
                     // 귀퉁이 픽셀수 초기화
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
@@ -1570,6 +1571,7 @@ function countWhitePixels(ctx, x, y, size) {
                     pathRects23_n1 = [];
                     pathRects02_n1 = [];
                     pathRects13_n1 = [];
+                    recommendedPathRects = [];
                     // 귀퉁이 픽셀수 초기화
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
@@ -1644,6 +1646,7 @@ function countWhitePixels(ctx, x, y, size) {
         let pathRects23_n1 = []; // 하단 수평 (2→3) n-1크기
         let pathRects02_n1 = []; // 좌측 수직 (0→2) n-1크기
         let pathRects13_n1 = []; // 우측 수직 (1→3) n-1크기
+        let recommendedPathRects = []; // 빨간 테두리(최우선 추천)와 동일한 위치 목록
         // 경로 버튼 클릭: 임시 노란색 사각형 (F9로 확정 전)
         let tempYellowRect = null; // {x: number, y: number, size: number} | null
         // F9: 확정된 노란색 사각형들을 저장하는 배열
@@ -1889,6 +1892,63 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
+        function syncCanvasPathPointsFromButtons() {
+            const pathWhiteContent = document.getElementById('pathWhiteContent');
+            if (!pathWhiteContent) {
+                recommendedPathRects = [];
+                return;
+            }
+
+            const pathMap = {
+                path01_n: [],
+                path23_n: [],
+                path02_n: [],
+                path13_n: [],
+                path01_n1: [],
+                path23_n1: [],
+                path02_n1: [],
+                path13_n1: []
+            };
+
+            const redSet = new Set();
+            const redRects = [];
+            const buttons = Array.from(pathWhiteContent.querySelectorAll('button[data-path]'));
+
+            buttons.forEach(btn => {
+                if (btn.disabled) return;
+
+                const pathName = btn.getAttribute('data-path') || '';
+                if (!Object.prototype.hasOwnProperty.call(pathMap, pathName)) return;
+
+                const x = parseInt(btn.getAttribute('data-x'), 10);
+                const y = parseInt(btn.getAttribute('data-y'), 10);
+                const size = parseInt(btn.getAttribute('data-size'), 10);
+                if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size)) return;
+
+                const rect = { x, y, size };
+                pathMap[pathName].push(rect);
+
+                const styleText = (btn.getAttribute('style') || '').toLowerCase();
+                if (styleText.includes('#ff0000')) {
+                    const key = `${x},${y},${size}`;
+                    if (!redSet.has(key)) {
+                        redSet.add(key);
+                        redRects.push(rect);
+                    }
+                }
+            });
+
+            pathRects01_n = pathMap.path01_n;
+            pathRects23_n = pathMap.path23_n;
+            pathRects02_n = pathMap.path02_n;
+            pathRects13_n = pathMap.path13_n;
+            pathRects01_n1 = pathMap.path01_n1;
+            pathRects23_n1 = pathMap.path23_n1;
+            pathRects02_n1 = pathMap.path02_n1;
+            pathRects13_n1 = pathMap.path13_n1;
+            recommendedPathRects = redRects;
+        }
+
         // 헬퍼 함수: 사각형의 각도 차이 계산 (공통 로직)
         function calculateRectAngleDiff(pt, size, baseX, baseY, expectedAngle) {
             // 흰색 픽셀 확인
@@ -2106,16 +2166,6 @@ function countWhitePixels(ctx, x, y, size) {
         function updatePathUI(pathsData, cornerSize, cornerSize_n1) {
             const { paths_n, paths_n1, whiteCounts_n, whiteCounts_n1 } = pathsData;
             
-            // 전역 변수에 경로 저장 (렌더링에서 사용)
-            pathRects01_n = paths_n.path01;
-            pathRects23_n = paths_n.path23;
-            pathRects02_n = paths_n.path02;
-            pathRects13_n = paths_n.path13;
-            pathRects01_n1 = paths_n1.path01;
-            pathRects23_n1 = paths_n1.path23;
-            pathRects02_n1 = paths_n1.path02;
-            pathRects13_n1 = paths_n1.path13;
-            
             // 경로별 개수 표시 업데이트 (n 크기만 표시)
             if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = paths_n.path01.length;
             if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = paths_n.path23.length;
@@ -2149,6 +2199,14 @@ function countWhitePixels(ctx, x, y, size) {
                 addPathButtonClickEvents('path02_n1', cornerSize_n1);
                 addPathButtonClickEvents('path13_n1', cornerSize_n1);
             }
+
+            // 캔버스 점은 버튼 기준으로 동기화: 활성 버튼만 표시 + 빨간 추천점 수집
+            syncCanvasPathPointsFromButtons();
+
+            if(document.getElementById('pathCount01')) document.getElementById('pathCount01').textContent = pathRects01_n.length;
+            if(document.getElementById('pathCount23')) document.getElementById('pathCount23').textContent = pathRects23_n.length;
+            if(document.getElementById('pathCount02')) document.getElementById('pathCount02').textContent = pathRects02_n.length;
+            if(document.getElementById('pathCount13')) document.getElementById('pathCount13').textContent = pathRects13_n.length;
         }
         
         // 공통 함수: 귀퉁이 및 경로 정보 업데이트 (메인 함수)
@@ -3105,6 +3163,24 @@ function countWhitePixels(ctx, x, y, size) {
                             ctx2.beginPath();
                             ctx2.arc(pt.x * scale + (cornerSize_n1 * scale)/2, pt.y * scale + (cornerSize_n1 * scale)/2, Math.max(1.5, scale/5), 0, Math.PI * 2);
                             ctx2.fill();
+                        }
+                    }
+
+                    // 최우선 추천점(빨간 테두리와 동일 기준)을 빨간 점으로 강조
+                    if (recommendedPathRects.length > 0) {
+                        ctx2.fillStyle = 'rgba(255, 0, 0, 0.95)';
+                        ctx2.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+                        ctx2.lineWidth = Math.max(1, scale / 8);
+
+                        for (const pt of recommendedPathRects) {
+                            const cx = pt.x * scale + (pt.size * scale) / 2;
+                            const cy = pt.y * scale + (pt.size * scale) / 2;
+                            const radius = Math.max(2.2, scale / 3.2);
+
+                            ctx2.beginPath();
+                            ctx2.arc(cx, cy, radius, 0, Math.PI * 2);
+                            ctx2.fill();
+                            ctx2.stroke();
                         }
                     }
                 }
