@@ -991,6 +991,20 @@ function countWhitePixels(ctx, x, y, size) {
         let mergeStateDisplayTimer = null;
         let roleActionDisplayTimer = null;
         let goMetaDisplayTimer = null;
+        let lastClickedYellowPoint = null;
+        let lastClickedMatchedIndices = [];
+
+        function areSamePoint(pointA, pointB) {
+            return pointA && pointB && pointA.x === pointB.x && pointA.y === pointB.y;
+        }
+
+        function arraysAreEqual(a, b) {
+            if (a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) {
+                if (a[i] !== b[i]) return false;
+            }
+            return true;
+        }
 
         function showTempMessage({ elementId, text, className = '', previousTimerId = null, onClear = null }) {
             const display = document.getElementById(elementId);
@@ -2959,12 +2973,27 @@ function countWhitePixels(ctx, x, y, size) {
             const clickMode = document.getElementById('yellowClickMode')?.value || 'closest';
 
             if (matchedIndices.length > 0) {
-                // 포함된 노란 점이 하나 이상이면 모두 정보를 표시하고, 첫번째 점으로 이동
                 showGoMetaForMatchedIndices(matchedIndices);
 
-                // 첫번째 점을 실제 대상으로 이동하되, 다중 요약 메시지는 유지
-                goToYellowRect(matchedIndices[0], { preserveGoMeta: true });
+                let targetIndex = matchedIndices[0];
+                if (
+                    areSamePoint(lastClickedYellowPoint, { x: ox, y: oy }) &&
+                    arraysAreEqual(lastClickedMatchedIndices, matchedIndices) &&
+                    matchedIndices.length > 1
+                ) {
+                    const currentPos = matchedIndices.indexOf(currentYellowIndex);
+                    if (currentPos !== -1) {
+                        targetIndex = matchedIndices[(currentPos + 1) % matchedIndices.length];
+                    }
+                }
+
+                lastClickedYellowPoint = { x: ox, y: oy };
+                lastClickedMatchedIndices = matchedIndices.slice();
+                goToYellowRect(targetIndex, { preserveGoMeta: true });
             } else {
+                lastClickedYellowPoint = null;
+                lastClickedMatchedIndices = [];
+
                 const targetYellowIndex = findYellowRectIndexByPoint(ox, oy);
                 if (targetYellowIndex !== -1) {
                     goToYellowRect(targetYellowIndex);
