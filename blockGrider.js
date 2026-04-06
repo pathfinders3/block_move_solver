@@ -1427,6 +1427,38 @@ function countWhitePixels(ctx, x, y, size) {
             scaleCanvas();
         }
 
+        function clearCornerPathPreview() {
+            cornerRects = [];
+            pathRects01_n = [];
+            pathRects23_n = [];
+            pathRects02_n = [];
+            pathRects13_n = [];
+            pathRects01_n1 = [];
+            pathRects23_n1 = [];
+            pathRects02_n1 = [];
+            pathRects13_n1 = [];
+            recommendedPathRects = [];
+            secondaryPathRects = [];
+            tertiaryPathRects = [];
+            fallbackPathRects = [];
+
+            const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
+            if (cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
+
+            const baseRectWhite = document.getElementById('baseRectWhite');
+            if (baseRectWhite) baseRectWhite.textContent = '—';
+
+            ['pathCount01', 'pathCount23', 'pathCount02', 'pathCount13'].forEach(id => {
+                if (document.getElementById(id)) document.getElementById(id).textContent = 0;
+            });
+
+            ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
+                if (document.getElementById(id)) document.getElementById(id).innerHTML = '-';
+            });
+
+            resetPriorityBorderCountsDisplay();
+        }
+
         // F2, F4, F8, F9, F10, F11, DEL, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             const activeElement = document.activeElement;
@@ -1548,34 +1580,7 @@ function countWhitePixels(ctx, x, y, size) {
                     console.log(`  0→2 (좌측 수직): [n]${pathRects02_n.length}개 / [n-1]${pathRects02_n1.length}개`);
                     console.log(`  1→3 (우측 수직): [n]${pathRects13_n.length}개 / [n-1]${pathRects13_n1.length}개`);
                 } else {
-                    cornerRects = [];
-                    pathRects01_n = [];
-                    pathRects23_n = [];
-                    pathRects02_n = [];
-                    pathRects13_n = [];
-                    pathRects01_n1 = [];
-                    pathRects23_n1 = [];
-                    pathRects02_n1 = [];
-                    pathRects13_n1 = [];
-                    recommendedPathRects = [];
-                    secondaryPathRects = [];
-                    tertiaryPathRects = [];
-                    fallbackPathRects = [];
-                    // 귀퉁이 픽셀수 초기화
-                    const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
-                    if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
-                    // 기준 사각형 흰색점 초기화
-                    const baseRectWhite = document.getElementById('baseRectWhite');
-                    if(baseRectWhite) baseRectWhite.textContent = '—';
-                    // 개수 초기화
-                    ['pathCount01', 'pathCount23', 'pathCount02', 'pathCount13'].forEach(id => {
-                        if(document.getElementById(id)) document.getElementById(id).textContent = 0;
-                    });
-                    // 흰색점 초기화
-                    ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
-                        if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
-                    });
-                    resetPriorityBorderCountsDisplay();
+                    clearCornerPathPreview();
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -1607,34 +1612,7 @@ function countWhitePixels(ctx, x, y, size) {
                 if(showCorners && selectedPixel) {
                     updateCornerAndPathInfo();
                 } else {
-                    cornerRects = [];
-                    pathRects01_n = [];
-                    pathRects23_n = [];
-                    pathRects02_n = [];
-                    pathRects13_n = [];
-                    pathRects01_n1 = [];
-                    pathRects23_n1 = [];
-                    pathRects02_n1 = [];
-                    pathRects13_n1 = [];
-                    recommendedPathRects = [];
-                    secondaryPathRects = [];
-                    tertiaryPathRects = [];
-                    fallbackPathRects = [];
-                    // 귀퉁이 픽셀수 초기화
-                    const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
-                    if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
-                    // 기준 사각형 흰색점 초기화
-                    const baseRectWhite = document.getElementById('baseRectWhite');
-                    if(baseRectWhite) baseRectWhite.textContent = '—';
-                    // 개수 초기화
-                    ['pathCount01', 'pathCount23', 'pathCount02', 'pathCount13'].forEach(id => {
-                        if(document.getElementById(id)) document.getElementById(id).textContent = 0;
-                    });
-                    // 흰색점 초기화
-                    ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
-                        if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
-                    });
-                    resetPriorityBorderCountsDisplay();
+                    clearCornerPathPreview();
                 }
                 scaleCanvas();
                 e.preventDefault();
@@ -2994,22 +2972,7 @@ function countWhitePixels(ctx, x, y, size) {
             if(showCorners && selectedPixel) {
                 updateCornerAndPathInfo();
             } else {
-                cornerRects = [];
-                // 귀퉁이 픽셀수 초기화
-                const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
-                if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
-                // 기준 사각형 흰색점 초기화
-                const baseRectWhite = document.getElementById('baseRectWhite');
-                if(baseRectWhite) baseRectWhite.textContent = '—';
-                // 개수 초기화
-                ['pathCount01', 'pathCount23', 'pathCount02', 'pathCount13'].forEach(id => {
-                    if(document.getElementById(id)) document.getElementById(id).textContent = 0;
-                });
-                // 흰색점 초기화
-                ['pathWhite01', 'pathWhite23', 'pathWhite02', 'pathWhite13'].forEach(id => {
-                    if(document.getElementById(id)) document.getElementById(id).innerHTML = '-';
-                });
-                resetPriorityBorderCountsDisplay();
+                clearCornerPathPreview();
             }
             // 캔버스2 다시 그림 (사각형 오버레이 위해)
             scaleCanvas();
