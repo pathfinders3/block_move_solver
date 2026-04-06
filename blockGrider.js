@@ -1516,6 +1516,9 @@ function countWhitePixels(ctx, x, y, size) {
                     pathRects02_n1 = [];
                     pathRects13_n1 = [];
                     recommendedPathRects = [];
+                    secondaryPathRects = [];
+                    tertiaryPathRects = [];
+                    fallbackPathRects = [];
                     // 귀퉁이 픽셀수 초기화
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
@@ -1572,6 +1575,9 @@ function countWhitePixels(ctx, x, y, size) {
                     pathRects02_n1 = [];
                     pathRects13_n1 = [];
                     recommendedPathRects = [];
+                    secondaryPathRects = [];
+                    tertiaryPathRects = [];
+                    fallbackPathRects = [];
                     // 귀퉁이 픽셀수 초기화
                     const cornerPixelsDisplay = document.getElementById('cornerPixelsDisplay');
                     if(cornerPixelsDisplay) cornerPixelsDisplay.textContent = '[—,—,—,—]';
@@ -1647,6 +1653,9 @@ function countWhitePixels(ctx, x, y, size) {
         let pathRects02_n1 = []; // 좌측 수직 (0→2) n-1크기
         let pathRects13_n1 = []; // 우측 수직 (1→3) n-1크기
         let recommendedPathRects = []; // 빨간 테두리(최우선 추천)와 동일한 위치 목록
+        let secondaryPathRects = []; // 주황색 테두리와 동일한 위치 목록
+        let tertiaryPathRects = []; // 연노랑 테두리와 동일한 위치 목록
+        let fallbackPathRects = []; // 분류색이 없는 이동 가능 위치(파란색 표시)
         // 경로 버튼 클릭: 임시 노란색 사각형 (F9로 확정 전)
         let tempYellowRect = null; // {x: number, y: number, size: number} | null
         // F9: 확정된 노란색 사각형들을 저장하는 배열
@@ -1896,6 +1905,9 @@ function countWhitePixels(ctx, x, y, size) {
             const pathWhiteContent = document.getElementById('pathWhiteContent');
             if (!pathWhiteContent) {
                 recommendedPathRects = [];
+                secondaryPathRects = [];
+                tertiaryPathRects = [];
+                fallbackPathRects = [];
                 return;
             }
 
@@ -1912,6 +1924,12 @@ function countWhitePixels(ctx, x, y, size) {
 
             const redSet = new Set();
             const redRects = [];
+            const orangeSet = new Set();
+            const orangeRects = [];
+            const yellowSet = new Set();
+            const yellowRectsLocal = [];
+            const blueSet = new Set();
+            const blueRects = [];
             const buttons = Array.from(pathWhiteContent.querySelectorAll('button[data-path]'));
 
             buttons.forEach(btn => {
@@ -1929,11 +1947,26 @@ function countWhitePixels(ctx, x, y, size) {
                 pathMap[pathName].push(rect);
 
                 const styleText = (btn.getAttribute('style') || '').toLowerCase();
+                const key = `${x},${y},${size}`;
                 if (styleText.includes('#ff0000')) {
-                    const key = `${x},${y},${size}`;
                     if (!redSet.has(key)) {
                         redSet.add(key);
                         redRects.push(rect);
+                    }
+                } else if (styleText.includes('#ff8c00')) {
+                    if (!orangeSet.has(key)) {
+                        orangeSet.add(key);
+                        orangeRects.push(rect);
+                    }
+                } else if (styleText.includes('#a39908')) {
+                    if (!yellowSet.has(key)) {
+                        yellowSet.add(key);
+                        yellowRectsLocal.push(rect);
+                    }
+                } else {
+                    if (!blueSet.has(key)) {
+                        blueSet.add(key);
+                        blueRects.push(rect);
                     }
                 }
             });
@@ -1947,6 +1980,9 @@ function countWhitePixels(ctx, x, y, size) {
             pathRects02_n1 = pathMap.path02_n1;
             pathRects13_n1 = pathMap.path13_n1;
             recommendedPathRects = redRects;
+            secondaryPathRects = orangeRects;
+            tertiaryPathRects = yellowRectsLocal;
+            fallbackPathRects = blueRects;
         }
 
         // 헬퍼 함수: 사각형의 각도 차이 계산 (공통 로직)
@@ -3087,102 +3123,30 @@ function countWhitePixels(ctx, x, y, size) {
                 }
                 // 경로 점들 표시 (4가지 경로를 각각 다른 색으로)
                 if (showCorners) {
-                    const cornerSize = parseInt(document.getElementById('cornerSize').value) || 4;
-                    const cornerSize_n1 = cornerSize - 1;
-                    
-                    // 상단 수평 (0→1): 녹색 [n 크기]
-                    if (pathRects01_n.length > 0) {
-                        ctx2.fillStyle = 'rgba(0, 255, 0, 0.5)';
-                        for (const pt of pathRects01_n) {
-                            ctx2.beginPath();
-                            ctx2.arc(pt.x * scale + (cornerSize * scale)/2, pt.y * scale + (cornerSize * scale)/2, Math.max(2, scale/4), 0, Math.PI * 2);
-                            ctx2.fill();
-                        }
-                    }
-                    // 상단 수평 (0→1): 연한 녹색 [n-1 크기]
-                    if (pathRects01_n1.length > 0) {
-                        ctx2.fillStyle = 'rgba(100, 255, 100, 0.3)';
-                        for (const pt of pathRects01_n1) {
-                            ctx2.beginPath();
-                            ctx2.arc(pt.x * scale + (cornerSize_n1 * scale)/2, pt.y * scale + (cornerSize_n1 * scale)/2, Math.max(1.5, scale/5), 0, Math.PI * 2);
-                            ctx2.fill();
-                        }
-                    }
-                    
-                    // 하단 수평 (2→3): 청록색 [n 크기]
-                    if (pathRects23_n.length > 0) {
-                        ctx2.fillStyle = 'rgba(0, 200, 200, 0.5)';
-                        for (const pt of pathRects23_n) {
-                            ctx2.beginPath();
-                            ctx2.arc(pt.x * scale + (cornerSize * scale)/2, pt.y * scale + (cornerSize * scale)/2, Math.max(2, scale/4), 0, Math.PI * 2);
-                            ctx2.fill();
-                        }
-                    }
-                    // 하단 수평 (2→3): 연한 청록색 [n-1 크기]
-                    if (pathRects23_n1.length > 0) {
-                        ctx2.fillStyle = 'rgba(100, 230, 230, 0.3)';
-                        for (const pt of pathRects23_n1) {
-                            ctx2.beginPath();
-                            ctx2.arc(pt.x * scale + (cornerSize_n1 * scale)/2, pt.y * scale + (cornerSize_n1 * scale)/2, Math.max(1.5, scale/5), 0, Math.PI * 2);
-                            ctx2.fill();
-                        }
-                    }
-                    
-                    // 좌측 수직 (0→2): 주황색 [n 크기]
-                    if (pathRects02_n.length > 0) {
-                        ctx2.fillStyle = 'rgba(255, 165, 0, 0.5)';
-                        for (const pt of pathRects02_n) {
-                            ctx2.beginPath();
-                            ctx2.arc(pt.x * scale + (cornerSize * scale)/2, pt.y * scale + (cornerSize * scale)/2, Math.max(2, scale/4), 0, Math.PI * 2);
-                            ctx2.fill();
-                        }
-                    }
-                    // 좌측 수직 (0→2): 연한 주황색 [n-1 크기]
-                    if (pathRects02_n1.length > 0) {
-                        ctx2.fillStyle = 'rgba(255, 200, 100, 0.3)';
-                        for (const pt of pathRects02_n1) {
-                            ctx2.beginPath();
-                            ctx2.arc(pt.x * scale + (cornerSize_n1 * scale)/2, pt.y * scale + (cornerSize_n1 * scale)/2, Math.max(1.5, scale/5), 0, Math.PI * 2);
-                            ctx2.fill();
-                        }
-                    }
-                    
-                    // 우측 수직 (1→3): 보라색 [n 크기]
-                    if (pathRects13_n.length > 0) {
-                        ctx2.fillStyle = 'rgba(200, 0, 200, 0.5)';
-                        for (const pt of pathRects13_n) {
-                            ctx2.beginPath();
-                            ctx2.arc(pt.x * scale + (cornerSize * scale)/2, pt.y * scale + (cornerSize * scale)/2, Math.max(2, scale/4), 0, Math.PI * 2);
-                            ctx2.fill();
-                        }
-                    }
-                    // 우측 수직 (1→3): 연한 보라색 [n-1 크기]
-                    if (pathRects13_n1.length > 0) {
-                        ctx2.fillStyle = 'rgba(230, 100, 230, 0.3)';
-                        for (const pt of pathRects13_n1) {
-                            ctx2.beginPath();
-                            ctx2.arc(pt.x * scale + (cornerSize_n1 * scale)/2, pt.y * scale + (cornerSize_n1 * scale)/2, Math.max(1.5, scale/5), 0, Math.PI * 2);
-                            ctx2.fill();
-                        }
-                    }
+                    const drawCategoryDots = (rects, fillStyle, strokeStyle, radiusFactor = 3.6) => {
+                        if (!rects || rects.length === 0) return;
 
-                    // 최우선 추천점(빨간 테두리와 동일 기준)을 빨간 점으로 강조
-                    if (recommendedPathRects.length > 0) {
-                        ctx2.fillStyle = 'rgba(255, 0, 0, 0.95)';
-                        ctx2.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-                        ctx2.lineWidth = Math.max(1, scale / 8);
+                        ctx2.fillStyle = fillStyle;
+                        ctx2.strokeStyle = strokeStyle;
+                        ctx2.lineWidth = Math.max(1, scale / 9);
 
-                        for (const pt of recommendedPathRects) {
+                        for (const pt of rects) {
                             const cx = pt.x * scale + (pt.size * scale) / 2;
                             const cy = pt.y * scale + (pt.size * scale) / 2;
-                            const radius = Math.max(2.2, scale / 3.2);
+                            const radius = Math.max(1.8, scale / radiusFactor);
 
                             ctx2.beginPath();
                             ctx2.arc(cx, cy, radius, 0, Math.PI * 2);
                             ctx2.fill();
                             ctx2.stroke();
                         }
-                    }
+                    };
+
+                    // 우선순위 낮은 색부터 그리고, 높은 우선순위를 마지막에 그려 겹침 시 강조
+                    drawCategoryDots(fallbackPathRects, 'rgba(30, 130, 255, 0.78)', 'rgba(220, 240, 255, 0.92)', 4.6); // 파랑
+                    drawCategoryDots(tertiaryPathRects, 'rgba(231, 214, 70, 0.82)', 'rgba(255, 243, 176, 0.96)', 4.2); // 연노랑
+                    drawCategoryDots(secondaryPathRects, 'rgba(255, 140, 0, 0.86)', 'rgba(255, 228, 180, 0.96)', 3.9); // 주황
+                    drawCategoryDots(recommendedPathRects, 'rgba(255, 0, 0, 0.94)', 'rgba(255, 255, 255, 0.96)', 3.2); // 빨강
                 }
                 ctx2.setLineDash([]);
                 
