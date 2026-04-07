@@ -1829,8 +1829,11 @@ function countWhitePixels(ctx, x, y, size) {
                 forcedTooltip = '부분 겹침은 선택할 수 없습니다.';
             } else if (isAllWhite && overlapState === 'full') {
                 const border = borderColor || '#000000';
-                const fullOverlapBg = isPrimaryCornerSize ? '#7e6502' : '#FFD700';
-                buttonStyle = `background:${fullOverlapBg}; color:#000; border:3px solid ${border}; cursor:pointer; font-weight:bold;`;
+                const fullOverlapBg = isPrimaryCornerSize
+                    ? 'repeating-linear-gradient(90deg, #7e6502 0, #7e6502 6px, #a57e1c 6px, #a57e1c 12px)'
+                    : 'repeating-linear-gradient(90deg, #FFD700 0, #FFD700 6px, #FFE680 6px, #FFE680 12px)';
+                const textColor = isPrimaryCornerSize ? '#ffffff' : '#000000';
+                buttonStyle = `background:${fullOverlapBg}; color:${textColor}; border:3px solid ${border}; cursor:pointer; font-weight:bold;`;
                 disabled = '';
             } else if (isAllWhite) {
                 const border = borderColor || '#45a049';
