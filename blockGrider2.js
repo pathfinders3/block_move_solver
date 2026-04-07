@@ -2336,31 +2336,134 @@
     if (!source) return null;
 
     const normalized = [];
-    for (const item of source) {
-      if (!item || typeof item !== 'object') continue;
+    source.forEach((item, sourceIndex) => {
+      if (!item || typeof item !== 'object') return;
 
       const x = Number(item.x);
       const y = Number(item.y);
       const size = Number(item.size);
 
-      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size)) continue;
-      if (size <= 0) continue;
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size)) return;
+      if (size <= 0) return;
 
       normalized.push({
         x: Math.round(x),
         y: Math.round(y),
         size: Math.round(size),
         canConnect: typeof item.canConnect === 'boolean' ? item.canConnect : false,
-        mergeState: typeof item.mergeState === 'boolean' ? item.mergeState : false
+        mergeState: typeof item.mergeState === 'boolean' ? item.mergeState : false,
+        sourceIndex,
+        pointOrder: Number.isFinite(Number(item.pointOrder)) ? Number(item.pointOrder) : null,
+        polylineId: typeof item.polylineId === 'string' ? item.polylineId : null
+      });
+    });
+
+    return {
+      points: normalized,
+      source,
+      hasCanConnectField: source.some(item => item && Object.prototype.hasOwnProperty.call(item, 'canConnect'))
+    };
+  }
+
+  function createGroupFromImportedPayload(parsed, normalizedResult) {
+    const points = normalizedResult && Array.isArray(normalizedResult.points) ? normalizedResult.points : [];
+    const polylines = parsed && Array.isArray(parsed.polylines) ? parsed.polylines : null;
+
+    if (!polylines || polylines.length === 0) {
+      const fallbackPoints = points.map(point => ({ ...point }));
+      if (fallbackPoints.length > 0 && !normalizedResult.hasCanConnectField) {
+        fallbackPoints[0].canConnect = true;
+        fallbackPoints[fallbackPoints.length - 1].canConnect = true;
+      }
+      return createGroupFromPoints(fallbackPoints);
+    }
+
+    const pointBySourceIndex = new Map();
+    points.forEach(point => {
+      pointBySourceIndex.set(point.sourceIndex, point);
+    });
+
+    const assignedSourceIndices = new Set();
+    const segments = [];
+
+    polylines.forEach(polyline => {
+      let indices = [];
+      if (Array.isArray(polyline.pointIndices)) {
+        indices = polyline.pointIndices
+          .map(value => Number(value))
+          .filter(Number.isFinite)
+          .map(value => Math.trunc(value));
+      } else {
+        const startIndex = Number(polyline && polyline.startIndex);
+        const endIndex = Number(polyline && polyline.endIndex);
+        if (Number.isFinite(startIndex) && Number.isFinite(endIndex)) {
+          const start = Math.trunc(startIndex);
+          const end = Math.trunc(endIndex);
+          const step = start <= end ? 1 : -1;
+          for (let idx = start; step > 0 ? idx <= end : idx >= end; idx += step) {
+            indices.push(idx);
+          }
+        }
+      }
+
+      if (indices.length === 0) return;
+
+      const seen = new Set();
+      const segmentPoints = [];
+      indices.forEach(idx => {
+        if (seen.has(idx)) return;
+        seen.add(idx);
+
+        const point = pointBySourceIndex.get(idx);
+        if (!point) return;
+
+        assignedSourceIndices.add(idx);
+        segmentPoints.push({ ...point });
+      });
+
+      if (segmentPoints.length === 0) return;
+
+      if (!normalizedResult.hasCanConnectField) {
+        segmentPoints[0].canConnect = true;
+        segmentPoints[segmentPoints.length - 1].canConnect = true;
+      }
+
+      segments.push({
+        id: createSegmentId(),
+        points: segmentPoints.map(clonePoint)
+      });
+    });
+
+    const unassignedPoints = points
+      .filter(point => !assignedSourceIndices.has(point.sourceIndex))
+      .sort((a, b) => a.sourceIndex - b.sourceIndex)
+      .map(point => ({ ...point }));
+
+    if (unassignedPoints.length > 0) {
+      if (!normalizedResult.hasCanConnectField) {
+        unassignedPoints[0].canConnect = true;
+        unassignedPoints[unassignedPoints.length - 1].canConnect = true;
+      }
+      segments.push({
+        id: createSegmentId(),
+        points: unassignedPoints.map(clonePoint)
       });
     }
 
-    if (normalized.length > 0 && !source.some(item => Object.prototype.hasOwnProperty.call(item, 'canConnect'))) {
-      normalized[0].canConnect = true;
-      normalized[normalized.length - 1].canConnect = true;
+    if (segments.length === 0) {
+      const fallbackPoints = points.map(point => ({ ...point }));
+      if (fallbackPoints.length > 0 && !normalizedResult.hasCanConnectField) {
+        fallbackPoints[0].canConnect = true;
+        fallbackPoints[fallbackPoints.length - 1].canConnect = true;
+      }
+      return createGroupFromPoints(fallbackPoints);
     }
 
-    return normalized;
+    return {
+      id: createGroupId(),
+      segments,
+      connections: []
+    };
   }
 
   function renderGroups(groups) {
@@ -2429,14 +2532,15 @@
         return;
       }
 
-      const points = normalizePoints(parsed);
-      if (!points) {
+      const normalizedResult = normalizePoints(parsed);
+      if (!normalizedResult) {
         setStatus('JSON 배열 형식이 아닙니다. [{x,y,size,...}] 형태가 필요합니다.', true);
         jsonOutput.value = JSON.stringify(parsed, null, 2);
         return;
       }
 
-      const nextGroups = currentGroups.concat([createGroupFromPoints(points)]);
+      const importedGroup = createGroupFromImportedPayload(parsed, normalizedResult);
+      const nextGroups = currentGroups.concat([importedGroup]);
       renderGroups(nextGroups);
       console.log(`🖼️ 실제 해상도: ${baseCanvas.width}x${baseCanvas.height}`);
 
