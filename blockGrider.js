@@ -1149,6 +1149,9 @@ function countWhitePixels(ctx, x, y, size) {
                 return false;
             }
 
+            // 확정 추가도 Ctrl/Cmd+Z로 되돌릴 수 있도록 스냅샷 저장
+            pushDeleteUndoState(triggerKey);
+
             // 원래 사각형 크기를 임시 사각형의 크기로 변경
             const rectSizeInput = document.getElementById('rectSize');
             const currentRectSize = parseInt(rectSizeInput.value) || 4;
@@ -1355,35 +1358,36 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         const deleteUndoStack = [];
+        const deleteRedoStack = [];
         const MAX_DELETE_UNDO_STACK = 50;
 
         function cloneYellowRectsState(rects) {
             return rects.map(rect => ({ ...rect }));
         }
 
-        function pushDeleteUndoState(triggerLabel = 'Del') {
-            deleteUndoStack.push({
+        function captureDeleteEditState(triggerLabel = '') {
+            const rectSizeInput = document.getElementById('rectSize');
+            const rectSizeValue = rectSizeInput ? (parseInt(rectSizeInput.value, 10) || null) : null;
+
+            return {
                 triggerLabel,
                 yellowRects: cloneYellowRectsState(yellowRects),
                 currentYellowIndex,
-                selectedPixel: selectedPixel ? { ...selectedPixel } : null
-            });
-
-            if (deleteUndoStack.length > MAX_DELETE_UNDO_STACK) {
-                deleteUndoStack.shift();
-            }
+                selectedPixel: selectedPixel ? { ...selectedPixel } : null,
+                rectSizeValue
+            };
         }
 
-        function undoLastDelete(triggerLabel = 'Ctrl+Z') {
-            if (deleteUndoStack.length === 0) {
-                console.log(`ℹ️ [${triggerLabel}] 되돌릴 삭제 이력이 없습니다.`);
-                return false;
+        function restoreDeleteEditState(state) {
+            yellowRects = cloneYellowRectsState(state.yellowRects || []);
+            currentYellowIndex = Number.isInteger(state.currentYellowIndex) ? state.currentYellowIndex : -1;
+            selectedPixel = state.selectedPixel ? { ...state.selectedPixel } : selectedPixel;
+
+            const rectSizeInput = document.getElementById('rectSize');
+            if (rectSizeInput && Number.isFinite(state.rectSizeValue)) {
+                rectSizeInput.value = String(state.rectSizeValue);
             }
 
-            const prev = deleteUndoStack.pop();
-            yellowRects = cloneYellowRectsState(prev.yellowRects);
-            currentYellowIndex = prev.currentYellowIndex;
-            selectedPixel = prev.selectedPixel ? { ...prev.selectedPixel } : selectedPixel;
             if (yellowRects.length === 0) {
                 activePolylineId = null;
             } else {
@@ -1399,8 +1403,51 @@ function countWhitePixels(ctx, x, y, size) {
                 updateCornerAndPathInfo();
             }
 
-            console.log(`↩️ [${triggerLabel}] 삭제 되돌리기 완료 (${prev.triggerLabel}).`);
             scaleCanvas();
+        }
+
+        function pushDeleteUndoState(triggerLabel = 'Del') {
+            deleteUndoStack.push(captureDeleteEditState(triggerLabel));
+
+            if (deleteUndoStack.length > MAX_DELETE_UNDO_STACK) {
+                deleteUndoStack.shift();
+            }
+
+            // 새로운 편집이 발생하면 redo 체인은 끊는다.
+            deleteRedoStack.length = 0;
+        }
+
+        function undoLastDelete(triggerLabel = 'Ctrl+Z') {
+            if (deleteUndoStack.length === 0) {
+                console.log(`ℹ️ [${triggerLabel}] 되돌릴 삭제 이력이 없습니다.`);
+                return false;
+            }
+
+            deleteRedoStack.push(captureDeleteEditState('redo-base'));
+            if (deleteRedoStack.length > MAX_DELETE_UNDO_STACK) {
+                deleteRedoStack.shift();
+            }
+
+            const prev = deleteUndoStack.pop();
+            restoreDeleteEditState(prev);
+            console.log(`↩️ [${triggerLabel}] 작업 되돌리기 완료 (${prev.triggerLabel}).`);
+            return true;
+        }
+
+        function redoLastDelete(triggerLabel = 'Ctrl+Y') {
+            if (deleteRedoStack.length === 0) {
+                console.log(`ℹ️ [${triggerLabel}] 다시 실행할 이력이 없습니다.`);
+                return false;
+            }
+
+            deleteUndoStack.push(captureDeleteEditState('undo-base'));
+            if (deleteUndoStack.length > MAX_DELETE_UNDO_STACK) {
+                deleteUndoStack.shift();
+            }
+
+            const next = deleteRedoStack.pop();
+            restoreDeleteEditState(next);
+            console.log(`↪️ [${triggerLabel}] 작업 다시 실행 완료 (${next.triggerLabel || 'redo'}).`);
             return true;
         }
 
@@ -1541,9 +1588,22 @@ function countWhitePixels(ctx, x, y, size) {
                 !e.shiftKey &&
                 !e.altKey;
 
+            const isRedoCommand =
+                !e.altKey && (
+                    ((e.key === 'y' || e.key === 'Y') && e.ctrlKey && !e.metaKey && !e.shiftKey) ||
+                    ((e.key === 'z' || e.key === 'Z') && e.metaKey && !e.ctrlKey && e.shiftKey)
+                );
+
             if (isUndoCommand && !isTypingTarget) {
                 const undone = undoLastDelete(e.metaKey ? 'Cmd+Z' : 'Ctrl+Z');
                 if (undone) {
+                    e.preventDefault();
+                }
+            }
+
+            if (isRedoCommand && !isTypingTarget) {
+                const redone = redoLastDelete((e.metaKey && e.shiftKey) ? 'Cmd+Shift+Z' : 'Ctrl+Y');
+                if (redone) {
                     e.preventDefault();
                 }
             }
