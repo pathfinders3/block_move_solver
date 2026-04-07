@@ -1872,6 +1872,7 @@ function countWhitePixels(ctx, x, y, size) {
         let fallbackPathRects = []; // 분류색이 없는 이동 가능 위치(파란색 표시)
         // 경로 버튼 클릭: 임시 노란색 사각형 (F9로 확정 전)
         let tempYellowRect = null; // {x: number, y: number, size: number} | null
+        let tempYellowClickVariant = 0; // 경로 버튼 재클릭 시 임시 사각형 테두리색 교대 표시용
         // F9: 확정된 노란색 사각형들을 저장하는 배열
         let yellowRects = []; // {x: number, y: number, size: number, role?: 'start'|'middle'|'end'}[]
         let polylineIdSeq = 1;
@@ -2360,7 +2361,11 @@ function countWhitePixels(ctx, x, y, size) {
                         );
                         
                         // 임시 노란색 사각형만 설정 (F9로 확정 전까지는 이동 안 함)
-                        tempYellowRect = finalRect;
+                        tempYellowClickVariant = (tempYellowClickVariant + 1) % 2;
+                        tempYellowRect = {
+                            ...finalRect,
+                            clickVariant: tempYellowClickVariant
+                        };
                         
                         if (normalizedTarget.snapped) {
                             updateTempYellowAngle();
@@ -3465,8 +3470,9 @@ function countWhitePixels(ctx, x, y, size) {
                 
                 // 임시 노란색 사각형 그리기 (F9로 확정 전, 점선 테두리)
                 if (tempYellowRect) {
-                    ctx2.fillStyle = 'rgba(255, 200, 0, 0.4)'; // 조금 더 진한 노란색
-                    ctx2.strokeStyle = 'rgba(255, 150, 0, 1.0)';
+                    const isVariantA = (tempYellowRect.clickVariant || 0) % 2 === 0;
+                    ctx2.fillStyle = isVariantA ? 'rgba(255, 200, 0, 0.4)' : 'rgba(255, 170, 40, 0.42)';
+                    ctx2.strokeStyle = isVariantA ? 'rgba(255, 150, 0, 1.0)' : 'rgba(255, 70, 0, 1.0)';
                     ctx2.lineWidth = Math.max(2, scale/6);
                     ctx2.setLineDash([5, 5]); // 점선
                     
