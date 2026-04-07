@@ -1073,6 +1073,15 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
+        function showRoleActionInfoMessage(message) {
+            roleActionDisplayTimer = showTempMessage({
+                elementId: 'roleActionDisplay',
+                text: `✅ ${message}`,
+                className: 'status-role-start',
+                previousTimerId: roleActionDisplayTimer
+            });
+        }
+
         function showRoleActionErrorMessage(message) {
             roleActionDisplayTimer = showTempMessage({
                 elementId: 'roleActionDisplay',
@@ -1155,6 +1164,9 @@ function countWhitePixels(ctx, x, y, size) {
             addYellowRectWithAngleCheck(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
             const confirmedRect = yellowRects[yellowRects.length - 1];
             showMergeStateMessage(triggerKey, confirmedRect);
+            if (normalizedTarget.snapped) {
+                showRoleActionInfoMessage(`MERGE 정규화 저장: ${confirmedRect.size}x${confirmedRect.size}로 저장됨`);
+            }
 
             // 경로 재계산 (새로 확정된 각도를 기준으로)
             if (showCorners) {
