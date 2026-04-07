@@ -1082,15 +1082,6 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
-        function showRoleActionInfoMessage(message) {
-            roleActionDisplayTimer = showTempMessage({
-                elementId: 'roleActionDisplay',
-                text: `ℹ️ ${message}`,
-                className: 'status-role-info',
-                previousTimerId: roleActionDisplayTimer
-            });
-        }
-
         function showGoMetaMessage(rect, index) {
             if (!rect) return;
 
@@ -1125,12 +1116,6 @@ function countWhitePixels(ctx, x, y, size) {
                 return false;
             }
 
-            const originalTempRect = {
-                x: tempYellowRect.x,
-                y: tempYellowRect.y,
-                size: tempYellowRect.size
-            };
-
             const normalizedTarget = normalizeRectToFullOverlapTarget(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
             if (normalizedTarget.snapped) {
                 tempYellowRect = {
@@ -1142,18 +1127,6 @@ function countWhitePixels(ctx, x, y, size) {
                     `   [${triggerKey}] full-overlap 정규화 적용: ` +
                     `기존 점 #${normalizedTarget.targetIndex + 1} (${tempYellowRect.x},${tempYellowRect.y}, size=${tempYellowRect.size})`
                 );
-
-                const changed =
-                    originalTempRect.x !== tempYellowRect.x ||
-                    originalTempRect.y !== tempYellowRect.y ||
-                    originalTempRect.size !== tempYellowRect.size;
-
-                if (changed) {
-                    showRoleActionInfoMessage(
-                        `[${triggerKey}] 자동 변환: ${originalTempRect.size}x${originalTempRect.size} → ` +
-                        `${tempYellowRect.size}x${tempYellowRect.size}`
-                    );
-                }
             }
 
             const whiteCheck = isAllWhiteRect(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
