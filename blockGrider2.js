@@ -147,6 +147,62 @@
     };
   }
 
+  // JSON import 시 mergeState=true 점들을 좌표 기준으로 연결 관계로 복원한다.
+  function buildConnectionsFromMergeState(segments) {
+    if (!Array.isArray(segments) || segments.length === 0) return [];
+
+    const buckets = new Map();
+    segments.forEach((segment, segmentIndex) => {
+      (segment.points || []).forEach((point, pointIndex) => {
+        if (!point || !point.mergeState) return;
+        const key = `${point.x},${point.y}`;
+        if (!buckets.has(key)) {
+          buckets.set(key, []);
+        }
+        buckets.get(key).push({ segmentIndex, pointIndex });
+      });
+    });
+
+    const connections = [];
+    const seenPairs = new Set();
+
+    buckets.forEach(items => {
+      if (!Array.isArray(items) || items.length < 2) return;
+
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          const fromRef = items[i];
+          const toRef = items[j];
+
+          const fromSegment = segments[fromRef.segmentIndex];
+          const toSegment = segments[toRef.segmentIndex];
+          if (!fromSegment || !toSegment) continue;
+
+          const a = `${fromSegment.id}:${fromRef.pointIndex}`;
+          const b = `${toSegment.id}:${toRef.pointIndex}`;
+          const pairKey = a < b ? `${a}|${b}` : `${b}|${a}`;
+          if (seenPairs.has(pairKey)) continue;
+          seenPairs.add(pairKey);
+
+          connections.push({
+            id: createConnectionId(),
+            from: {
+              segmentId: fromSegment.id,
+              pointIndex: fromRef.pointIndex
+            },
+            to: {
+              segmentId: toSegment.id,
+              pointIndex: toRef.pointIndex
+            },
+            distance: 0
+          });
+        }
+      }
+    });
+
+    return connections;
+  }
+
   function getAllPoints(groups) {
     const points = [];
     groups.forEach(group => {
@@ -2375,7 +2431,9 @@
         fallbackPoints[0].canConnect = true;
         fallbackPoints[fallbackPoints.length - 1].canConnect = true;
       }
-      return createGroupFromPoints(fallbackPoints);
+      const group = createGroupFromPoints(fallbackPoints);
+      group.connections = buildConnectionsFromMergeState(group.segments);
+      return group;
     }
 
     const pointBySourceIndex = new Map();
@@ -2456,13 +2514,15 @@
         fallbackPoints[0].canConnect = true;
         fallbackPoints[fallbackPoints.length - 1].canConnect = true;
       }
-      return createGroupFromPoints(fallbackPoints);
+      const group = createGroupFromPoints(fallbackPoints);
+      group.connections = buildConnectionsFromMergeState(group.segments);
+      return group;
     }
 
     return {
       id: createGroupId(),
       segments,
-      connections: []
+      connections: buildConnectionsFromMergeState(segments)
     };
   }
 
