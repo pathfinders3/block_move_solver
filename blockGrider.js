@@ -993,6 +993,7 @@ function countWhitePixels(ctx, x, y, size) {
         let goMetaDisplayTimer = null;
         let lastClickedYellowPoint = null;
         let lastClickedMatchedIndices = [];
+        let lastMergeTabCycleKey = '';
 
         function areSamePoint(pointA, pointB) {
             return pointA && pointB && pointA.x === pointB.x && pointA.y === pointB.y;
@@ -1003,6 +1004,48 @@ function countWhitePixels(ctx, x, y, size) {
             for (let i = 0; i < a.length; i++) {
                 if (a[i] !== b[i]) return false;
             }
+            return true;
+        }
+
+        function cycleToMergedYellowRect(reverse = false) {
+            if (currentYellowIndex === -1 || yellowRects.length === 0) {
+                showRoleActionErrorMessage('TAB 전환할 MERGE 점이 없습니다.');
+                return false;
+            }
+
+            const baseRect = yellowRects[currentYellowIndex];
+            if (!baseRect) {
+                showRoleActionErrorMessage('현재 선택 점을 찾을 수 없습니다.');
+                return false;
+            }
+
+            const mergedIndices = yellowRects
+                .map((rect, index) => ({ rect, index }))
+                .filter(item => classifyRectOverlap(baseRect.x, baseRect.y, baseRect.size, item.rect) === 'full')
+                .map(item => item.index)
+                .sort((a, b) => a - b);
+
+            if (mergedIndices.length <= 1) {
+                showRoleActionErrorMessage('TAB 전환 대상 MERGE 점이 없습니다.');
+                return false;
+            }
+
+            const cycleKey = mergedIndices.join(',');
+            let currentPos = mergedIndices.indexOf(currentYellowIndex);
+            if (currentPos === -1) currentPos = 0;
+
+            // 순환 군집이 바뀌면 현재 위치 기준으로 한 칸 이동부터 시작
+            if (lastMergeTabCycleKey !== cycleKey) {
+                lastMergeTabCycleKey = cycleKey;
+            }
+
+            const nextPos = reverse
+                ? (currentPos - 1 + mergedIndices.length) % mergedIndices.length
+                : (currentPos + 1) % mergedIndices.length;
+            const targetIndex = mergedIndices[nextPos];
+
+            goToYellowRect(targetIndex);
+            showRoleActionInfoMessage(`MERGE TAB 전환: [${targetIndex + 1}/${yellowRects.length}]`);
             return true;
         }
 
@@ -1625,6 +1668,14 @@ function countWhitePixels(ctx, x, y, size) {
                 const redone = redoLastDelete((e.metaKey && e.shiftKey) ? 'Cmd+Shift+Z' : 'Ctrl+Y');
                 if (redone) {
                     e.preventDefault();
+                }
+            }
+
+            if (!isTypingTarget && e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                const switched = cycleToMergedYellowRect(e.shiftKey);
+                e.preventDefault();
+                if (!switched) {
+                    showRoleActionErrorMessage('TAB 전환 대상이 없어 기본 TAB 이동을 막았습니다.');
                 }
             }
 
