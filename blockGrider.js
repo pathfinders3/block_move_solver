@@ -1082,6 +1082,15 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
+        function showRoleActionInfoMessage(message) {
+            roleActionDisplayTimer = showTempMessage({
+                elementId: 'roleActionDisplay',
+                text: `ℹ️ ${message}`,
+                className: 'status-role-info',
+                previousTimerId: roleActionDisplayTimer
+            });
+        }
+
         function showGoMetaMessage(rect, index) {
             if (!rect) return;
 
@@ -1114,6 +1123,37 @@ function countWhitePixels(ctx, x, y, size) {
             if (!tempYellowRect) {
                 console.log(`❌ 확정할 임시 노란색 사각형이 없습니다.`);
                 return false;
+            }
+
+            const originalTempRect = {
+                x: tempYellowRect.x,
+                y: tempYellowRect.y,
+                size: tempYellowRect.size
+            };
+
+            const normalizedTarget = normalizeRectToFullOverlapTarget(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
+            if (normalizedTarget.snapped) {
+                tempYellowRect = {
+                    x: normalizedTarget.x,
+                    y: normalizedTarget.y,
+                    size: normalizedTarget.size
+                };
+                console.log(
+                    `   [${triggerKey}] full-overlap 정규화 적용: ` +
+                    `기존 점 #${normalizedTarget.targetIndex + 1} (${tempYellowRect.x},${tempYellowRect.y}, size=${tempYellowRect.size})`
+                );
+
+                const changed =
+                    originalTempRect.x !== tempYellowRect.x ||
+                    originalTempRect.y !== tempYellowRect.y ||
+                    originalTempRect.size !== tempYellowRect.size;
+
+                if (changed) {
+                    showRoleActionInfoMessage(
+                        `[${triggerKey}] 자동 변환: ${originalTempRect.size}x${originalTempRect.size} → ` +
+                        `${tempYellowRect.size}x${tempYellowRect.size}`
+                    );
+                }
             }
 
             const whiteCheck = isAllWhiteRect(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
@@ -1760,6 +1800,31 @@ function countWhitePixels(ctx, x, y, size) {
             return (rect1InsideRect2 || rect2InsideRect1) ? 'full' : 'partial';
         }
 
+        // 기존 노란 사각형과 full 겹침이면 가장 큰 기존 사각형으로 좌표/크기를 정규화
+        function normalizeRectToFullOverlapTarget(x, y, size) {
+            const fullOverlapCandidates = yellowRects
+                .map((rect, index) => ({ rect, index }))
+                .filter(item => classifyRectOverlap(x, y, size, item.rect) === 'full');
+
+            if (fullOverlapCandidates.length === 0) {
+                return { x, y, size, snapped: false, targetIndex: -1 };
+            }
+
+            fullOverlapCandidates.sort((a, b) => {
+                if (b.rect.size !== a.rect.size) return b.rect.size - a.rect.size;
+                return a.index - b.index;
+            });
+
+            const target = fullOverlapCandidates[0];
+            return {
+                x: target.rect.x,
+                y: target.rect.y,
+                size: target.rect.size,
+                snapped: true,
+                targetIndex: target.index
+            };
+        }
+
         // 경로 후보 사각형의 각도 및 각도차 계산
         function getPathRectAngleInfo(pt, cornerSize, baseX, baseY, expectedAngle) {
             const targetX = pt.x + cornerSize / 2;
@@ -2159,20 +2224,33 @@ function countWhitePixels(ctx, x, y, size) {
                 if (!btn.disabled) {
                     btn.onclick = () => {
                         const idx = btn.getAttribute('data-idx');
-                        const x = parseInt(btn.getAttribute('data-x'));
-                        const y = parseInt(btn.getAttribute('data-y'));
-                        const angle = parseInt(btn.getAttribute('data-angle')); // 미리 계산된 각도
-                        
-                        console.log(`✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${cornerSize}x${cornerSize}, 각도: ${angle}°`);
-                        
-                        // 임시 노란색 사각형만 설정 (F9로 확정 전까지는 이동 안 함)
-                        tempYellowRect = {
-                            x: x,
-                            y: y,
-                            size: cornerSize
+                        const x = parseInt(btn.getAttribute('data-x'), 10);
+                        const y = parseInt(btn.getAttribute('data-y'), 10);
+                        const sizeFromButton = parseInt(btn.getAttribute('data-size'), 10);
+                        const angle = parseInt(btn.getAttribute('data-angle'), 10); // 미리 계산된 각도
+                        const candidateSize = Number.isFinite(sizeFromButton) ? sizeFromButton : cornerSize;
+                        const normalizedTarget = normalizeRectToFullOverlapTarget(x, y, candidateSize);
+                        const finalRect = {
+                            x: normalizedTarget.x,
+                            y: normalizedTarget.y,
+                            size: normalizedTarget.size
                         };
                         
-                        updateTempYellowAngle(angle); // 미리 계산된 각도 전달
+                        console.log(
+                            `✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${candidateSize}x${candidateSize}, 각도: ${angle}°` +
+                            (normalizedTarget.snapped
+                                ? ` → full-overlap 정규화: (${finalRect.x}, ${finalRect.y}), 크기: ${finalRect.size}x${finalRect.size}`
+                                : '')
+                        );
+                        
+                        // 임시 노란색 사각형만 설정 (F9로 확정 전까지는 이동 안 함)
+                        tempYellowRect = finalRect;
+                        
+                        if (normalizedTarget.snapped) {
+                            updateTempYellowAngle();
+                        } else {
+                            updateTempYellowAngle(angle); // 미리 계산된 각도 전달
+                        }
                         
                         console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
                         scaleCanvas();
