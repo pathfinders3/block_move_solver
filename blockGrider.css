@@ -142,12 +142,6 @@ canvas {
     border: 1px solid #911b14;
 }
 
-.status-role-info {
-    color: #0b2e4f;
-    background-color: #d7ecff;
-    border: 1px solid #8cc4f5;
-}
-
 .status-go {
     color: #ffffff;
     background-color: #092d63; /* 진한 하늘색 */
