@@ -1082,6 +1082,24 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
+        function showHistoryActionMessage(actionLabel, sourceLabel = '') {
+            const safeAction = actionLabel === 'REDO' ? 'REDO' : 'UNDO';
+            const className = safeAction === 'REDO' ? 'status-role-end' : 'status-role-start';
+            const compactSource = String(sourceLabel || '')
+                .split('·')
+                .map(part => part.trim())
+                .filter(Boolean)
+                .pop() || '';
+            const text = compactSource ? `[${safeAction}] ${compactSource}` : `[${safeAction}]`;
+
+            roleActionDisplayTimer = showTempMessage({
+                elementId: 'roleActionDisplay',
+                text,
+                className,
+                previousTimerId: roleActionDisplayTimer
+            });
+        }
+
         function showRoleActionErrorMessage(message) {
             roleActionDisplayTimer = showTempMessage({
                 elementId: 'roleActionDisplay',
@@ -1431,6 +1449,7 @@ function countWhitePixels(ctx, x, y, size) {
             const prev = deleteUndoStack.pop();
             restoreDeleteEditState(prev);
             console.log(`↩️ [${triggerLabel}] 작업 되돌리기 완료 (${prev.triggerLabel}).`);
+            showHistoryActionMessage('UNDO', `${triggerLabel} · ${prev.triggerLabel}`);
             return true;
         }
 
@@ -1448,6 +1467,7 @@ function countWhitePixels(ctx, x, y, size) {
             const next = deleteRedoStack.pop();
             restoreDeleteEditState(next);
             console.log(`↪️ [${triggerLabel}] 작업 다시 실행 완료 (${next.triggerLabel || 'redo'}).`);
+            showHistoryActionMessage('REDO', `${triggerLabel} · ${next.triggerLabel || 'redo'}`);
             return true;
         }
 
