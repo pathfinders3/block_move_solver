@@ -1689,7 +1689,8 @@ function countWhitePixels(ctx, x, y, size) {
                     const styleText = (btn.getAttribute('style') || '').toLowerCase();
                     const isRed = styleText.includes('#ff0000');
                     const isOrange = styleText.includes('#ff8c00');
-                    if (!isRed && !isOrange) return null;
+                    const isThird = styleText.includes('#a39908');
+                    const isBlue = styleText.includes('#1867dd');
 
                     const x = parseInt(btn.getAttribute('data-x'), 10);
                     const y = parseInt(btn.getAttribute('data-y'), 10);
@@ -1711,6 +1712,9 @@ function countWhitePixels(ctx, x, y, size) {
                         btn,
                         key: `${x},${y},${size}`,
                         isRed,
+                        isOrange,
+                        isThird,
+                        isBlue,
                         direction: classifyDirectionFromAngle(angle)
                     };
                 })
@@ -1731,8 +1735,17 @@ function countWhitePixels(ctx, x, y, size) {
             };
 
             const redCandidates = uniqueByRect(filteredByDirection.filter(item => item.isRed));
-            const orangeCandidates = uniqueByRect(filteredByDirection.filter(item => !item.isRed));
-            const target = redCandidates[0] || orangeCandidates[0];
+            const orangeCandidates = uniqueByRect(filteredByDirection.filter(item => !item.isRed && item.isOrange));
+            const thirdCandidates = uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && item.isThird));
+            const blueCandidates = uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && !item.isThird && item.isBlue));
+            const fallbackCandidates = uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && !item.isThird && !item.isBlue));
+
+            const target =
+                redCandidates[0] ||
+                orangeCandidates[0] ||
+                thirdCandidates[0] ||
+                blueCandidates[0] ||
+                fallbackCandidates[0];
             if (!target) return false;
 
             target.btn.click();
