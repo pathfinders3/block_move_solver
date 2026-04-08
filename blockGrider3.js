@@ -6,6 +6,7 @@
   const badgeGroups = document.getElementById('badgeGroups');
   const badgePoints = document.getElementById('badgePoints');
   const btnCopy = document.getElementById('btnCopy');
+  const btnCopyForBg2 = document.getElementById('btnCopyForBg2');
   const btnCopyBitmap = document.getElementById('btnCopyBitmap');
   const btnRestoreOriginal = document.getElementById('btnRestoreOriginal');
   const btnReload = document.getElementById('btnReload');
@@ -29,6 +30,7 @@
     badgeGroups,
     badgePoints,
     btnCopy,
+    btnCopyForBg2,
     btnCopyBitmap,
     btnRestoreOriginal,
     btnReload,
@@ -576,6 +578,61 @@
     return JSON.parse(text);
   }
 
+  function toBlockGrider2Payload(payload) {
+    const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
+    const rects = [];
+    const polylines = [];
+
+    groups.forEach(group => {
+      const segments = Array.isArray(group && group.segments) ? group.segments : [];
+      segments.forEach(segment => {
+        const points = Array.isArray(segment && segment.points) ? segment.points : [];
+        const pointIndices = [];
+
+        points.forEach(point => {
+          const x = Number(point && point.x);
+          const y = Number(point && point.y);
+          const size = Number(point && point.size);
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size) || size <= 0) {
+            return;
+          }
+
+          rects.push({
+            x: Math.round(x),
+            y: Math.round(y),
+            size: Math.round(size),
+            canConnect: !!(point && point.canConnect)
+          });
+          pointIndices.push(rects.length - 1);
+        });
+
+        if (pointIndices.length > 0) {
+          polylines.push({ pointIndices });
+        }
+      });
+    });
+
+    return {
+      rects,
+      polylines
+    };
+  }
+
+  function getPayloadForBg2Copy() {
+    try {
+      const parsed = parseOutputPayload();
+      if (parsed && Array.isArray(parsed.groups)) return parsed;
+    } catch (error) {
+      // textarea 파싱 실패 시 렌더된 payload로 fallback
+    }
+
+    if (currentPayload && Array.isArray(currentPayload.groups)) {
+      return currentPayload;
+    }
+
+    return null;
+  }
+
   function applyDpSimplification(options) {
     const opts = options || {};
     const refreshSourceFromTextarea = !!opts.refreshSourceFromTextarea;
@@ -680,6 +737,31 @@
       setStatus('JSON을 클립보드에 복사했습니다.', false);
     } catch (error) {
       setStatus('클립보드 복사에 실패했습니다.', true);
+    }
+  });
+
+  btnCopyForBg2.addEventListener('click', async () => {
+    const sourcePayload = getPayloadForBg2Copy();
+    if (!sourcePayload) {
+      setStatus('변환할 groups 데이터가 없습니다. 먼저 JSON을 수신하거나 유효한 JSON을 입력해주세요.', true);
+      return;
+    }
+
+    const converted = toBlockGrider2Payload(sourcePayload);
+    if (!Array.isArray(converted.rects) || converted.rects.length === 0) {
+      setStatus('변환 결과에 유효한 rect가 없어 복사하지 않았습니다.', true);
+      return;
+    }
+
+    const text = JSON.stringify(converted, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus(
+        `blockGrider2 호환 JSON 복사 완료: rect ${converted.rects.length}개, polyline ${converted.polylines.length}개`,
+        false
+      );
+    } catch (error) {
+      setStatus('blockGrider2 호환 JSON 클립보드 복사에 실패했습니다.', true);
     }
   });
 
