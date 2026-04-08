@@ -557,6 +557,24 @@ function countWhitePixels(ctx, x, y, size) {
             return nextId;
         }
 
+        function syncPolylineIdSeqFromRects(rects) {
+            let maxSeq = 0;
+            for (let i = 0; i < rects.length; i++) {
+                const polylineId = rects[i] && rects[i].polylineId;
+                if (!isValidPolylineId(polylineId)) continue;
+
+                const match = /^PL(\d+)$/.exec(polylineId);
+                if (!match) continue;
+
+                const seq = parseInt(match[1], 10);
+                if (Number.isFinite(seq) && seq > maxSeq) {
+                    maxSeq = seq;
+                }
+            }
+
+            polylineIdSeq = Math.max(1, maxSeq + 1);
+        }
+
         function ensureActivePolylineId() {
             if (!isValidPolylineId(activePolylineId)) {
                 activePolylineId = createPolylineId();
@@ -601,6 +619,7 @@ function countWhitePixels(ctx, x, y, size) {
             const role = options.role;
             const assignedPolylineId = options.polylineId || ensureActivePolylineId();
             const pointOrder = getNextPointOrder(assignedPolylineId);
+            const isPolylineFirstPoint = (pointOrder === 1);
             // 이전 사각형으로부터의 각도 계산
             let angle = null;
             let angleExceeded = false;
@@ -619,7 +638,8 @@ function countWhitePixels(ctx, x, y, size) {
                 });
             }
             
-            if (yellowRects.length > 0) {
+            // 새 폴리라인의 첫 점(start)은 이전 폴리라인과 각도 비교를 하지 않는다.
+            if (yellowRects.length > 0 && !isPolylineFirstPoint) {
                 const prevRect = yellowRects[yellowRects.length - 1];
                 angle = calculateRectToRectAngle(prevRect.x, prevRect.y, prevRect.size, x, y, size);
                 
@@ -3136,6 +3156,122 @@ function countWhitePixels(ctx, x, y, size) {
             }
         });
 
+        // Paste Rects 버튼: 클립보드 JSON을 읽어 노란색 사각형 목록을 복원
+        document.getElementById('btnPasteRects').addEventListener('click', async () => {
+            let jsonText = '';
+
+            try {
+                jsonText = await navigator.clipboard.readText();
+            } catch (err) {
+                console.error('❌ 클립보드 텍스트 읽기 실패:', err);
+                return;
+            }
+
+            if (!jsonText || jsonText.trim().length === 0) {
+                console.log('❌ 클립보드가 비어 있습니다.');
+                return;
+            }
+
+            let parsed;
+            try {
+                parsed = JSON.parse(jsonText);
+            } catch (err) {
+                console.error('❌ JSON 파싱 실패: 올바른 JSON 텍스트가 아닙니다.', err);
+                return;
+            }
+
+            const sourceRects = Array.isArray(parsed)
+                ? parsed
+                : (parsed && Array.isArray(parsed.rects) ? parsed.rects : null);
+
+            if (!Array.isArray(sourceRects)) {
+                console.log('❌ JSON 형식이 올바르지 않습니다. 배열 또는 { rects: [...] } 형식이 필요합니다.');
+                return;
+            }
+
+            const normalizedRects = [];
+            const pointOrderByPolyline = new Map();
+
+            for (let i = 0; i < sourceRects.length; i++) {
+                const raw = sourceRects[i] || {};
+                const x = Number(raw.x);
+                const y = Number(raw.y);
+                const size = Number(raw.size);
+
+                if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size) || size <= 0) {
+                    console.log(`❌ ${i + 1}번째 rect 형식 오류: x/y/size는 유효한 숫자이고 size는 1 이상이어야 합니다.`);
+                    return;
+                }
+
+                const polylineId = isValidPolylineId(raw.polylineId) ? raw.polylineId : null;
+                let pointOrder = null;
+                if (polylineId) {
+                    const nextOrder = (pointOrderByPolyline.get(polylineId) || 0) + 1;
+                    pointOrderByPolyline.set(polylineId, nextOrder);
+                    pointOrder = nextOrder;
+                }
+
+                const angle = Number(raw.angle);
+                const expectedAngle = Number(raw.expectedAngle);
+                const angleDiff = Number(raw.angleDiff);
+
+                normalizedRects.push({
+                    x: Math.trunc(x),
+                    y: Math.trunc(y),
+                    size: Math.max(1, Math.trunc(size)),
+                    angle: Number.isFinite(angle) ? angle : null,
+                    angleExceeded: !!(raw.angleExceeded || raw.sharpTurn),
+                    angleDiff: Number.isFinite(angleDiff) ? angleDiff : null,
+                    expectedAngle: Number.isFinite(expectedAngle) ? expectedAngle : null,
+                    mergeState: !!raw.mergeState,
+                    role: normalizeRole(raw.role),
+                    polylineId,
+                    pointOrder
+                });
+            }
+
+            const recalculatedMergeStates = normalizedRects.map((rect, rectIndex) =>
+                normalizedRects.some((otherRect, otherIndex) => {
+                    if (rectIndex === otherIndex) return false;
+                    return classifyRectOverlap(rect.x, rect.y, rect.size, otherRect) === 'full';
+                })
+            );
+
+            for (let i = 0; i < normalizedRects.length; i++) {
+                normalizedRects[i].mergeState = normalizedRects[i].mergeState || recalculatedMergeStates[i];
+            }
+
+            yellowRects = normalizedRects;
+            currentYellowIndex = yellowRects.length > 0 ? (yellowRects.length - 1) : -1;
+            polylineHighlightRange = null;
+            goStartHighlightIndex = -1;
+
+            if (yellowRects.length === 0) {
+                selectedPixel = null;
+                activePolylineId = null;
+            } else {
+                const lastRect = yellowRects[yellowRects.length - 1];
+                selectedPixel = { x: lastRect.x, y: lastRect.y };
+                const rectSizeInput = document.getElementById('rectSize');
+                if (rectSizeInput) {
+                    rectSizeInput.value = String(lastRect.size);
+                }
+                activePolylineId = normalizeRole(lastRect.role) === 'end' ? null : (lastRect.polylineId || null);
+            }
+
+            syncPolylineIdSeqFromRects(yellowRects);
+            updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
+            refreshPolylineRangeControl();
+
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+
+            scaleCanvas();
+            console.log(`✅ Paste Rects 완료: 사각형 ${yellowRects.length}개를 클립보드 JSON에서 불러왔습니다.`);
+        });
+
         // 자동 F9 버튼: 빨간 후보 1개일 때 선택+확정을 한 번에 수행
         document.getElementById('btnAutoF9').addEventListener('click', () => {
             runAutoF9Step();
@@ -3351,9 +3487,9 @@ function countWhitePixels(ctx, x, y, size) {
             origScaleCanvas(); // 원래 내용 실행
             const index = parseInt(scaleRange.value);
             const scale = scaleValues[index];
+            ctx2.save();
             if (selectedPixel) {
                 const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
-                ctx2.save();
                 // 메인 사각형: 빨강/검정 점선
                 ctx2.strokeStyle = 'red';
                 ctx2.lineWidth = Math.max(1, scale/8);
@@ -3408,9 +3544,10 @@ function countWhitePixels(ctx, x, y, size) {
                     drawCategoryDots(secondaryPathRects, 'rgba(255, 140, 0, 0.86)', 'rgba(255, 228, 180, 0.96)', 3.9); // 주황
                     drawCategoryDots(recommendedPathRects, 'rgba(255, 0, 0, 0.94)', 'rgba(255, 255, 255, 0.96)', 3.2); // 빨강
                 }
-                ctx2.setLineDash([]);
-                
-                // F8/F9로 확정된 노란색 사각형들 그리기
+            }
+            ctx2.setLineDash([]);
+
+            // F8/F9로 확정된 노란색 사각형들 그리기
                 if (yellowRects.length > 0) {
                     for (let i = 0; i < yellowRects.length; i++) {
                         const rect = yellowRects[i];
@@ -3461,7 +3598,7 @@ function countWhitePixels(ctx, x, y, size) {
                         const terminal = getPolylineTerminalInfo(i);
                         if (terminal.isStart || terminal.isEnd) {
                             // START는 검정, END는 회색, 둘 다이면 START를 우선 표시
-                            ctx2.strokeStyle = terminal.isStart ? 'rgba(0, 0, 0, 0.98)' : 'rgba(120, 120, 120, 0.98)';
+                            ctx2.strokeStyle = terminal.isStart ? 'rgb(20, 22, 158)' : 'rgb(60, 58, 68)';
                             ctx2.lineWidth = Math.max(2, scale / 5);
                             ctx2.strokeRect(rect.x * scale+0.5, rect.y * scale+0.5, rect.size * scale-1, rect.size * scale-1);
                         }
@@ -3480,7 +3617,6 @@ function countWhitePixels(ctx, x, y, size) {
                     ctx2.strokeRect(tempYellowRect.x * scale+0.5, tempYellowRect.y * scale+0.5, tempYellowRect.size * scale-1, tempYellowRect.size * scale-1);
                     ctx2.setLineDash([]); // 점선 해제
                 }
-                
-                ctx2.restore();
-            }
+
+            ctx2.restore();
         }
