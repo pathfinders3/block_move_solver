@@ -998,10 +998,8 @@ function countWhitePixels(ctx, x, y, size) {
                 }
                 
                 // 좌표 표시
-                const tempYellowXInput = document.getElementById('tempYellowX');
-                const tempYellowYInput = document.getElementById('tempYellowY');
-                if (tempYellowXInput) tempYellowXInput.value = tempYellowRect.x;
-                if (tempYellowYInput) tempYellowYInput.value = tempYellowRect.y;
+                const tempYellowCoordInput = document.getElementById('tempYellowCoord');
+                if (tempYellowCoordInput) tempYellowCoordInput.value = `${tempYellowRect.x},${tempYellowRect.y}`;
                 
                 return angle;
             }
@@ -1266,10 +1264,8 @@ function countWhitePixels(ctx, x, y, size) {
             if (angleDisplay) angleDisplay.innerHTML = '';
 
             // 좌표 표시 초기화
-            const tempYellowXInput = document.getElementById('tempYellowX');
-            const tempYellowYInput = document.getElementById('tempYellowY');
-            if (tempYellowXInput) tempYellowXInput.value = '-';
-            if (tempYellowYInput) tempYellowYInput.value = '-';
+            const tempYellowCoordInput = document.getElementById('tempYellowCoord');
+            if (tempYellowCoordInput) tempYellowCoordInput.value = '-';
 
             scaleCanvas(); // 화면 갱신
             return true;
