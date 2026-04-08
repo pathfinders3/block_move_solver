@@ -1648,6 +1648,97 @@ function countWhitePixels(ctx, x, y, size) {
             resetPriorityBorderCountsDisplay();
         }
 
+        function classifyDirectionFromAngle(angle) {
+            const normalized = ((angle % 360) + 360) % 360;
+
+            if (normalized >= 337.5 || normalized < 22.5) return 'right';
+            if (normalized >= 22.5 && normalized < 67.5) return 'upRight';
+            if (normalized >= 67.5 && normalized < 112.5) return 'up';
+            if (normalized >= 112.5 && normalized < 157.5) return 'upLeft';
+            if (normalized >= 157.5 && normalized < 202.5) return 'left';
+            if (normalized >= 202.5 && normalized < 247.5) return 'downLeft';
+            if (normalized >= 247.5 && normalized < 292.5) return 'down';
+            return 'downRight';
+        }
+
+        function triggerPathButtonByNumpadKey(rawKey) {
+            const key = (rawKey || '').toUpperCase();
+            const keyToDirection = {
+                Q: 'upLeft',
+                W: 'up',
+                E: 'upRight',
+                A: 'left',
+                S: 'center',
+                D: 'right',
+                Z: 'downLeft',
+                X: 'down',
+                C: 'downRight'
+            };
+
+            const requestedDirection = keyToDirection[key];
+            if (!requestedDirection) return false;
+
+            const pathWhiteContent = document.getElementById('pathWhiteContent');
+            if (!pathWhiteContent) return false;
+
+            const allButtons = Array.from(pathWhiteContent.querySelectorAll('button[data-path]')).filter(btn => !btn.disabled);
+            if (allButtons.length === 0) return false;
+
+            const withPriority = allButtons
+                .map(btn => {
+                    const styleText = (btn.getAttribute('style') || '').toLowerCase();
+                    const isRed = styleText.includes('#ff0000');
+                    const isOrange = styleText.includes('#ff8c00');
+                    if (!isRed && !isOrange) return null;
+
+                    const x = parseInt(btn.getAttribute('data-x'), 10);
+                    const y = parseInt(btn.getAttribute('data-y'), 10);
+                    const size = parseInt(btn.getAttribute('data-size'), 10);
+                    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size)) return null;
+
+                    let angle = parseFloat(btn.getAttribute('data-angle'));
+                    if (!Number.isFinite(angle) && selectedPixel) {
+                        const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
+                        const baseX = selectedPixel.x + rectSize / 2;
+                        const baseY = selectedPixel.y + rectSize / 2;
+                        const targetX = x + size / 2;
+                        const targetY = y + size / 2;
+                        angle = calculateCartesianAngle(targetX - baseX, targetY - baseY);
+                    }
+                    if (!Number.isFinite(angle)) return null;
+
+                    return {
+                        btn,
+                        key: `${x},${y},${size}`,
+                        isRed,
+                        direction: classifyDirectionFromAngle(angle)
+                    };
+                })
+                .filter(Boolean);
+
+            const filteredByDirection = requestedDirection === 'center'
+                ? withPriority
+                : withPriority.filter(item => item.direction === requestedDirection);
+
+            const uniqueByRect = (items) => {
+                const unique = new Map();
+                items.forEach(item => {
+                    if (!unique.has(item.key)) {
+                        unique.set(item.key, item);
+                    }
+                });
+                return Array.from(unique.values());
+            };
+
+            const redCandidates = uniqueByRect(filteredByDirection.filter(item => item.isRed));
+            const orangeCandidates = uniqueByRect(filteredByDirection.filter(item => !item.isRed));
+            const target = redCandidates[0] || orangeCandidates[0];
+            if (!target) return false;
+
+            target.btn.click();
+            return true;
+        }
+
         // F2, F4, F8, F9, F10, F11, DEL, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             const activeElement = document.activeElement;
@@ -1714,6 +1805,11 @@ function countWhitePixels(ctx, x, y, size) {
 
             if (!isTypingTarget && (e.key === ']' || e.key === '}')) {
                 adjustCornerSize(1);
+                e.preventDefault();
+            }
+
+            const noModifier = !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
+            if (!isTypingTarget && noModifier && triggerPathButtonByNumpadKey(e.key)) {
                 e.preventDefault();
             }
 
