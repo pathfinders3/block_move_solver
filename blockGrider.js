@@ -1729,16 +1729,43 @@ function countWhitePixels(ctx, x, y, size) {
                     const baseMaxPixels = rectSize * rectSize;
                     
                     if (baseWhiteCount === baseMaxPixels) {
+                        const normalizedTarget = normalizeRectToFullOverlapTarget(selectedPixel.x, selectedPixel.y, rectSize);
+                        const finalX = normalizedTarget.x;
+                        const finalY = normalizedTarget.y;
+                        const finalSize = normalizedTarget.size;
+
+                        if (normalizedTarget.snapped) {
+                            selectedPixel = { x: finalX, y: finalY };
+                            const rectSizeInput = document.getElementById('rectSize');
+                            if (rectSizeInput && parseInt(rectSizeInput.value, 10) !== finalSize) {
+                                rectSizeInput.value = String(finalSize);
+                            }
+
+                            console.log(
+                                `   [F8] full-overlap 정규화 적용: 기존 점 #${normalizedTarget.targetIndex + 1} ` +
+                                `(${finalX},${finalY}, size=${finalSize})`
+                            );
+                        }
+
                         // 새 start를 찍기 전에 기존 마지막 점을 end로 자동 확정
                         autoCloseLatestPointAsEndBeforeStart();
 
                         // F8으로 찍는 점은 start role로 저장
                         const nextPolylineId = createPolylineId();
                         activePolylineId = nextPolylineId;
-                        addYellowRectWithAngleCheck(selectedPixel.x, selectedPixel.y, rectSize, {
+                        addYellowRectWithAngleCheck(finalX, finalY, finalSize, {
                             role: 'start',
                             polylineId: nextPolylineId
                         });
+                        showMergeStateMessage('F8', yellowRects[yellowRects.length - 1]);
+                        if (normalizedTarget.snapped) {
+                            showRoleActionInfoMessage(`F8 MERGE start 저장: ${finalSize}x${finalSize}`);
+                        }
+
+                        if (showCorners && selectedPixel) {
+                            updateCornerAndPathInfo();
+                        }
+
                         scaleCanvas(); // 화면 갱신
                     } else {
                         showRoleActionErrorMessage(`사각형이 모두 흰색이 아닙니다. (${baseWhiteCount}/${baseMaxPixels})`);
