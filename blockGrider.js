@@ -1009,6 +1009,7 @@ function countWhitePixels(ctx, x, y, size) {
         let mergeStateDisplayTimer = null;
         let roleActionDisplayTimer = null;
         let goMetaDisplayTimer = null;
+        let canvas1AutoF9MessageTimer = null;
         let lastClickedYellowPoint = null;
         let lastClickedMatchedIndices = [];
         let lastMergeTabCycleKey = '';
@@ -1167,6 +1168,20 @@ function countWhitePixels(ctx, x, y, size) {
                 text: `❌ ${message}`,
                 className: 'status-role-error',
                 previousTimerId: roleActionDisplayTimer
+            });
+        }
+
+        function showCanvas1AutoF9Message(message) {
+            canvas1AutoF9MessageTimer = showTempMessage({
+                elementId: 'canvas1AutoF9Message',
+                text: `❌ ${message}`,
+                className: 'status-role-error',
+                previousTimerId: canvas1AutoF9MessageTimer,
+                onClear: (display) => {
+                    display.textContent = '';
+                    display.className = '';
+                    canvas1AutoF9MessageTimer = null;
+                }
             });
         }
 
@@ -1366,8 +1381,9 @@ function countWhitePixels(ctx, x, y, size) {
                     uniqueRedButtonMap.size > 0
                         ? `빨간 테두리 후보(중복제거) 수가 1개가 아님 (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`
                         : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`;
-                showRoleActionErrorMessage(`자동 F9 조건 불만족: ${reason}`);
-                console.log(`❌ 자동 F9 조건 불만족: ${reason}`);
+                const autoF9FailMessage = `자동 F9 조건 불만족: ${reason}`;
+                showCanvas1AutoF9Message(autoF9FailMessage);
+                console.log(`❌ ${autoF9FailMessage}`);
                 flashAutoF9ButtonError();
                 return false;
             }
