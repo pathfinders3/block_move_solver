@@ -1305,6 +1305,17 @@ function countWhitePixels(ctx, x, y, size) {
 
         // 자동 F9 한 스텝: 빨간 테두리 1개 우선, 없으면 주황 테두리 1개를 대체 선택
         function runAutoF9Step() {
+            // 사용자가 QWE/ASD/ZXC(또는 버튼 클릭)로 이미 1개 임시 점을 선택한 경우,
+            // F10은 해당 점을 우선 자동 확정한다.
+            if (tempYellowRect) {
+                const confirmedCurrentTemp = confirmTempYellowRect('F10');
+                if (confirmedCurrentTemp) {
+                    console.log('✅ 자동 F10: 기존 임시 선택 점을 우선 확정했습니다.');
+                    return true;
+                }
+                // 임시 점 확정 실패 시 기존 자동 선택 로직으로 계속 진행
+            }
+
             const pathWhiteContent = document.getElementById('pathWhiteContent');
             if (!pathWhiteContent) {
                 console.log('❌ 경로별 흰색점 영역을 찾을 수 없습니다.');
