@@ -421,8 +421,9 @@
     };
   }
 
-  function renderBitmapForClipboard(payload, lineThickness) {
-    const size = calculateCanvasSize(payload);
+  function renderBitmapForClipboard(payload, lineThickness, exportScale) {
+    const scale = Math.max(1, Math.round(Number(exportScale) || 1));
+    const size = calculateCanvasSize(payload) * scale;
     const bitmapCanvas = document.createElement('canvas');
     bitmapCanvas.width = size;
     bitmapCanvas.height = size;
@@ -435,12 +436,27 @@
     ctx.fillRect(0, 0, size, size);
 
     const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
-    const thickness = Math.max(1, Math.min(5, Math.round(Number(lineThickness) || DEFAULT_LINE_THICKNESS)));
+    const thickness = Math.max(1, Math.min(5, Math.round(Number(lineThickness) || DEFAULT_LINE_THICKNESS))) * scale;
 
     groups.forEach((group, groupIndex) => {
       (group.segments || []).forEach((segment, segmentIndex) => {
         const points = Array.isArray(segment.points) ? segment.points : [];
-        const normalized = points.map(normalizePoint);
+        const normalized = points
+          .map(normalizePoint)
+          .map(p => {
+            if (!p) return null;
+            const scaledX = p.x * scale;
+            const scaledY = p.y * scale;
+            const scaledSize = p.size * scale;
+            return {
+              ...p,
+              x: scaledX,
+              y: scaledY,
+              size: scaledSize,
+              centerX: p.centerX * scale,
+              centerY: p.centerY * scale
+            };
+          });
         const connectedIndices = new Set();
         const fillStyle = getDrawColor(groupIndex, segmentIndex);
 
@@ -798,7 +814,8 @@
 
     try {
       const lineThickness = getCurrentLineThickness();
-      const bitmapCanvas = renderBitmapForClipboard(currentPayload, lineThickness);
+      const exportScale = getCurrentScale();
+      const bitmapCanvas = renderBitmapForClipboard(currentPayload, lineThickness, exportScale);
       if (!bitmapCanvas) {
         setStatus('비트맵 캔버스 생성에 실패했습니다.', true);
         return;
@@ -812,13 +829,13 @@
           })
         ]);
 
-        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
+        setStatus(`비트맵(PNG)을 ${exportScale}배 확대 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
         return;
       }
 
       const copiedByLegacy = tryLegacyImageCopy(bitmapCanvas);
       if (copiedByLegacy) {
-        setStatus(`비트맵(PNG)을 원본 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드, 선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
+        setStatus(`비트맵(PNG)을 ${exportScale}배 확대 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드, 선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
       } else {
         setStatus('현재 브라우저는 이미지 클립보드 쓰기를 지원하지 않습니다. 크롬 최신 버전(HTTPS/localhost)에서 다시 시도해주세요.', true);
       }
