@@ -66,6 +66,7 @@
   const MAX_CANVAS_SIZE = 1024;
   const DEFAULT_DP_EPSILON = 1.5;
   const DP_AUTO_APPLY_DEBOUNCE_MS = 80;
+  const DP_TOLERANCE_STORAGE_KEY = 'blockGrider3.dpTolerance';
   const DEFAULT_LINE_THICKNESS = 1;
   const LINE_THICKNESS_STORAGE_KEY = 'blockGrider3.lineThickness';
   const COLOR_MODE_MONO = 'mono';
@@ -225,6 +226,28 @@
     const epsilon = Number(dpToleranceRange.value);
     if (!Number.isFinite(epsilon)) return DEFAULT_DP_EPSILON;
     return Math.max(0, epsilon);
+  }
+
+  function loadDpToleranceFromStorage() {
+    try {
+      const raw = localStorage.getItem(DP_TOLERANCE_STORAGE_KEY);
+      if (raw == null) return DEFAULT_DP_EPSILON;
+      const epsilon = Number(raw);
+      if (!Number.isFinite(epsilon)) return DEFAULT_DP_EPSILON;
+      return Math.max(0, epsilon);
+    } catch (error) {
+      return DEFAULT_DP_EPSILON;
+    }
+  }
+
+  function saveDpToleranceToStorage(value) {
+    try {
+      const epsilon = Number(value);
+      const safe = Number.isFinite(epsilon) ? Math.max(0, epsilon) : DEFAULT_DP_EPSILON;
+      localStorage.setItem(DP_TOLERANCE_STORAGE_KEY, String(safe));
+    } catch (error) {
+      // 저장 불가 환경(private mode 등)에서는 무시
+    }
   }
 
   function updateDpToleranceDisplay() {
@@ -830,6 +853,7 @@
   });
 
   dpToleranceRange.addEventListener('input', () => {
+    saveDpToleranceToStorage(dpToleranceRange.value);
     updateDpToleranceDisplay();
     scheduleAutoDpApply();
   });
@@ -859,6 +883,7 @@
     }
   });
 
+  dpToleranceRange.value = String(loadDpToleranceFromStorage());
   lineThicknessRange.value = String(loadLineThicknessFromStorage());
 
   updateDpToleranceDisplay();
