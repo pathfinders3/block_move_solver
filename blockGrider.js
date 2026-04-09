@@ -1461,6 +1461,56 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        function deleteYellowRectsFromStartToCurrent(triggerLabel = 'Shift+Del 버튼') {
+            if (currentYellowIndex === -1 || yellowRects.length === 0) {
+                console.log('❌ 삭제할 노란색 사각형이 선택되지 않았습니다.');
+                return false;
+            }
+
+            const range = resolveStartToCurrentRange(currentYellowIndex);
+            if (!range) {
+                console.log('❌ 현재 점이 속한 폴리라인의 시작점을 찾을 수 없습니다.');
+                return false;
+            }
+
+            const deleteStart = range.startIndex;
+            const deleteCount = range.endIndex - range.startIndex + 1;
+
+            if (deleteCount <= 0) {
+                console.log('ℹ️ 선택된 사각형 앞에 삭제할 항목이 없습니다.');
+                return false;
+            }
+
+            pushDeleteUndoState(triggerLabel);
+
+            yellowRects.splice(deleteStart, deleteCount);
+
+            // 폴리라인 시작~현재 삭제 후에는 남은 동일 위치(shift된 인덱스)를 선택한다.
+            if (yellowRects.length === 0) {
+                currentYellowIndex = -1;
+            } else {
+                currentYellowIndex = Math.min(deleteStart, yellowRects.length - 1);
+            }
+
+            updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
+            if (yellowRects.length === 0) {
+                activePolylineId = null;
+            } else {
+                const lastRect = yellowRects[yellowRects.length - 1];
+                activePolylineId = normalizeRole(lastRect.role) === 'end' ? null : (lastRect.polylineId || null);
+            }
+            refreshPolylineRangeControl();
+
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+
+            console.log(`✅ [${triggerLabel}] 노란색 사각형 ${deleteCount}개 삭제됨 (현재 폴리라인 시작점부터 선택 인덱스까지).`);
+            scaleCanvas();
+            return true;
+        }
+
         const deleteUndoStack = [];
         const deleteRedoStack = [];
         const MAX_DELETE_UNDO_STACK = 50;
@@ -1832,7 +1882,9 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             if (e.key === 'Delete' && !isTypingTarget) {
-                const deleted = deleteYellowRectsFromCurrentToEnd('DEL 키');
+                const deleted = e.shiftKey
+                    ? deleteYellowRectsFromStartToCurrent('SHIFT+DEL 키')
+                    : deleteYellowRectsFromCurrentToEnd('DEL 키');
                 if (deleted) {
                     e.preventDefault();
                 }
