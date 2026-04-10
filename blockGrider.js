@@ -458,6 +458,7 @@ function countWhitePixels(ctx, x, y, size) {
                                 const scaledHeight = img.height * scale;
                                 const offsetX = (canvasWidth - scaledWidth) / 2;
                                 const offsetY = (canvasHeight - scaledHeight) / 2;
+                                const scalePercent = (scale * 100).toFixed(1);
                                 
                                 // 빈 영역을 검은색으로 채움
                                 ctx1.fillStyle = 'black';
@@ -465,6 +466,9 @@ function countWhitePixels(ctx, x, y, size) {
                                 
                                 // 이미지를 현재 캔버스 크기에 맞춰서 그리기 (비율 유지)
                                 ctx1.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
+                                showCanvas1ClipboardScaleMessage(
+                                    `Canvas1 반영 배율: ${scalePercent}% (${img.width}x${img.height} → ${Math.round(scaledWidth)}x${Math.round(scaledHeight)})`
+                                );
                                 console.log('클립보드에서 이미지를 가져왔습니다.');
                                 scaleCanvas();
                             };
@@ -1017,6 +1021,7 @@ function countWhitePixels(ctx, x, y, size) {
         let goMetaDisplayTimer = null;
         let canvas1AutoF9MessageTimer = null;
         let canvas1AutoF9InfoMessageTimer = null;
+        let canvas1ClipboardScaleMessageTimer = null;
         let lastClickedYellowPoint = null;
         let lastClickedMatchedIndices = [];
         let lastMergeTabCycleKey = '';
@@ -1202,6 +1207,20 @@ function countWhitePixels(ctx, x, y, size) {
                     display.textContent = '';
                     display.className = '';
                     canvas1AutoF9InfoMessageTimer = null;
+                }
+            });
+        }
+
+        function showCanvas1ClipboardScaleMessage(message) {
+            canvas1ClipboardScaleMessageTimer = showTempMessage({
+                elementId: 'canvas1ClipboardScaleMessage',
+                text: `📋 ${message}`,
+                className: 'status-clipboard-scale',
+                previousTimerId: canvas1ClipboardScaleMessageTimer,
+                onClear: (display) => {
+                    display.textContent = '';
+                    display.className = '';
+                    canvas1ClipboardScaleMessageTimer = null;
                 }
             });
         }

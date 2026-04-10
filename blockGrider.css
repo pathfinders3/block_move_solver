@@ -147,3 +147,9 @@ canvas {
     background-color: #092d63; /* 진한 하늘색 */
     border: 1px solid #1d3f70;
 }
+
+.status-clipboard-scale {
+    color: #0f2f12;
+    background-color: #b8f3c4;
+    border: 1px solid #66b87b;
+}
