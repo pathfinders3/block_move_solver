@@ -1318,6 +1318,92 @@ function countWhitePixels(ctx, x, y, size) {
             }, 2000);
         }
 
+        // 자동 F10 실패 시: 각도 차이가 가장 작은 후보 1개를 기본 선택
+        function selectClosestAnglePathButton(buttons) {
+            if (!Array.isArray(buttons) || buttons.length === 0) return null;
+
+            const uniqueButtonMap = new Map();
+            buttons.forEach(btn => {
+                const x = btn.getAttribute('data-x') || '';
+                const y = btn.getAttribute('data-y') || '';
+                const size = btn.getAttribute('data-size') || '';
+                const key = `${x},${y},${size}`;
+                if (!uniqueButtonMap.has(key)) {
+                    uniqueButtonMap.set(key, btn);
+                }
+            });
+            const uniqueButtons = Array.from(uniqueButtonMap.values());
+            if (uniqueButtons.length === 0) return null;
+
+            let expectedAngle = null;
+            if (yellowRects.length > 0) {
+                const lastAngle = yellowRects[yellowRects.length - 1].angle;
+                if (Number.isFinite(lastAngle)) {
+                    expectedAngle = lastAngle;
+                }
+            }
+
+            const getPriority = (btn) => {
+                const styleText = (btn.getAttribute('style') || '').toLowerCase();
+                if (styleText.includes('#ff0000')) return 0;
+                if (styleText.includes('#ff8c00')) return 1;
+                if (styleText.includes('#a39908')) return 2;
+                if (styleText.includes('#1867dd')) return 3;
+                return 4;
+            };
+
+            const scored = uniqueButtons
+                .map((btn, index) => {
+                    const x = parseInt(btn.getAttribute('data-x'), 10);
+                    const y = parseInt(btn.getAttribute('data-y'), 10);
+                    const size = parseInt(btn.getAttribute('data-size'), 10);
+                    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size)) return null;
+
+                    let angle = parseFloat(btn.getAttribute('data-angle'));
+                    if (!Number.isFinite(angle) && selectedPixel) {
+                        const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
+                        const baseX = selectedPixel.x + rectSize / 2;
+                        const baseY = selectedPixel.y + rectSize / 2;
+                        const targetX = x + size / 2;
+                        const targetY = y + size / 2;
+                        angle = calculateCartesianAngle(targetX - baseX, targetY - baseY);
+                    }
+
+                    const angleDiff = (expectedAngle !== null && Number.isFinite(angle))
+                        ? Math.abs(getCircularAngleDiff(angle, expectedAngle, false))
+                        : null;
+
+                    return {
+                        btn,
+                        angleDiff,
+                        priority: getPriority(btn),
+                        index
+                    };
+                })
+                .filter(Boolean);
+
+            if (scored.length === 0) return null;
+
+            // 기대 각도가 있으면 각도 차이 우선, 동률은 테두리 우선순위로 선택
+            if (expectedAngle !== null) {
+                const withAngle = scored.filter(item => item.angleDiff !== null);
+                if (withAngle.length > 0) {
+                    withAngle.sort((a, b) => {
+                        if (a.angleDiff !== b.angleDiff) return a.angleDiff - b.angleDiff;
+                        if (a.priority !== b.priority) return a.priority - b.priority;
+                        return a.index - b.index;
+                    });
+                    return withAngle[0].btn;
+                }
+            }
+
+            scored.sort((a, b) => {
+                if (a.priority !== b.priority) return a.priority - b.priority;
+                return a.index - b.index;
+            });
+            return scored[0].btn;
+        }
+
         // 자동 F9 한 스텝: 빨간 테두리 1개 우선, 없으면 주황 테두리 1개를 대체 선택
         function runAutoF9Step() {
             // 사용자가 QWE/ASD/ZXC(또는 버튼 클릭)로 이미 1개 임시 점을 선택한 경우,
@@ -1382,6 +1468,23 @@ function countWhitePixels(ctx, x, y, size) {
                         ? `빨간 테두리 후보(중복제거) 수가 1개가 아님 (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`
                         : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`;
                 const autoF9FailMessage = `자동 F9 조건 불만족: ${reason}`;
+
+                const fallbackButton = selectClosestAnglePathButton(allButtons);
+                if (fallbackButton) {
+                    fallbackButton.click();
+
+                    const fallbackX = parseInt(fallbackButton.getAttribute('data-x'), 10);
+                    const fallbackY = parseInt(fallbackButton.getAttribute('data-y'), 10);
+                    const fallbackSize = parseInt(fallbackButton.getAttribute('data-size'), 10);
+
+                    showCanvas1AutoF9Message(`${autoF9FailMessage} → 각도 유사 후보 1개를 기본 선택함`);
+                    console.log(
+                        `⚠️ ${autoF9FailMessage} | ` +
+                        `기본 선택 적용: (${fallbackX},${fallbackY}), 크기 ${fallbackSize}x${fallbackSize}`
+                    );
+                    return false;
+                }
+
                 showCanvas1AutoF9Message(autoF9FailMessage);
                 console.log(`❌ ${autoF9FailMessage}`);
                 flashAutoF9ButtonError();
