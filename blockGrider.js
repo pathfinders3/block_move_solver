@@ -1343,6 +1343,15 @@ function countWhitePixels(ctx, x, y, size) {
                 }
             }
 
+            const getBorderMeta = (btn) => {
+                const styleText = (btn.getAttribute('style') || '').toLowerCase();
+                if (styleText.includes('#ff0000')) return { name: '빨강', color: '#FF0000' };
+                if (styleText.includes('#ff8c00')) return { name: '주황', color: '#FF8C00' };
+                if (styleText.includes('#a39908')) return { name: '황토', color: '#A39908' };
+                if (styleText.includes('#1867dd')) return { name: '파랑', color: '#1867DD' };
+                return { name: '기본', color: '-' };
+            };
+
             const getPriority = (btn) => {
                 const styleText = (btn.getAttribute('style') || '').toLowerCase();
                 if (styleText.includes('#ff0000')) return 0;
@@ -1375,7 +1384,13 @@ function countWhitePixels(ctx, x, y, size) {
 
                     return {
                         btn,
+                        x,
+                        y,
+                        size,
+                        angle,
+                        expectedAngle,
                         angleDiff,
+                        border: getBorderMeta(btn),
                         priority: getPriority(btn),
                         index
                     };
@@ -1393,7 +1408,7 @@ function countWhitePixels(ctx, x, y, size) {
                         if (a.priority !== b.priority) return a.priority - b.priority;
                         return a.index - b.index;
                     });
-                    return withAngle[0].btn;
+                    return withAngle[0];
                 }
             }
 
@@ -1401,7 +1416,7 @@ function countWhitePixels(ctx, x, y, size) {
                 if (a.priority !== b.priority) return a.priority - b.priority;
                 return a.index - b.index;
             });
-            return scored[0].btn;
+            return scored[0];
         }
 
         // 자동 F9 한 스텝: 빨간 테두리 1개 우선, 없으면 주황 테두리 1개를 대체 선택
@@ -1469,18 +1484,26 @@ function countWhitePixels(ctx, x, y, size) {
                         : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`;
                 const autoF9FailMessage = `자동 F9 조건 불만족: ${reason}`;
 
-                const fallbackButton = selectClosestAnglePathButton(allButtons);
-                if (fallbackButton) {
-                    fallbackButton.click();
+                const fallbackTarget = selectClosestAnglePathButton(allButtons);
+                if (fallbackTarget && fallbackTarget.btn) {
+                    fallbackTarget.btn.click();
 
-                    const fallbackX = parseInt(fallbackButton.getAttribute('data-x'), 10);
-                    const fallbackY = parseInt(fallbackButton.getAttribute('data-y'), 10);
-                    const fallbackSize = parseInt(fallbackButton.getAttribute('data-size'), 10);
+                    const fallbackX = fallbackTarget.x;
+                    const fallbackY = fallbackTarget.y;
+                    const fallbackSize = fallbackTarget.size;
+                    const fallbackAngleDiffText = Number.isFinite(fallbackTarget.angleDiff)
+                        ? `Δ${fallbackTarget.angleDiff}°`
+                        : 'Δ-';
+                    const fallbackBorderText = `${fallbackTarget.border.name}(${fallbackTarget.border.color})`;
 
                     showCanvas1AutoF9Message(`${autoF9FailMessage} → 각도 유사 후보 1개를 기본 선택함`);
+                    showRoleActionInfoMessage(
+                        `F10 추천 점 자동선택: (${fallbackX},${fallbackY}), ${fallbackSize}x${fallbackSize}, ${fallbackAngleDiffText}, 테두리 ${fallbackBorderText}`
+                    );
                     console.log(
                         `⚠️ ${autoF9FailMessage} | ` +
-                        `기본 선택 적용: (${fallbackX},${fallbackY}), 크기 ${fallbackSize}x${fallbackSize}`
+                        `기본 선택 적용: (${fallbackX},${fallbackY}), 크기 ${fallbackSize}x${fallbackSize}, ` +
+                        `${fallbackAngleDiffText}, 테두리 ${fallbackBorderText}`
                     );
                     return false;
                 }
