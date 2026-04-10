@@ -1456,7 +1456,7 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             return warningParts.length > 0
-                ? `⛔⤭⤭ 기존 점과 ${warningParts.join(' / ')}`
+                ? `⛔🚷⤭ 기존 점과 ${warningParts.join(' / ')}`
                 : '';
         }
 
@@ -1549,7 +1549,7 @@ function countWhitePixels(ctx, x, y, size) {
 
                     showCanvas1AutoF9Message(`${autoF9FailMessage} → 각도 유사 후보 1개를 기본 선택함`);
                     showCanvas1AutoF9InfoMessage(
-                        overlapWarning ? `${fallbackDetailMessage} | ${overlapWarning}` : fallbackDetailMessage
+                        overlapWarning ? `${overlapWarning} | ${fallbackDetailMessage}` : fallbackDetailMessage
                     );
                     console.log(
                         `⚠️ ${autoF9FailMessage} | ` +
