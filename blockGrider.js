@@ -1010,6 +1010,7 @@ function countWhitePixels(ctx, x, y, size) {
         let roleActionDisplayTimer = null;
         let goMetaDisplayTimer = null;
         let canvas1AutoF9MessageTimer = null;
+        let canvas1AutoF9InfoMessageTimer = null;
         let lastClickedYellowPoint = null;
         let lastClickedMatchedIndices = [];
         let lastMergeTabCycleKey = '';
@@ -1181,6 +1182,20 @@ function countWhitePixels(ctx, x, y, size) {
                     display.textContent = '';
                     display.className = '';
                     canvas1AutoF9MessageTimer = null;
+                }
+            });
+        }
+
+        function showCanvas1AutoF9InfoMessage(message) {
+            canvas1AutoF9InfoMessageTimer = showTempMessage({
+                elementId: 'canvas1AutoF9InfoMessage',
+                text: `✅ ${message}`,
+                className: 'status-role-start',
+                previousTimerId: canvas1AutoF9InfoMessageTimer,
+                onClear: (display) => {
+                    display.textContent = '';
+                    display.className = '';
+                    canvas1AutoF9InfoMessageTimer = null;
                 }
             });
         }
@@ -1491,19 +1506,25 @@ function countWhitePixels(ctx, x, y, size) {
                     const fallbackX = fallbackTarget.x;
                     const fallbackY = fallbackTarget.y;
                     const fallbackSize = fallbackTarget.size;
+                    const fallbackAngleText = Number.isFinite(fallbackTarget.angle)
+                        ? `${Math.round(fallbackTarget.angle)}°`
+                        : '-';
                     const fallbackAngleDiffText = Number.isFinite(fallbackTarget.angleDiff)
                         ? `Δ${fallbackTarget.angleDiff}°`
                         : 'Δ-';
+                    const fallbackDirection = Number.isFinite(fallbackTarget.angle)
+                        ? getDirectionArrowLabel(classifyDirectionFromAngle(fallbackTarget.angle))
+                        : '-';
                     const fallbackBorderText = `${fallbackTarget.border.name}(${fallbackTarget.border.color})`;
 
                     showCanvas1AutoF9Message(`${autoF9FailMessage} → 각도 유사 후보 1개를 기본 선택함`);
-                    showRoleActionInfoMessage(
-                        `F10 추천 점 자동선택: (${fallbackX},${fallbackY}), ${fallbackSize}x${fallbackSize}, ${fallbackAngleDiffText}, 테두리 ${fallbackBorderText}`
+                    showCanvas1AutoF9InfoMessage(
+                        `F10 추천 점 자동선택: (${fallbackX},${fallbackY}), ${fallbackSize}x${fallbackSize}, 각도 ${fallbackAngleText}, 방향 ${fallbackDirection}, ${fallbackAngleDiffText}, 테두리 ${fallbackBorderText}`
                     );
                     console.log(
                         `⚠️ ${autoF9FailMessage} | ` +
                         `기본 선택 적용: (${fallbackX},${fallbackY}), 크기 ${fallbackSize}x${fallbackSize}, ` +
-                        `${fallbackAngleDiffText}, 테두리 ${fallbackBorderText}`
+                        `각도 ${fallbackAngleText}, 방향 ${fallbackDirection}, ${fallbackAngleDiffText}, 테두리 ${fallbackBorderText}`
                     );
                     return false;
                 }
@@ -1862,6 +1883,20 @@ function countWhitePixels(ctx, x, y, size) {
             if (normalized >= 202.5 && normalized < 247.5) return 'downLeft';
             if (normalized >= 247.5 && normalized < 292.5) return 'down';
             return 'downRight';
+        }
+
+        function getDirectionArrowLabel(direction) {
+            const map = {
+                right: '→ 우',
+                upRight: '↗ 우상',
+                up: '↑ 상',
+                upLeft: '↖ 좌상',
+                left: '← 좌',
+                downLeft: '↙ 좌하',
+                down: '↓ 하',
+                downRight: '↘ 우하'
+            };
+            return map[direction] || '-';
         }
 
         function triggerPathButtonByNumpadKey(rawKey) {
