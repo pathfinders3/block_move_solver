@@ -1195,7 +1195,7 @@ function countWhitePixels(ctx, x, y, size) {
         function showCanvas1AutoF9InfoMessage(message) {
             canvas1AutoF9InfoMessageTimer = showTempMessage({
                 elementId: 'canvas1AutoF9InfoMessage',
-                text: `✅ ${message}`,
+                text: `${message}🔠`,
                 className: 'status-role-start',
                 previousTimerId: canvas1AutoF9InfoMessageTimer,
                 onClear: (display) => {
@@ -1462,19 +1462,31 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             return warningParts.length > 0
-                ? `⛔🚷⤭ 기존 점과 ${warningParts.join(' / ')}`
+                ? `⛔⛔⤭ 기존 점과 ${warningParts.join(' / ')}`
                 : '';
         }
 
         function getAutoF10PreviewTarget() {
             if (tempYellowRect) {
+                const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
+                const tempAngle = selectedPixel
+                    ? calculateRectToRectAngle(
+                        selectedPixel.x,
+                        selectedPixel.y,
+                        rectSize,
+                        tempYellowRect.x,
+                        tempYellowRect.y,
+                        tempYellowRect.size
+                    )
+                    : null;
+
                 return {
                     ok: true,
                     source: 'temp',
                     x: tempYellowRect.x,
                     y: tempYellowRect.y,
                     size: tempYellowRect.size,
-                    angle: null,
+                    angle: Number.isFinite(tempAngle) ? tempAngle : null,
                     borderText: '임시 선택',
                     failReason: ''
                 };
