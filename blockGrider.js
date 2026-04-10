@@ -485,6 +485,12 @@ function countWhitePixels(ctx, x, y, size) {
         // 버튼 이벤트 리스너
         document.getElementById('btnLoadClipboard').addEventListener('click', loadImageFromClipboard);
         document.getElementById('btnRandomize').addEventListener('click', drawRandomPixels);
+        const btnViewRecommendedPoint = document.getElementById('btnViewRecommendedPoint');
+        if (btnViewRecommendedPoint) {
+            btnViewRecommendedPoint.addEventListener('click', () => {
+                viewNextAutoF10PointOnCanvas2();
+            });
+        }
         
         // Range 바 값 변경 시 표시 업데이트 및 Canvas2 즉시 확대 갱신
         scaleRange.addEventListener('input', (e) => {
@@ -1458,6 +1464,167 @@ function countWhitePixels(ctx, x, y, size) {
             return warningParts.length > 0
                 ? `⛔🚷⤭ 기존 점과 ${warningParts.join(' / ')}`
                 : '';
+        }
+
+        function getAutoF10PreviewTarget() {
+            if (tempYellowRect) {
+                return {
+                    ok: true,
+                    source: 'temp',
+                    x: tempYellowRect.x,
+                    y: tempYellowRect.y,
+                    size: tempYellowRect.size,
+                    angle: null,
+                    borderText: '임시 선택',
+                    failReason: ''
+                };
+            }
+
+            const pathWhiteContent = document.getElementById('pathWhiteContent');
+            if (!pathWhiteContent) {
+                return {
+                    ok: false,
+                    failReason: '경로별 흰색점 영역을 찾을 수 없습니다.'
+                };
+            }
+
+            const allButtons = Array.from(pathWhiteContent.querySelectorAll('button')).filter(btn => !btn.disabled);
+            if (allButtons.length === 0) {
+                return {
+                    ok: false,
+                    failReason: '선택 가능한 경로 후보가 없습니다.'
+                };
+            }
+
+            const uniqueByRect = (buttons) => {
+                const uniqueButtonMap = new Map();
+                buttons.forEach(btn => {
+                    const x = btn.getAttribute('data-x') || '';
+                    const y = btn.getAttribute('data-y') || '';
+                    const size = btn.getAttribute('data-size') || '';
+                    const key = `${x},${y},${size}`;
+                    if (!uniqueButtonMap.has(key)) {
+                        uniqueButtonMap.set(key, btn);
+                    }
+                });
+                return uniqueButtonMap;
+            };
+
+            const redButtons = allButtons.filter(btn => {
+                const styleText = (btn.getAttribute('style') || '').toLowerCase();
+                return styleText.includes('#ff0000');
+            });
+            const orangeButtons = allButtons.filter(btn => {
+                const styleText = (btn.getAttribute('style') || '').toLowerCase();
+                return styleText.includes('#ff8c00');
+            });
+
+            const uniqueRedButtonMap = uniqueByRect(redButtons);
+            const uniqueOrangeButtonMap = uniqueByRect(orangeButtons);
+
+            const parseButtonTarget = (btn, source, borderText, failReason = '') => {
+                const x = parseInt(btn.getAttribute('data-x'), 10);
+                const y = parseInt(btn.getAttribute('data-y'), 10);
+                const size = parseInt(btn.getAttribute('data-size'), 10);
+                let angle = parseFloat(btn.getAttribute('data-angle'));
+                if (!Number.isFinite(angle) && selectedPixel) {
+                    const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
+                    const baseX = selectedPixel.x + rectSize / 2;
+                    const baseY = selectedPixel.y + rectSize / 2;
+                    const targetX = x + size / 2;
+                    const targetY = y + size / 2;
+                    angle = calculateCartesianAngle(targetX - baseX, targetY - baseY);
+                }
+                return {
+                    ok: Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(size),
+                    source,
+                    x,
+                    y,
+                    size,
+                    angle: Number.isFinite(angle) ? angle : null,
+                    borderText,
+                    failReason
+                };
+            };
+
+            if (uniqueRedButtonMap.size === 1) {
+                return parseButtonTarget(Array.from(uniqueRedButtonMap.values())[0], 'red', '빨강(#FF0000)');
+            }
+
+            if (uniqueRedButtonMap.size === 0 && uniqueOrangeButtonMap.size === 1) {
+                return parseButtonTarget(Array.from(uniqueOrangeButtonMap.values())[0], 'orange', '주황(#FF8C00)');
+            }
+
+            const reason =
+                uniqueRedButtonMap.size > 0
+                    ? `빨간 테두리 후보(중복제거) 수가 1개가 아님 (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`
+                    : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`;
+
+            const fallbackTarget = selectClosestAnglePathButton(allButtons);
+            if (fallbackTarget && fallbackTarget.btn) {
+                return {
+                    ok: true,
+                    source: 'fallback',
+                    x: fallbackTarget.x,
+                    y: fallbackTarget.y,
+                    size: fallbackTarget.size,
+                    angle: Number.isFinite(fallbackTarget.angle) ? fallbackTarget.angle : null,
+                    borderText: `${fallbackTarget.border.name}(${fallbackTarget.border.color})`,
+                    failReason: reason,
+                    angleDiff: Number.isFinite(fallbackTarget.angleDiff) ? fallbackTarget.angleDiff : null
+                };
+            }
+
+            return {
+                ok: false,
+                failReason: `자동 F9 조건 불만족: ${reason}`
+            };
+        }
+
+        function viewNextAutoF10PointOnCanvas2() {
+            const preview = getAutoF10PreviewTarget();
+            if (!preview.ok) {
+                showCanvas1AutoF9Message(`추천 점 View 실패: ${preview.failReason}`);
+                return false;
+            }
+
+            const size = Number.isFinite(preview.size) ? preview.size : 1;
+            const maxX = Math.max(0, currentCanvasWidth - size);
+            const maxY = Math.max(0, currentCanvasHeight - size);
+            const x = clamp(preview.x, 0, maxX);
+            const y = clamp(preview.y, 0, maxY);
+
+            tempYellowClickVariant = (tempYellowClickVariant + 1) % 2;
+            tempYellowRect = {
+                x,
+                y,
+                size,
+                clickVariant: tempYellowClickVariant
+            };
+
+            if (Number.isFinite(preview.angle)) {
+                updateTempYellowAngle(preview.angle);
+            } else {
+                updateTempYellowAngle();
+            }
+
+            const overlapWarning = getRecommendedRectOverlapWarning(x, y, size);
+            const angleText = Number.isFinite(preview.angle) ? `${Math.round(preview.angle)}°` : '-';
+            const directionText = Number.isFinite(preview.angle)
+                ? getDirectionArrowLabel(classifyDirectionFromAngle(preview.angle))
+                : '-';
+            const sourceText =
+                preview.source === 'temp'
+                    ? '현재 임시점 확정 예정'
+                    : (preview.source === 'fallback' ? 'fallback 추천 예정' : '자동 추천 예정');
+            const angleDiffText = Number.isFinite(preview.angleDiff) ? `, Δ${preview.angleDiff}°` : '';
+            const detail =
+                `F10 예정 점 View: (${x},${y}), ${size}x${size}, 각도 ${angleText}, 방향 ${directionText}${angleDiffText}, ` +
+                `테두리 ${preview.borderText}, ${sourceText}`;
+
+            showCanvas1AutoF9InfoMessage(overlapWarning ? `${overlapWarning} | ${detail}` : detail);
+            scaleCanvas();
+            return true;
         }
 
         // 자동 F9 한 스텝: 빨간 테두리 1개 우선, 없으면 주황 테두리 1개를 대체 선택
