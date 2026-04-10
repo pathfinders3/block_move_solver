@@ -1434,6 +1434,32 @@ function countWhitePixels(ctx, x, y, size) {
             return scored[0];
         }
 
+        function getRecommendedRectOverlapWarning(x, y, size) {
+            const fullOverlapIndices = [];
+            const partialOverlapIndices = [];
+
+            yellowRects.forEach((rect, index) => {
+                const overlapType = classifyRectOverlap(x, y, size, rect);
+                if (overlapType === 'full') {
+                    fullOverlapIndices.push(index + 1);
+                } else if (overlapType === 'partial') {
+                    partialOverlapIndices.push(index + 1);
+                }
+            });
+
+            const warningParts = [];
+            if (fullOverlapIndices.length > 0) {
+                warningParts.push(`FULL 겹침 [${fullOverlapIndices.join(',')}]`);
+            }
+            if (partialOverlapIndices.length > 0) {
+                warningParts.push(`일부 겹침(PARTIAL) [${partialOverlapIndices.join(',')}]`);
+            }
+
+            return warningParts.length > 0
+                ? `⛔⤭⤭ 기존 점과 ${warningParts.join(' / ')}`
+                : '';
+        }
+
         // 자동 F9 한 스텝: 빨간 테두리 1개 우선, 없으면 주황 테두리 1개를 대체 선택
         function runAutoF9Step() {
             // 사용자가 QWE/ASD/ZXC(또는 버튼 클릭)로 이미 1개 임시 점을 선택한 경우,
@@ -1516,15 +1542,20 @@ function countWhitePixels(ctx, x, y, size) {
                         ? getDirectionArrowLabel(classifyDirectionFromAngle(fallbackTarget.angle))
                         : '-';
                     const fallbackBorderText = `${fallbackTarget.border.name}(${fallbackTarget.border.color})`;
+                    const overlapWarning = getRecommendedRectOverlapWarning(fallbackX, fallbackY, fallbackSize);
+                    const fallbackDetailMessage =
+                        `F10 추천 점 자동선택: (${fallbackX},${fallbackY}), ${fallbackSize}x${fallbackSize}, ` +
+                        `각도 ${fallbackAngleText}, 방향 ${fallbackDirection}, ${fallbackAngleDiffText}, 테두리 ${fallbackBorderText}`;
 
                     showCanvas1AutoF9Message(`${autoF9FailMessage} → 각도 유사 후보 1개를 기본 선택함`);
                     showCanvas1AutoF9InfoMessage(
-                        `F10 추천 점 자동선택: (${fallbackX},${fallbackY}), ${fallbackSize}x${fallbackSize}, 각도 ${fallbackAngleText}, 방향 ${fallbackDirection}, ${fallbackAngleDiffText}, 테두리 ${fallbackBorderText}`
+                        overlapWarning ? `${fallbackDetailMessage} | ${overlapWarning}` : fallbackDetailMessage
                     );
                     console.log(
                         `⚠️ ${autoF9FailMessage} | ` +
                         `기본 선택 적용: (${fallbackX},${fallbackY}), 크기 ${fallbackSize}x${fallbackSize}, ` +
-                        `각도 ${fallbackAngleText}, 방향 ${fallbackDirection}, ${fallbackAngleDiffText}, 테두리 ${fallbackBorderText}`
+                        `각도 ${fallbackAngleText}, 방향 ${fallbackDirection}, ${fallbackAngleDiffText}, 테두리 ${fallbackBorderText}` +
+                        (overlapWarning ? `, ${overlapWarning}` : '')
                     );
                     return false;
                 }
