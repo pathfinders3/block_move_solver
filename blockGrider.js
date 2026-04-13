@@ -3791,6 +3791,22 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             const sourcePolylineId = findSourcePolylineIdAtSelectedPoint(targetPolylineId);
+            if (sourcePolylineId) {
+                const sourcePointCount = countPointsByPolylineId(sourcePolylineId);
+                const shouldDeleteSource = window.confirm(
+                    `선택한 점은 기존 폴리라인 ${sourcePolylineId}에 속해 있습니다.\n` +
+                    `삭제 시 ${sourcePointCount}개의 점이 함께 삭제됩니다.\n` +
+                    `이 폴리라인을 삭제할까요?`
+                );
+
+                // 삭제를 거부하면 추가 동작을 취소하여 점이 원래 폴리라인(A)에 남도록 한다.
+                if (!shouldDeleteSource) {
+                    showRoleActionInfoMessage(`${sourcePolylineId} 유지: 점 추가를 취소했습니다.`);
+                    return false;
+                }
+            }
+
+            pushDeleteUndoState('Start앞+1');
 
             const sizeInput = document.getElementById('rectSize');
             const rectSize = sizeInput ? (parseInt(sizeInput.value, 10) || 4) : 4;
@@ -3832,15 +3848,7 @@ function countWhitePixels(ctx, x, y, size) {
 
             let removedSource = false;
             if (sourcePolylineId) {
-                const sourcePointCount = countPointsByPolylineId(sourcePolylineId);
-                const shouldDeleteSource = window.confirm(
-                    `선택한 점은 기존 폴리라인 ${sourcePolylineId}에 속해 있습니다.\n` +
-                    `삭제 시 ${sourcePointCount}개의 점이 함께 삭제됩니다.\n` +
-                    `이 폴리라인을 삭제할까요?`
-                );
-                if (shouldDeleteSource) {
-                    removedSource = deletePolylineById(sourcePolylineId);
-                }
+                removedSource = deletePolylineById(sourcePolylineId);
             }
 
             if (removedSource) {
