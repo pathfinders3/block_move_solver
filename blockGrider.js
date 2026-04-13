@@ -172,6 +172,7 @@ function countWhitePixels(ctx, x, y, size) {
         const btnZoomSelectedOut = document.getElementById('btnZoomSelectedOut');
         const btnZoomSelectedIn = document.getElementById('btnZoomSelectedIn');
         const polylineSelect = document.getElementById('polylineSelect');
+        const btnInsertBeforePolylineStart = document.getElementById('btnInsertBeforePolylineStart');
         const polylineCountDisplay = document.getElementById('polylineCountDisplay');
         const polylineRangeDisplay = document.getElementById('polylineRangeDisplay');
         
@@ -3676,6 +3677,180 @@ function countWhitePixels(ctx, x, y, size) {
             return polylines[selectedIndex - 1];
         }
 
+        function recomputePointOrderForPolyline(polylineId) {
+            if (!isValidPolylineId(polylineId)) return;
+
+            let order = 1;
+            for (let i = 0; i < yellowRects.length; i++) {
+                const rect = yellowRects[i];
+                if (rect.polylineId === polylineId) {
+                    rect.pointOrder = order;
+                    order += 1;
+                }
+            }
+        }
+
+        function recomputeMergeStateForAllYellowRects() {
+            for (let i = 0; i < yellowRects.length; i++) {
+                const base = yellowRects[i];
+                const merged = yellowRects.some((other, j) => {
+                    if (i === j) return false;
+                    return classifyRectOverlap(base.x, base.y, base.size, other) === 'full';
+                });
+                base.mergeState = merged;
+            }
+        }
+
+        function findSourcePolylineIdAtSelectedPoint(targetPolylineId) {
+            if (!selectedPixel) return null;
+
+            // 현재 선택 인덱스가 유효하면 우선 사용
+            if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
+                const currentRect = yellowRects[currentYellowIndex];
+                const containsSelectedPoint =
+                    selectedPixel.x >= currentRect.x &&
+                    selectedPixel.x < currentRect.x + currentRect.size &&
+                    selectedPixel.y >= currentRect.y &&
+                    selectedPixel.y < currentRect.y + currentRect.size;
+
+                if (containsSelectedPoint && isValidPolylineId(currentRect.polylineId) && currentRect.polylineId !== targetPolylineId) {
+                    return currentRect.polylineId;
+                }
+            }
+
+            const matchedIndices = findYellowRectIndicesByPoint(selectedPixel.x, selectedPixel.y);
+            for (let i = 0; i < matchedIndices.length; i++) {
+                const idx = matchedIndices[i];
+                const rect = yellowRects[idx];
+                if (rect && isValidPolylineId(rect.polylineId) && rect.polylineId !== targetPolylineId) {
+                    return rect.polylineId;
+                }
+            }
+
+            return null;
+        }
+
+        function deletePolylineById(polylineId) {
+            if (!isValidPolylineId(polylineId)) return false;
+
+            const beforeCount = yellowRects.length;
+            yellowRects = yellowRects.filter(rect => rect.polylineId !== polylineId);
+            const removedCount = beforeCount - yellowRects.length;
+            if (removedCount <= 0) return false;
+
+            if (yellowRects.length === 0) {
+                currentYellowIndex = -1;
+                activePolylineId = null;
+            } else {
+                currentYellowIndex = clamp(currentYellowIndex, 0, yellowRects.length - 1);
+                const lastRect = yellowRects[yellowRects.length - 1];
+                activePolylineId = normalizeRole(lastRect.role) === 'end' ? null : (lastRect.polylineId || null);
+            }
+
+            recomputeMergeStateForAllYellowRects();
+            refreshPolylineRangeControl();
+            updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+            scaleCanvas();
+
+            return true;
+        }
+
+        function countPointsByPolylineId(polylineId) {
+            if (!isValidPolylineId(polylineId)) return 0;
+
+            let count = 0;
+            for (let i = 0; i < yellowRects.length; i++) {
+                if (yellowRects[i].polylineId === polylineId) {
+                    count += 1;
+                }
+            }
+            return count;
+        }
+
+        function insertPointBeforeSelectedPolylineStart() {
+            if (!selectedPixel) {
+                showRoleActionErrorMessage('먼저 Canvas2에서 추가할 점을 선택하세요.');
+                return false;
+            }
+
+            const selectedPolyline = getSelectedPolylineRangeFromControl();
+            if (!selectedPolyline) {
+                showRoleActionErrorMessage('먼저 Poly Line을 선택하세요.');
+                return false;
+            }
+
+            const targetPolylineId = selectedPolyline.polylineId;
+            const startIndex = selectedPolyline.startIndex;
+            if (!Number.isFinite(startIndex) || startIndex < 0 || startIndex >= yellowRects.length) {
+                showRoleActionErrorMessage('선택한 Poly Line의 시작점을 찾을 수 없습니다.');
+                return false;
+            }
+
+            const sourcePolylineId = findSourcePolylineIdAtSelectedPoint(targetPolylineId);
+
+            const sizeInput = document.getElementById('rectSize');
+            const rectSize = sizeInput ? (parseInt(sizeInput.value, 10) || 4) : 4;
+            const insertX = clamp(selectedPixel.x, 0, currentCanvasWidth - 1);
+            const insertY = clamp(selectedPixel.y, 0, currentCanvasHeight - 1);
+
+            const prevStartRect = yellowRects[startIndex];
+            if (prevStartRect && prevStartRect.polylineId === targetPolylineId) {
+                prevStartRect.role = 'middle';
+            }
+
+            yellowRects.splice(startIndex, 0, {
+                x: insertX,
+                y: insertY,
+                size: Math.max(1, rectSize),
+                angle: null,
+                angleExceeded: false,
+                angleDiff: null,
+                expectedAngle: null,
+                mergeState: false,
+                role: 'start',
+                polylineId: targetPolylineId,
+                pointOrder: 1
+            });
+
+            recomputePointOrderForPolyline(targetPolylineId);
+            recomputeMergeStateForAllYellowRects();
+
+            activePolylineId = targetPolylineId;
+            currentYellowIndex = startIndex;
+
+            updateYellowIndexDisplay();
+            updateYellowAngleDisplay();
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+            refreshPolylineRangeControl();
+            scaleCanvas();
+
+            let removedSource = false;
+            if (sourcePolylineId) {
+                const sourcePointCount = countPointsByPolylineId(sourcePolylineId);
+                const shouldDeleteSource = window.confirm(
+                    `선택한 점은 기존 폴리라인 ${sourcePolylineId}에 속해 있습니다.\n` +
+                    `삭제 시 ${sourcePointCount}개의 점이 함께 삭제됩니다.\n` +
+                    `이 폴리라인을 삭제할까요?`
+                );
+                if (shouldDeleteSource) {
+                    removedSource = deletePolylineById(sourcePolylineId);
+                }
+            }
+
+            if (removedSource) {
+                showRoleActionInfoMessage(`${targetPolylineId} start 앞 점 추가 + ${sourcePolylineId} 삭제 완료`);
+            } else {
+                showRoleActionInfoMessage(`${targetPolylineId} start 앞에 점 1개를 추가했습니다.`);
+            }
+            return true;
+        }
+
         function findPolylineRangeContainingIndex(index) {
             const polylines = getCurrentPolylinesFromYellowRects();
             for (let i = 0; i < polylines.length; i++) {
@@ -3731,6 +3906,12 @@ function countWhitePixels(ctx, x, y, size) {
             };
 
             polylineSelect.addEventListener('change', handlePolylineRangeSelection);
+        }
+
+        if (btnInsertBeforePolylineStart) {
+            btnInsertBeforePolylineStart.addEventListener('click', () => {
+                insertPointBeforeSelectedPolylineStart();
+            });
         }
 
         // Angle 검사 버튼: 각도별 그룹화
