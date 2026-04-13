@@ -169,6 +169,8 @@ function countWhitePixels(ctx, x, y, size) {
         // Range 바 요소
         const scaleRange = document.getElementById('scaleRange');
         const scaleDisplay = document.getElementById('scaleDisplay');
+        const btnZoomSelectedOut = document.getElementById('btnZoomSelectedOut');
+        const btnZoomSelectedIn = document.getElementById('btnZoomSelectedIn');
         const polylineSelect = document.getElementById('polylineSelect');
         const polylineCountDisplay = document.getElementById('polylineCountDisplay');
         const polylineRangeDisplay = document.getElementById('polylineRangeDisplay');
@@ -493,6 +495,16 @@ function countWhitePixels(ctx, x, y, size) {
         if (btnViewRecommendedPoint) {
             btnViewRecommendedPoint.addEventListener('click', () => {
                 viewNextAutoF10PointOnCanvas2();
+            });
+        }
+        if (btnZoomSelectedOut) {
+            btnZoomSelectedOut.addEventListener('click', () => {
+                zoomCanvas2AroundSelected(-1);
+            });
+        }
+        if (btnZoomSelectedIn) {
+            btnZoomSelectedIn.addEventListener('click', () => {
+                zoomCanvas2AroundSelected(1);
             });
         }
         
@@ -2467,6 +2479,42 @@ function countWhitePixels(ctx, x, y, size) {
                 }
             }
 
+        }
+
+        function centerCanvas2OnPoint(point) {
+            if (!point) return;
+
+            const wrapper = document.querySelector('.canvas2-wrapper');
+            if (!wrapper) return;
+
+            const index = parseInt(scaleRange.value, 10);
+            const scale = scaleValues[index];
+            const targetX = (point.x + 0.5) * scale;
+            const targetY = (point.y + 0.5) * scale;
+            const left = Math.max(0, targetX - wrapper.clientWidth / 2);
+            const top = Math.max(0, targetY - wrapper.clientHeight / 2);
+
+            wrapper.scrollTo({ left, top, behavior: 'auto' });
+        }
+
+        function zoomCanvas2AroundSelected(step) {
+            if (!selectedPixel) {
+                showRoleActionErrorMessage('먼저 Canvas2에서 기준 점을 선택하세요.');
+                return;
+            }
+
+            const currentIndex = parseInt(scaleRange.value, 10);
+            const nextIndex = clamp(currentIndex + step, 0, scaleValues.length - 1);
+
+            if (nextIndex === currentIndex) {
+                centerCanvas2OnPoint(selectedPixel);
+                return;
+            }
+
+            scaleRange.value = String(nextIndex);
+            scaleDisplay.textContent = `${scaleValues[nextIndex]}x`;
+            scaleCanvas();
+            centerCanvas2OnPoint(selectedPixel);
         }
         
         // 초기 스케일 표시 설정
