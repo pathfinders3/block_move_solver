@@ -1039,7 +1039,6 @@ function countWhitePixels(ctx, x, y, size) {
             return null;
         }
 
-        let mergeStateDisplayTimer = null;
         let roleActionDisplayTimer = null;
         let goMetaDisplayTimer = null;
         let canvas1StatusMessageTimer = null;
@@ -1130,9 +1129,7 @@ function countWhitePixels(ctx, x, y, size) {
                     }
                 }
 
-                if (elementId === 'mergeStateDisplay') {
-                    mergeStateDisplayTimer = null;
-                } else if (elementId === 'roleActionDisplay') {
+                if (elementId === 'roleActionDisplay') {
                     roleActionDisplayTimer = null;
                 } else if (elementId === 'goMetaDisplay') {
                     goMetaDisplayTimer = null;
@@ -1149,11 +1146,16 @@ function countWhitePixels(ctx, x, y, size) {
             const mergeLabel = isMerged ? 'TRUE' : 'FALSE';
             const badge = isMerged ? 'MERGED' : 'NOT MERGED';
 
-            mergeStateDisplayTimer = showTempMessage({
-                elementId: 'mergeStateDisplay',
+            canvas1StatusMessageTimer = showTempMessage({
+                elementId: 'canvas1StatusMessage',
                 text: `[${triggerKey}] ${badge} | mergeState: ${mergeLabel} | size: ${rect.size}x${rect.size}`,
                 className: isMerged ? 'status-merged' : 'status-unmerged',
-                previousTimerId: mergeStateDisplayTimer
+                previousTimerId: canvas1StatusMessageTimer,
+                onClear: (display) => {
+                    display.textContent = '';
+                    display.className = '';
+                    canvas1StatusMessageTimer = null;
+                }
             });
         }
 
