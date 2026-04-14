@@ -2287,6 +2287,12 @@ function countWhitePixels(ctx, x, y, size) {
                 const switched = cycleToMergedYellowRect(e.shiftKey);
                 e.preventDefault();
                 if (!switched) {
+                    if (currentYellowIndex >= 0 && currentYellowIndex < yellowRects.length) {
+                        const containingRange = findPolylineRangeContainingIndex(currentYellowIndex);
+                        if (containingRange) {
+                            highlightPolylineRange(containingRange.startIndex, containingRange.endIndex, 3000);
+                        }
+                    }
                     showRoleActionErrorMessage('TAB 전환 대상이 없어 기본 TAB 이동을 막았습니다.');
                 }
             }
