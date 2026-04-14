@@ -1097,6 +1097,10 @@ function countWhitePixels(ctx, x, y, size) {
             const targetIndex = mergedIndices[nextPos];
 
             goToYellowRect(targetIndex);
+            const containingRange = findPolylineRangeContainingIndex(targetIndex);
+            if (containingRange) {
+                highlightPolylineRange(containingRange.startIndex, containingRange.endIndex, 4000);
+            }
             showRoleActionInfoMessage(`MERGE TAB 전환: [${targetIndex + 1}/${yellowRects.length}]`);
             return true;
         }
