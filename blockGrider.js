@@ -4246,11 +4246,16 @@ function countWhitePixels(ctx, x, y, size) {
                 return `[${matchedIndices[idx] + 1}/${yellowRects.length}] ${mergeLabel} | ${terminal.label} | ${rect.size}x${rect.size} | P:${polylineLabel}`;
             }).join('  ┋  ');
 
-            goMetaDisplayTimer = showTempMessage({
-                elementId: 'goMetaDisplay',
+            canvas1StatusMessageTimer = showTempMessage({
+                elementId: 'canvas1StatusMessage',
                 text: `점 ${matchedIndices.length}개: ${summary}`,
                 className: 'status-go',
-                previousTimerId: goMetaDisplayTimer
+                previousTimerId: canvas1StatusMessageTimer,
+                onClear: (display) => {
+                    display.textContent = '';
+                    display.className = '';
+                    canvas1StatusMessageTimer = null;
+                }
             });
 
             return true;
