@@ -1032,9 +1032,7 @@ function countWhitePixels(ctx, x, y, size) {
         let mergeStateDisplayTimer = null;
         let roleActionDisplayTimer = null;
         let goMetaDisplayTimer = null;
-        let canvas1AutoF9MessageTimer = null;
-        let canvas1AutoF9InfoMessageTimer = null;
-        let canvas1ClipboardScaleMessageTimer = null;
+        let canvas1StatusMessageTimer = null;
         let lastClickedYellowPoint = null;
         let lastClickedMatchedIndices = [];
         let lastMergeTabCycleKey = '';
@@ -1197,43 +1195,43 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         function showCanvas1AutoF9Message(message) {
-            canvas1AutoF9MessageTimer = showTempMessage({
-                elementId: 'canvas1AutoF9Message',
+            canvas1StatusMessageTimer = showTempMessage({
+                elementId: 'canvas1StatusMessage',
                 text: `❌ ${message}`,
                 className: 'status-role-error',
-                previousTimerId: canvas1AutoF9MessageTimer,
+                previousTimerId: canvas1StatusMessageTimer,
                 onClear: (display) => {
                     display.textContent = '';
                     display.className = '';
-                    canvas1AutoF9MessageTimer = null;
+                    canvas1StatusMessageTimer = null;
                 }
             });
         }
 
         function showCanvas1AutoF9InfoMessage(message) {
-            canvas1AutoF9InfoMessageTimer = showTempMessage({
-                elementId: 'canvas1AutoF9InfoMessage',
+            canvas1StatusMessageTimer = showTempMessage({
+                elementId: 'canvas1StatusMessage',
                 text: `${message}🔠`,
                 className: 'status-role-start',
-                previousTimerId: canvas1AutoF9InfoMessageTimer,
+                previousTimerId: canvas1StatusMessageTimer,
                 onClear: (display) => {
                     display.textContent = '';
                     display.className = '';
-                    canvas1AutoF9InfoMessageTimer = null;
+                    canvas1StatusMessageTimer = null;
                 }
             });
         }
 
         function showCanvas1ClipboardScaleMessage(message) {
-            canvas1ClipboardScaleMessageTimer = showTempMessage({
-                elementId: 'canvas1ClipboardScaleMessage',
+            canvas1StatusMessageTimer = showTempMessage({
+                elementId: 'canvas1StatusMessage',
                 text: `📋 ${message}`,
                 className: 'status-clipboard-scale',
-                previousTimerId: canvas1ClipboardScaleMessageTimer,
+                previousTimerId: canvas1StatusMessageTimer,
                 onClear: (display) => {
                     display.textContent = '';
                     display.className = '';
-                    canvas1ClipboardScaleMessageTimer = null;
+                    canvas1StatusMessageTimer = null;
                 }
             });
         }
