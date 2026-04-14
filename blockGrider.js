@@ -493,6 +493,7 @@ function countWhitePixels(ctx, x, y, size) {
         document.getElementById('btnLoadClipboard').addEventListener('click', loadImageFromClipboard);
         document.getElementById('btnRandomize').addEventListener('click', drawRandomPixels);
         const btnViewRecommendedPoint = document.getElementById('btnViewRecommendedPoint');
+        const btnCenterSelected = document.getElementById('btnCenterSelected');
         if (btnViewRecommendedPoint) {
             btnViewRecommendedPoint.addEventListener('click', () => {
                 viewNextAutoF10PointOnCanvas2();
@@ -506,6 +507,15 @@ function countWhitePixels(ctx, x, y, size) {
         if (btnZoomSelectedIn) {
             btnZoomSelectedIn.addEventListener('click', () => {
                 zoomCanvas2AroundSelected(1);
+            });
+        }
+        if (btnCenterSelected) {
+            btnCenterSelected.addEventListener('click', () => {
+                if (!selectedPixel) {
+                    showRoleActionErrorMessage('먼저 Canvas2에서 기준 점을 선택하세요.');
+                    return;
+                }
+                centerCanvas2OnPoint(selectedPixel);
             });
         }
         
