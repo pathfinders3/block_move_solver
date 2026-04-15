@@ -19,6 +19,8 @@
   const scaleDisplay = document.getElementById('scaleDisplay');
   const dpToleranceRange = document.getElementById('dpToleranceRange');
   const dpToleranceDisplay = document.getElementById('dpToleranceDisplay');
+  const mergeStateMustKeep = document.getElementById('mergeStateMustKeep');
+  const mergeStatePolicyDisplay = document.getElementById('mergeStatePolicyDisplay');
   const lineThicknessRange = document.getElementById('lineThicknessRange');
   const lineThicknessDisplay = document.getElementById('lineThicknessDisplay');
   const colorModeSelect = document.getElementById('colorModeSelect');
@@ -43,6 +45,8 @@
     scaleDisplay,
     dpToleranceRange,
     dpToleranceDisplay,
+    mergeStateMustKeep,
+    mergeStatePolicyDisplay,
     lineThicknessRange,
     lineThicknessDisplay,
     colorModeSelect
@@ -67,6 +71,7 @@
   const DEFAULT_DP_EPSILON = 1.5;
   const DP_AUTO_APPLY_DEBOUNCE_MS = 80;
   const DP_TOLERANCE_STORAGE_KEY = 'blockGrider3.dpTolerance';
+  const MERGE_STATE_MUST_KEEP_STORAGE_KEY = 'blockGrider3.mergeStateMustKeep';
   const DEFAULT_LINE_THICKNESS = 1;
   const LINE_THICKNESS_STORAGE_KEY = 'blockGrider3.lineThickness';
   const COLOR_MODE_MONO = 'mono';
@@ -97,7 +102,8 @@
       x: Number(point.x),
       y: Number(point.y),
       size: Number(point.size),
-      canConnect: !!point.canConnect
+      canConnect: !!point.canConnect,
+      mergeState: !!point.mergeState
     };
   }
 
@@ -120,13 +126,23 @@
     return Math.abs(dy * px - dx * py + x2 * y1 - y2 * x1) / Math.hypot(dx, dy);
   }
 
-  function simplifySegmentDp(points, epsilon) {
+  function simplifySegmentDp(points, epsilon, options) {
+    const opts = options || {};
+    const keepMergeState = !!opts.keepMergeState;
     const len = points.length;
     if (len <= 2) return points.map(clonePoint);
 
     const keep = new Array(len).fill(false);
     keep[0] = true;
     keep[len - 1] = true;
+
+    if (keepMergeState) {
+      for (let i = 1; i < len - 1; i++) {
+        if (points[i] && points[i].mergeState === true) {
+          keep[i] = true;
+        }
+      }
+    }
 
     function mark(startIdx, endIdx) {
       if (endIdx - startIdx <= 1) return;
@@ -157,7 +173,9 @@
     return simplified;
   }
 
-  function simplifyByConnectNodes(points, epsilon) {
+  function simplifyByConnectNodes(points, epsilon, options) {
+    const opts = options || {};
+    const keepMergeState = !!opts.keepMergeState;
     if (!Array.isArray(points) || points.length <= 2) {
       return (points || []).map(clonePoint);
     }
@@ -175,7 +193,7 @@
       const start = boundaries[i];
       const end = boundaries[i + 1];
       const chunk = points.slice(start, end + 1);
-      const chunkSimplified = simplifySegmentDp(chunk, epsilon);
+      const chunkSimplified = simplifySegmentDp(chunk, epsilon, { keepMergeState });
 
       if (i === 0) {
         simplified.push(...chunkSimplified);
@@ -187,7 +205,9 @@
     return simplified;
   }
 
-  function simplifyPayloadByDp(payload, epsilon) {
+  function simplifyPayloadByDp(payload, epsilon, options) {
+    const opts = options || {};
+    const keepMergeState = !!opts.keepMergeState;
     const next = {
       ...payload,
       groups: Array.isArray(payload.groups)
@@ -196,7 +216,9 @@
             segments: Array.isArray(group.segments)
               ? group.segments.map(segment => ({
                   ...segment,
-                  points: simplifyByConnectNodes(Array.isArray(segment.points) ? segment.points : [], epsilon)
+                  points: simplifyByConnectNodes(Array.isArray(segment.points) ? segment.points : [], epsilon, {
+                    keepMergeState
+                  })
                 }))
               : []
           }))
@@ -252,6 +274,30 @@
 
   function updateDpToleranceDisplay() {
     dpToleranceDisplay.textContent = getCurrentDpTolerance().toFixed(1);
+  }
+
+  function getKeepMergeStateEnabled() {
+    return !!(mergeStateMustKeep && mergeStateMustKeep.checked);
+  }
+
+  function loadKeepMergeStateFromStorage() {
+    try {
+      return localStorage.getItem(MERGE_STATE_MUST_KEEP_STORAGE_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function saveKeepMergeStateToStorage(enabled) {
+    try {
+      localStorage.setItem(MERGE_STATE_MUST_KEEP_STORAGE_KEY, enabled ? '1' : '0');
+    } catch (error) {
+      // 저장 불가 환경(private mode 등)에서는 무시
+    }
+  }
+
+  function updateMergeStatePolicyDisplay() {
+    mergeStatePolicyDisplay.textContent = '포함';
   }
 
   function sanitizeLineThickness(value) {
@@ -700,13 +746,15 @@
 
     const epsilon = getCurrentDpTolerance();
     const beforePoints = countPoints(dpSourcePayload.groups);
-    const simplified = simplifyPayloadByDp(dpSourcePayload, epsilon);
+    const keepMergeState = getKeepMergeStateEnabled();
+    const simplified = simplifyPayloadByDp(dpSourcePayload, epsilon, { keepMergeState });
     const afterPoints = countPoints(simplified.groups || []);
+    const mergeStateModeText = keepMergeState ? '반드시 포함' : '신경쓰지 않음';
 
     output.value = JSON.stringify(simplified, null, 2);
     updateMeta(simplified, 'transferKey(localStorage)');
     renderPayload(simplified);
-    setStatus(`DP 단순화 적용 완료 (epsilon=${epsilon.toFixed(1)}): ${beforePoints} -> ${afterPoints} 점`, false);
+    setStatus(`DP 단순화 적용 완료 (epsilon=${epsilon.toFixed(1)}, mergeState=${mergeStateModeText}): ${beforePoints} -> ${afterPoints} 점`, false);
     return true;
   }
 
@@ -875,6 +923,12 @@
     scheduleAutoDpApply();
   });
 
+  mergeStateMustKeep.addEventListener('change', () => {
+    saveKeepMergeStateToStorage(mergeStateMustKeep.checked);
+    updateMergeStatePolicyDisplay();
+    scheduleAutoDpApply();
+  });
+
   lineThicknessRange.addEventListener('input', () => {
     saveLineThicknessToStorage(lineThicknessRange.value);
     updateLineThicknessDisplay();
@@ -901,9 +955,11 @@
   });
 
   dpToleranceRange.value = String(loadDpToleranceFromStorage());
+  mergeStateMustKeep.checked = loadKeepMergeStateFromStorage();
   lineThicknessRange.value = String(loadLineThicknessFromStorage());
 
   updateDpToleranceDisplay();
+  updateMergeStatePolicyDisplay();
   updateLineThicknessDisplay();
   updatePathLineButtonLabel();
 
