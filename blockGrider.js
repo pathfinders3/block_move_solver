@@ -158,6 +158,7 @@ function countWhitePixels(ctx, x, y, size) {
         const ctx2 = canvas2.getContext('2d', { willReadFrequently: true });
     const canvasSizeSelect = document.getElementById('canvasSizeSelect');
     const canvas1SizeLabel = document.getElementById('canvas1SizeLabel');
+        const canvas1ClipboardImageInfo = document.getElementById('canvas1ClipboardImageInfo');
     const CANVAS_SIZE_STORAGE_KEY = 'blockGrider.canvasSize';
     const RECT_SIZE_STORAGE_KEY = 'blockGrider.rectSize';
     const CORNER_SIZE_STORAGE_KEY = 'blockGrider.cornerSize';
@@ -463,6 +464,8 @@ function countWhitePixels(ctx, x, y, size) {
                                 const scaledHeight = img.height * scale;
                                 const offsetX = (canvasWidth - scaledWidth) / 2;
                                 const offsetY = (canvasHeight - scaledHeight) / 2;
+                                const croppedOriginalWidth = Math.max(1, Math.min(img.width, canvasWidth / scale));
+                                const croppedOriginalHeight = Math.max(1, Math.min(img.height, canvasHeight / scale));
                                 
                                 // 빈 영역을 검은색으로 채움
                                 ctx1.fillStyle = 'black';
@@ -473,6 +476,9 @@ function countWhitePixels(ctx, x, y, size) {
                                 showCanvas1ClipboardScaleMessage(
                                     `Canvas1 반영 배율: ${scalePercentInt}% (${img.width}x${img.height} → ${Math.round(scaledWidth)}x${Math.round(scaledHeight)})`
                                 );
+                                if (canvas1ClipboardImageInfo) {
+                                    canvas1ClipboardImageInfo.textContent = `원본: ${img.width}x${img.height} | 잘라낸 영역(원본 기준): ${Math.round(croppedOriginalWidth)}x${Math.round(croppedOriginalHeight)} | Canvas1 결과: ${canvasWidth}x${canvasHeight}`;
+                                }
                                 console.log('클립보드에서 이미지를 가져왔습니다.');
                                 scaleCanvas();
                             };
