@@ -455,22 +455,23 @@ function countWhitePixels(ctx, x, y, size) {
                                 ctx1.fillStyle = 'white';
                                 ctx1.fillRect(0, 0, canvasWidth, canvasHeight);
                                 
-                                // 이미지를 현재 캔버스 크기에 맞춰서 그리기 (비율 유지)
-                                const scale = Math.min(canvasWidth / img.width, canvasHeight / img.height);
+                                // 빈 여백이 생기지 않도록 cover 배율을 구한 뒤, 5% 단위로 올림해 중앙 크롭
+                                const coverScale = Math.max(canvasWidth / img.width, canvasHeight / img.height);
+                                const scalePercentInt = Math.ceil((coverScale * 100) / 5) * 5;
+                                const scale = scalePercentInt / 100;
                                 const scaledWidth = img.width * scale;
                                 const scaledHeight = img.height * scale;
                                 const offsetX = (canvasWidth - scaledWidth) / 2;
                                 const offsetY = (canvasHeight - scaledHeight) / 2;
-                                const scalePercent = (scale * 100).toFixed(1);
                                 
                                 // 빈 영역을 검은색으로 채움
                                 ctx1.fillStyle = 'black';
                                 ctx1.fillRect(0, 0, canvasWidth, canvasHeight);
                                 
-                                // 이미지를 현재 캔버스 크기에 맞춰서 그리기 (비율 유지)
+                                // 캔버스 바깥으로 넘어간 영역은 자동으로 잘려 중앙 기준 크롭됨
                                 ctx1.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
                                 showCanvas1ClipboardScaleMessage(
-                                    `Canvas1 반영 배율: ${scalePercent}% (${img.width}x${img.height} → ${Math.round(scaledWidth)}x${Math.round(scaledHeight)})`
+                                    `Canvas1 반영 배율: ${scalePercentInt}% (${img.width}x${img.height} → ${Math.round(scaledWidth)}x${Math.round(scaledHeight)})`
                                 );
                                 console.log('클립보드에서 이미지를 가져왔습니다.');
                                 scaleCanvas();
