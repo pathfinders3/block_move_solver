@@ -1286,11 +1286,31 @@ function countWhitePixels(ctx, x, y, size) {
             };
         }
 
+        function isExactSameRect(x, y, size, rect) {
+            return rect && rect.x === x && rect.y === y && rect.size === size;
+        }
+
+        function hasNonExactOverlapWithExistingRect(x, y, size) {
+            return yellowRects.some(rect => {
+                const overlapType = classifyRectOverlap(x, y, size, rect);
+                if (overlapType === 'none') return false;
+                return !isExactSameRect(x, y, size, rect);
+            });
+        }
+
         // 임시 노란색 사각형을 확정(F9 동작)하는 공통 함수
         function confirmTempYellowRect(triggerKey = 'F9') {
             if (!tempYellowRect) {
                 console.log(`❌ 확정할 임시 노란색 사각형이 없습니다.`);
                 return false;
+            }
+
+            if (hasNonExactOverlapWithExistingRect(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size)) {
+                const shouldAdd = window.confirm('일부만 겹칩니다. 추가하시겠습니까?');
+                if (!shouldAdd) {
+                    console.log(`ℹ️ [${triggerKey}] 일부 겹침 사각형 추가를 취소했습니다.`);
+                    return false;
+                }
             }
 
             const normalizedTarget = normalizeRectToFullOverlapTarget(tempYellowRect.x, tempYellowRect.y, tempYellowRect.size);
