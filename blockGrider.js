@@ -1712,15 +1712,27 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        let lastAutoF9StopReason = '';
+
         // 자동 F9 한 스텝: 빨간 테두리 1개 우선, 없으면 주황 테두리 1개를 대체 선택
-        function runAutoF9Step() {
+        function runAutoF9Step(options = {}) {
+            const strictUniqueOnly = !!options.strictUniqueOnly;
+            const showStopMessage = options.showStopMessage !== false;
             // 사용자가 QWE/ASD/ZXC(또는 버튼 클릭)로 이미 1개 임시 점을 선택한 경우,
             // F10은 해당 점을 우선 자동 확정한다.
+            lastAutoF9StopReason = '';
             if (tempYellowRect) {
                 const confirmedCurrentTemp = confirmTempYellowRect('F10');
                 if (confirmedCurrentTemp) {
                     console.log('✅ 자동 F10: 기존 임시 선택 점을 우선 확정했습니다.');
                     return true;
+                }
+                lastAutoF9StopReason = '임시 점 확정에 실패했습니다.';
+                if (strictUniqueOnly) {
+                    if (showStopMessage) {
+                        showCanvas1AutoF9Message(lastAutoF9StopReason);
+                    }
+                    return false;
                 }
                 // 임시 점 확정 실패 시 기존 자동 선택 로직으로 계속 진행
             }
@@ -1728,6 +1740,7 @@ function countWhitePixels(ctx, x, y, size) {
             const pathWhiteContent = document.getElementById('pathWhiteContent');
             if (!pathWhiteContent) {
                 console.log('❌ 경로별 흰색점 영역을 찾을 수 없습니다.');
+                lastAutoF9StopReason = '경로별 흰색점 영역을 찾을 수 없습니다.';
                 flashAutoF9ButtonError();
                 return false;
             }
@@ -1776,6 +1789,15 @@ function countWhitePixels(ctx, x, y, size) {
                         ? `빨간 테두리 후보(중복제거) 수가 1개가 아님 (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`
                         : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`;
                 const autoF9FailMessage = `자동 F9 조건 불만족: ${reason}`;
+                lastAutoF9StopReason = reason;
+
+                if (strictUniqueOnly) {
+                    if (showStopMessage) {
+                        showCanvas1AutoF9InfoMessage(`연속 F10 중지: ${reason}`);
+                    }
+                    console.log(`⏹️ 연속 F10 중지: ${reason}`);
+                    return false;
+                }
 
                 const fallbackTarget = selectClosestAnglePathButton(allButtons);
                 if (fallbackTarget && fallbackTarget.btn) {
@@ -1823,6 +1845,7 @@ function countWhitePixels(ctx, x, y, size) {
             const targetSize = parseInt(targetButton.getAttribute('data-size'), 10);
             if (!Number.isFinite(targetX) || !Number.isFinite(targetY) || !Number.isFinite(targetSize)) {
                 console.log('❌ 자동 F9 후보의 좌표/크기 데이터가 올바르지 않습니다.');
+                lastAutoF9StopReason = '자동 F9 후보의 좌표/크기 데이터가 올바르지 않습니다.';
                 flashAutoF9ButtonError();
                 return false;
             }
@@ -1834,6 +1857,7 @@ function countWhitePixels(ctx, x, y, size) {
                     `❌ 자동 F9 후보가 흰색 사각형이 아닙니다. ` +
                     `(흰색: ${whiteCheck.whiteCount}/${whiteCheck.maxPixels}, 좌표: ${targetX},${targetY}, 크기: ${targetSize})`
                 );
+                lastAutoF9StopReason = `흰색 사각형 아님 (${whiteCheck.whiteCount}/${whiteCheck.maxPixels})`;
                 flashAutoF9ButtonError();
                 return false;
             }
@@ -1845,8 +1869,44 @@ function countWhitePixels(ctx, x, y, size) {
             const confirmed = confirmTempYellowRect('F10');
             if (confirmed) {
                 console.log(`✅ 자동 F9 한 스텝 완료 (${selectedBorderLabel} 후보 1개 선택 + 확정).`);
+                lastAutoF9StopReason = '';
+            } else {
+                lastAutoF9StopReason = '후보를 클릭했지만 확정에 실패했습니다.';
             }
             return confirmed;
+        }
+
+        function runContinuousAutoF10(maxSteps = 300) {
+            let confirmedCount = 0;
+            let stopReason = '추천 후보가 없거나 2개 이상입니다.';
+
+            for (let i = 0; i < maxSteps; i++) {
+                const confirmed = runAutoF9Step({
+                    strictUniqueOnly: true,
+                    showStopMessage: false
+                });
+
+                if (!confirmed) {
+                    stopReason = lastAutoF9StopReason || stopReason;
+                    break;
+                }
+
+                confirmedCount += 1;
+            }
+
+            if (confirmedCount === maxSteps) {
+                stopReason = `안전 제한(${maxSteps}회)에 도달했습니다.`;
+            }
+
+            if (confirmedCount === 0) {
+                showCanvas1AutoF9Message(`연속 F10 시작 실패: ${stopReason}`);
+                console.log(`⏹️ 연속 F10 시작 실패: ${stopReason}`);
+                return false;
+            }
+
+            showCanvas1AutoF9InfoMessage(`연속 F10: ${confirmedCount}개 확정 후 중지 (${stopReason})`);
+            console.log(`✅ 연속 F10 완료: ${confirmedCount}개 확정, 중지 사유: ${stopReason}`);
+            return true;
         }
         
         function deleteYellowRectsFromCurrentToEnd(triggerLabel = 'Del 버튼') {
@@ -2273,7 +2333,7 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
-        // F2, F4, F8, F9, F10, F11, DEL, IJKL 키 이벤트 리스너
+        // F2, F4, F8, F9, F10, Shift+F10, F11, DEL, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             const activeElement = document.activeElement;
             const isTypingTarget = !!(
@@ -2416,7 +2476,11 @@ function countWhitePixels(ctx, x, y, size) {
                 confirmTempYellowRect('F9');
                 e.preventDefault();
             }
-            if (e.key === 'F10') {
+            if (e.key === 'F10' && e.shiftKey) {
+                runContinuousAutoF10();
+                e.preventDefault();
+            }
+            else if (e.key === 'F10') {
                 runAutoF9Step();
                 e.preventDefault();
             }
