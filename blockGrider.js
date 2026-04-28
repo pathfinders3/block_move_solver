@@ -1603,9 +1603,14 @@ function countWhitePixels(ctx, x, y, size) {
                 const styleText = (btn.getAttribute('style') || '').toLowerCase();
                 return styleText.includes('#ff8c00');
             });
+            const thirdButtons = allButtons.filter(btn => {
+                const styleText = (btn.getAttribute('style') || '').toLowerCase();
+                return styleText.includes('#a39908');
+            });
 
             const uniqueRedButtonMap = uniqueByRect(redButtons);
             const uniqueOrangeButtonMap = uniqueByRect(orangeButtons);
+            const uniqueThirdButtonMap = uniqueByRect(thirdButtons);
 
             const parseButtonTarget = (btn, source, borderText, failReason = '') => {
                 const x = parseInt(btn.getAttribute('data-x'), 10);
@@ -1778,16 +1783,24 @@ function countWhitePixels(ctx, x, y, size) {
             if (uniqueRedButtonMap.size === 1) {
                 targetButton = Array.from(uniqueRedButtonMap.values())[0];
                 selectedBorderLabel = '빨간';
-            } else if (uniqueRedButtonMap.size === 0 && uniqueOrangeButtonMap.size === 1) {
+            } else if (
+                uniqueRedButtonMap.size === 0 &&
+                uniqueOrangeButtonMap.size === 1 &&
+                (!strictUniqueOnly || uniqueThirdButtonMap.size === 0)
+            ) {
                 targetButton = Array.from(uniqueOrangeButtonMap.values())[0];
                 selectedBorderLabel = '주황';
             }
 
             if (!targetButton) {
                 const reason =
-                    uniqueRedButtonMap.size > 0
-                        ? `빨간 테두리 후보(중복제거) 수가 1개가 아님 (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`
-                        : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`;
+                    (strictUniqueOnly && uniqueRedButtonMap.size === 0 && uniqueOrangeButtonMap.size === 1 && uniqueThirdButtonMap.size > 0)
+                        ? `주황 테두리 후보(중복제거) 1개이지만 #A39908 후보도 존재 (중복제거 ${uniqueThirdButtonMap.size}개 / 중복포함 ${thirdButtons.length}개)`
+                        : (
+                            uniqueRedButtonMap.size > 0
+                                ? `빨간 테두리 후보(중복제거) 수가 1개가 아님 (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`
+                                : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`
+                        );
                 const autoF9FailMessage = `자동 F9 조건 불만족: ${reason}`;
                 lastAutoF9StopReason = reason;
 
