@@ -2424,6 +2424,14 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             const noModifier = !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
+            if (!isTypingTarget && noModifier && (e.key === '-' || e.key === '=')) {
+                const buttonId = e.key === '-' ? 'btnPrevYellow' : 'btnNextYellow';
+                const button = document.getElementById(buttonId);
+                if (button) {
+                    button.click();
+                    e.preventDefault();
+                }
+            }
             if (!isTypingTarget && noModifier && triggerPathButtonByNumpadKey(e.key)) {
                 e.preventDefault();
             }
