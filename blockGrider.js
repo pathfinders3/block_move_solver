@@ -2346,6 +2346,8 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        let lastShiftF10Timestamp = 0;
+
         // F2, F4, F8, F9, F10, Shift+F10, F11, DEL, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             const activeElement = document.activeElement;
@@ -2498,6 +2500,7 @@ function countWhitePixels(ctx, x, y, size) {
                 e.preventDefault();
             }
             if (e.key === 'F10' && e.shiftKey) {
+                lastShiftF10Timestamp = Date.now();
                 runContinuousAutoF10();
                 e.preventDefault();
             }
@@ -2575,6 +2578,13 @@ function countWhitePixels(ctx, x, y, size) {
                     clearCornerPathPreview();
                 }
                 scaleCanvas();
+                e.preventDefault();
+            }
+        });
+
+        // Shift+F10 직후 브라우저 기본 컨텍스트 메뉴가 뜨는 것을 방지
+        document.addEventListener('contextmenu', (e) => {
+            if (Date.now() - lastShiftF10Timestamp < 800) {
                 e.preventDefault();
             }
         });
