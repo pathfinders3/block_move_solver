@@ -223,12 +223,18 @@ function countWhitePixels(ctx, x, y, size) {
             }
         }
 
+        let hasShownCanvasCacheSaveWarning = false;
+
         function saveCanvas1ImageToStorage() {
             try {
                 const dataUrl = canvas1.toDataURL('image/png');
                 localStorage.setItem(CANVAS1_IMAGE_STORAGE_KEY, dataUrl);
+                hasShownCanvasCacheSaveWarning = false;
             } catch (ex) {
-                // localStorage 용량 초과/비활성화 등 저장 불가 시 무시
+                if (!hasShownCanvasCacheSaveWarning) {
+                    hasShownCanvasCacheSaveWarning = true;
+                    showCanvas1ClipboardScaleMessage('이미지 캐시 저장에 실패했습니다. (브라우저 저장공간/권한 확인)', true);
+                }
             }
         }
 
@@ -1300,11 +1306,11 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
-        function showCanvas1ClipboardScaleMessage(message) {
+        function showCanvas1ClipboardScaleMessage(message, isError = false) {
             canvas1StatusMessageTimer = showTempMessage({
                 elementId: 'canvas1StatusMessage',
-                text: `📋 ${message}`,
-                className: 'status-clipboard-scale',
+                text: `${isError ? '⚠️' : '📋'} ${message}`,
+                className: isError ? 'status-role-error' : 'status-clipboard-scale',
                 previousTimerId: canvas1StatusMessageTimer,
                 onClear: (display) => {
                     display.textContent = '';
