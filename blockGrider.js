@@ -2110,11 +2110,11 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
-        function showRectPixelStats(message) {
+        function showRectPixelStats(message, isError = false) {
             roleActionDisplayTimer = showTempMessage({
                 elementId: 'roleActionDisplay',
                 text: message,
-                className: 'status-go',
+                className: isError ? 'status-role-error' : 'status-go',
                 previousTimerId: roleActionDisplayTimer
             });
         }
@@ -2171,8 +2171,12 @@ function countWhitePixels(ctx, x, y, size) {
                 }
 
                 const avgVal = count > 0 ? (sum / count) : 0;
-                const failHint = minVal < whiteThreshold ? ' | 실패가능성!' : '';
-                showRectPixelStats(`F1: 선택 사각형 픽셀값 min ${minVal}, max ${maxVal}, avg ${avgVal.toFixed(1)} | 흰색기준 ${whiteThreshold}${failHint}`);
+                const hasFailRisk = minVal < whiteThreshold;
+                const failHint = hasFailRisk ? ' | 실패가능성!' : '';
+                showRectPixelStats(
+                    `F1: 선택 사각형 픽셀값 min ${minVal}, max ${maxVal}, avg ${avgVal.toFixed(1)} | 흰색기준 ${whiteThreshold}${failHint}`,
+                    hasFailRisk
+                );
             } catch (err) {
                 console.error('픽셀값 계산 오류:', err);
                 showRectPixelStats('❌ 픽셀값 계산 중 오류가 발생했습니다.');
