@@ -163,6 +163,7 @@ function countWhitePixels(ctx, x, y, size) {
     const RECT_SIZE_STORAGE_KEY = 'blockGrider.rectSize';
     const CORNER_SIZE_STORAGE_KEY = 'blockGrider.cornerSize';
     const WHITE_THRESHOLD_STORAGE_KEY = 'blockGrider.whiteThreshold';
+    const CANVAS1_IMAGE_STORAGE_KEY = 'blockGrider.canvas1ImageDataUrl';
     const ALLOWED_CANVAS_SIZES = ['64x64', '128x128', '256x256', '64x128'];
     let currentCanvasWidth = 64;
     let currentCanvasHeight = 64;
@@ -220,6 +221,53 @@ function countWhitePixels(ctx, x, y, size) {
             } catch (ex) {
                 // localStorage를 사용할 수 없는 환경에서는 저장을 건너뜀
             }
+        }
+
+        function saveCanvas1ImageToStorage() {
+            try {
+                const dataUrl = canvas1.toDataURL('image/png');
+                localStorage.setItem(CANVAS1_IMAGE_STORAGE_KEY, dataUrl);
+            } catch (ex) {
+                // localStorage 용량 초과/비활성화 등 저장 불가 시 무시
+            }
+        }
+
+        function restoreCanvas1ImageFromStorage() {
+            return new Promise((resolve) => {
+                try {
+                    const dataUrl = localStorage.getItem(CANVAS1_IMAGE_STORAGE_KEY);
+                    if (!dataUrl) {
+                        resolve(false);
+                        return;
+                    }
+
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvasWidth = currentCanvasWidth;
+                        const canvasHeight = currentCanvasHeight;
+
+                        ctx1.fillStyle = 'black';
+                        ctx1.fillRect(0, 0, canvasWidth, canvasHeight);
+                        ctx1.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+
+                        if (canvas1ClipboardImageInfo) {
+                            canvas1ClipboardImageInfo.textContent = `캐시 복원: Canvas1 결과 ${canvasWidth}x${canvasHeight}`;
+                        }
+
+                        showCanvas1ClipboardScaleMessage('저장된 이미지를 자동 복원했습니다.');
+                        scaleCanvas();
+                        resolve(true);
+                    };
+
+                    img.onerror = function() {
+                        resolve(false);
+                    };
+
+                    img.src = dataUrl;
+                } catch (ex) {
+                    resolve(false);
+                }
+            });
         }
 
         function parseAndClampInputValue(input, fallbackValue) {
@@ -357,6 +405,7 @@ function countWhitePixels(ctx, x, y, size) {
                 updateCornerAndPathInfo();
             }
             scaleCanvas();
+            saveCanvas1ImageToStorage();
         }
 
         canvasSizeSelect.addEventListener('change', (e) => {
@@ -405,7 +454,11 @@ function countWhitePixels(ctx, x, y, size) {
         // Document 로드 시 임의의 점들 그리기
         document.addEventListener('DOMContentLoaded', () => {
             updateCanvasSizeLabel();
-            drawRandomPixels();
+            restoreCanvas1ImageFromStorage().then((restored) => {
+                if (!restored) {
+                    drawRandomPixels();
+                }
+            });
         });
         
         // Canvas1에 임의의 점들 그리기
@@ -436,6 +489,7 @@ function countWhitePixels(ctx, x, y, size) {
 
             // Canvas2 확대 뷰를 즉시 갱신
             scaleCanvas();
+            saveCanvas1ImageToStorage();
         }
         
         // 클립보드에서 이미지 가져오기
@@ -479,6 +533,7 @@ function countWhitePixels(ctx, x, y, size) {
                                 if (canvas1ClipboardImageInfo) {
                                     canvas1ClipboardImageInfo.textContent = `원본: ${img.width}x${img.height} | 잘라낸 영역(원본 기준): ${Math.round(croppedOriginalWidth)}x${Math.round(croppedOriginalHeight)} | Canvas1 결과: ${canvasWidth}x${canvasHeight}`;
                                 }
+                                saveCanvas1ImageToStorage();
                                 console.log('클립보드에서 이미지를 가져왔습니다.');
                                 scaleCanvas();
                             };
