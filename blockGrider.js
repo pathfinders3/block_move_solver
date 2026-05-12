@@ -2125,6 +2125,12 @@ function countWhitePixels(ctx, x, y, size) {
                 return;
             }
 
+            const thresholdInput = document.getElementById('whiteThreshold');
+            const thresholdValue = thresholdInput ? parseInt(thresholdInput.value, 10) : 245;
+            const whiteThreshold = Number.isNaN(thresholdValue)
+                ? 245
+                : Math.min(255, Math.max(0, thresholdValue));
+
             const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
             const rect = {
                 x: selectedPixel.x,
@@ -2165,7 +2171,8 @@ function countWhitePixels(ctx, x, y, size) {
                 }
 
                 const avgVal = count > 0 ? (sum / count) : 0;
-                showRectPixelStats(`F1: 선택 사각형 픽셀값 min ${minVal}, max ${maxVal}, avg ${avgVal.toFixed(1)}`);
+                const failHint = minVal < whiteThreshold ? ' | 실패가능성!' : '';
+                showRectPixelStats(`F1: 선택 사각형 픽셀값 min ${minVal}, max ${maxVal}, avg ${avgVal.toFixed(1)} | 흰색기준 ${whiteThreshold}${failHint}`);
             } catch (err) {
                 console.error('픽셀값 계산 오류:', err);
                 showRectPixelStats('❌ 픽셀값 계산 중 오류가 발생했습니다.');
