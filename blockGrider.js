@@ -2293,14 +2293,23 @@ function countWhitePixels(ctx, x, y, size) {
                 const summaryLine =
                     `선택 사각형 픽셀값 min ${stats.minVal}, max ${stats.maxVal}, avg ${stats.avgVal.toFixed(1)} | 흰색기준 ${stats.whiteThreshold}${failHint}`;
 
-                const maxDigits = String(stats.maxVal).length;
-                const matrixText = stats.values2d
-                    .map(row => row.map(v => String(v).padStart(maxDigits, ' ')).join(' '))
-                    .join('\n');
+                const matrixRowsHtml = stats.values2d
+                    .map(row => {
+                        const rowCellsHtml = row
+                            .map(value => {
+                                const levelClass = value < stats.whiteThreshold
+                                    ? 'stats-overlay__cell--below'
+                                    : 'stats-overlay__cell--above';
+                                return `<span class="stats-overlay__cell ${levelClass}">${value}</span>`;
+                            })
+                            .join('');
+                        return `<div class="stats-overlay__row">${rowCellsHtml}</div>`;
+                    })
+                    .join('');
 
-                content.textContent =
-                    `${summaryLine}\n\n` +
-                    `${matrixText}`;
+                content.innerHTML =
+                    `<div class="stats-overlay__summary">${summaryLine}</div>` +
+                    `<div class="stats-overlay__matrix">${matrixRowsHtml}</div>`;
             }
 
             overlay.classList.add('is-open');
