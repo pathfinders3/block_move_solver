@@ -1126,6 +1126,33 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        function getButtonRectKey(btn) {
+            const x = btn.getAttribute('data-x') || '';
+            const y = btn.getAttribute('data-y') || '';
+            const size = btn.getAttribute('data-size') || '';
+            return `${x},${y},${size}`;
+        }
+
+        function uniqueButtonsByRect(buttons) {
+            const uniqueButtonMap = new Map();
+            buttons.forEach(btn => {
+                const key = getButtonRectKey(btn);
+                if (!uniqueButtonMap.has(key)) {
+                    uniqueButtonMap.set(key, btn);
+                }
+            });
+            return uniqueButtonMap;
+        }
+
+        function getButtonStyleLower(btn) {
+            return (btn.getAttribute('style') || '').toLowerCase();
+        }
+
+        function filterButtonsByStyleColor(buttons, colorHex) {
+            const targetColor = String(colorHex || '').toLowerCase();
+            return buttons.filter(btn => getButtonStyleLower(btn).includes(targetColor));
+        }
+
         function cycleToMergedYellowRect(reverse = false) {
             if (currentYellowIndex === -1 || yellowRects.length === 0) {
                 showRoleActionErrorMessage('TAB 전환할 MERGE 점이 없습니다.');
@@ -1642,36 +1669,13 @@ function countWhitePixels(ctx, x, y, size) {
                 };
             }
 
-            const uniqueByRect = (buttons) => {
-                const uniqueButtonMap = new Map();
-                buttons.forEach(btn => {
-                    const x = btn.getAttribute('data-x') || '';
-                    const y = btn.getAttribute('data-y') || '';
-                    const size = btn.getAttribute('data-size') || '';
-                    const key = `${x},${y},${size}`;
-                    if (!uniqueButtonMap.has(key)) {
-                        uniqueButtonMap.set(key, btn);
-                    }
-                });
-                return uniqueButtonMap;
-            };
+            const redButtons = filterButtonsByStyleColor(allButtons, '#ff0000');
+            const orangeButtons = filterButtonsByStyleColor(allButtons, '#ff8c00');
+            const thirdButtons = filterButtonsByStyleColor(allButtons, '#a39908');
 
-            const redButtons = allButtons.filter(btn => {
-                const styleText = (btn.getAttribute('style') || '').toLowerCase();
-                return styleText.includes('#ff0000');
-            });
-            const orangeButtons = allButtons.filter(btn => {
-                const styleText = (btn.getAttribute('style') || '').toLowerCase();
-                return styleText.includes('#ff8c00');
-            });
-            const thirdButtons = allButtons.filter(btn => {
-                const styleText = (btn.getAttribute('style') || '').toLowerCase();
-                return styleText.includes('#a39908');
-            });
-
-            const uniqueRedButtonMap = uniqueByRect(redButtons);
-            const uniqueOrangeButtonMap = uniqueByRect(orangeButtons);
-            const uniqueThirdButtonMap = uniqueByRect(thirdButtons);
+            const uniqueRedButtonMap = uniqueButtonsByRect(redButtons);
+            const uniqueOrangeButtonMap = uniqueButtonsByRect(orangeButtons);
+            const uniqueThirdButtonMap = uniqueButtonsByRect(thirdButtons);
 
             const parseButtonTarget = (btn, source, borderText, failReason = '') => {
                 const x = parseInt(btn.getAttribute('data-x'), 10);
@@ -1812,31 +1816,14 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             const allButtons = Array.from(pathWhiteContent.querySelectorAll('button')).filter(btn => !btn.disabled);
-            const uniqueByRect = (buttons) => {
-                const uniqueButtonMap = new Map();
-                buttons.forEach(btn => {
-                    const x = btn.getAttribute('data-x') || '';
-                    const y = btn.getAttribute('data-y') || '';
-                    const size = btn.getAttribute('data-size') || '';
-                    const key = `${x},${y},${size}`;
-                    if (!uniqueButtonMap.has(key)) {
-                        uniqueButtonMap.set(key, btn);
-                    }
-                });
-                return uniqueButtonMap;
-            };
 
-            const redButtons = allButtons.filter(btn => {
-                const styleText = (btn.getAttribute('style') || '').toLowerCase();
-                return styleText.includes('#ff0000');
-            });
-            const orangeButtons = allButtons.filter(btn => {
-                const styleText = (btn.getAttribute('style') || '').toLowerCase();
-                return styleText.includes('#ff8c00');
-            });
+            const redButtons = filterButtonsByStyleColor(allButtons, '#ff0000');
+            const orangeButtons = filterButtonsByStyleColor(allButtons, '#ff8c00');
+            const thirdButtons = filterButtonsByStyleColor(allButtons, '#a39908');
 
-            const uniqueRedButtonMap = uniqueByRect(redButtons);
-            const uniqueOrangeButtonMap = uniqueByRect(orangeButtons);
+            const uniqueRedButtonMap = uniqueButtonsByRect(redButtons);
+            const uniqueOrangeButtonMap = uniqueButtonsByRect(orangeButtons);
+            const uniqueThirdButtonMap = uniqueButtonsByRect(thirdButtons);
 
             let targetButton = null;
             let selectedBorderLabel = '';
@@ -3007,12 +2994,8 @@ function countWhitePixels(ctx, x, y, size) {
             });
 
             buttons.forEach(btn => {
-                const styleText = btn.getAttribute('style') || '';
-                const lowerStyle = styleText.toLowerCase();
-                const x = btn.getAttribute('data-x') || '';
-                const y = btn.getAttribute('data-y') || '';
-                const size = btn.getAttribute('data-size') || '';
-                const rectKey = `${x},${y},${size}`;
+                const lowerStyle = getButtonStyleLower(btn);
+                const rectKey = getButtonRectKey(btn);
 
                 colorTargets.forEach(target => {
                     const key = target.colorHex.toLowerCase();
@@ -3073,8 +3056,8 @@ function countWhitePixels(ctx, x, y, size) {
                 const rect = { x, y, size };
                 pathMap[pathName].push(rect);
 
-                const styleText = (btn.getAttribute('style') || '').toLowerCase();
-                const key = `${x},${y},${size}`;
+                const styleText = getButtonStyleLower(btn);
+                const key = getButtonRectKey(btn);
                 if (styleText.includes('#ff0000')) {
                     if (!redSet.has(key)) {
                         redSet.add(key);
