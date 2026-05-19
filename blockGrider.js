@@ -2168,10 +2168,9 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
-        function computeSelectedRectPixelStats() {
+        function calculateSelectedRectPixelStatsData() {
             if (!selectedPixel) {
-                showRectPixelStats('❌ 마우스로 선택된 위치가 없습니다.');
-                return;
+                return { ok: false, errorMessage: '❌ 마우스로 선택된 위치가 없습니다.' };
             }
 
             const thresholdInput = document.getElementById('whiteThreshold');
@@ -2195,41 +2194,72 @@ function countWhitePixels(ctx, x, y, size) {
             const height = y1 - y0;
 
             if (width <= 0 || height <= 0) {
-                showRectPixelStats('❌ 선택된 사각형이 캔버스 밖입니다.');
-                return;
+                return { ok: false, errorMessage: '❌ 선택된 사각형이 캔버스 밖입니다.' };
             }
 
             try {
                 const imageData = ctx1.getImageData(x0, y0, width, height);
                 const data = imageData.data;
+                const values2d = [];
                 let minVal = 255;
                 let maxVal = 0;
                 let sum = 0;
                 let count = 0;
 
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
-                    const value = Math.round((r + g + b) / 3);
+                for (let row = 0; row < height; row++) {
+                    const rowValues = [];
+                    for (let col = 0; col < width; col++) {
+                        const i = (row * width + col) * 4;
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        const value = Math.round((r + g + b) / 3);
 
-                    minVal = Math.min(minVal, value);
-                    maxVal = Math.max(maxVal, value);
-                    sum += value;
-                    count += 1;
+                        rowValues.push(value);
+                        minVal = Math.min(minVal, value);
+                        maxVal = Math.max(maxVal, value);
+                        sum += value;
+                        count += 1;
+                    }
+                    values2d.push(rowValues);
                 }
 
                 const avgVal = count > 0 ? (sum / count) : 0;
                 const hasFailRisk = minVal < whiteThreshold;
-                const failHint = hasFailRisk ? ' | 실패가능성!' : '';
-                showRectPixelStats(
-                    `F1: 선택 사각형 픽셀값 min ${minVal}, max ${maxVal}, avg ${avgVal.toFixed(1)} | 흰색기준 ${whiteThreshold}${failHint}`,
-                    hasFailRisk
-                );
+
+                return {
+                    ok: true,
+                    rect,
+                    x0,
+                    y0,
+                    width,
+                    height,
+                    whiteThreshold,
+                    minVal,
+                    maxVal,
+                    avgVal,
+                    hasFailRisk,
+                    values2d
+                };
             } catch (err) {
                 console.error('픽셀값 계산 오류:', err);
-                showRectPixelStats('❌ 픽셀값 계산 중 오류가 발생했습니다.');
+                return { ok: false, errorMessage: '❌ 픽셀값 계산 중 오류가 발생했습니다.' };
             }
+        }
+
+        function computeSelectedRectPixelStats() {
+            const stats = calculateSelectedRectPixelStatsData();
+            if (!stats.ok) {
+                showRectPixelStats(stats.errorMessage || '❌ 통계 계산에 실패했습니다.');
+                return;
+            }
+
+            const hasFailRisk = stats.hasFailRisk;
+                const failHint = hasFailRisk ? ' | 실패가능성!' : '';
+                showRectPixelStats(
+                    `F1: 선택 사각형 픽셀값 min ${stats.minVal}, max ${stats.maxVal}, avg ${stats.avgVal.toFixed(1)} | 흰색기준 ${stats.whiteThreshold}${failHint}`,
+                    hasFailRisk
+                );
         }
 
         let statsOverlayAutoHideTimer = null;
@@ -2255,11 +2285,23 @@ function countWhitePixels(ctx, x, y, size) {
                 return;
             }
 
-            const pointText = selectedPixel ? `${selectedPixel.x},${selectedPixel.y}` : '-,-';
-            content.textContent =
-                `Shift+F1 상세 통계 모달이 열렸습니다.\n` +
-                `선택 좌표: ${pointText}\n` +
-                `세부 데이터는 다음 단계에서 정의됩니다.`;
+            const stats = calculateSelectedRectPixelStatsData();
+            if (!stats.ok) {
+                content.textContent = stats.errorMessage || '통계를 표시할 수 없습니다.';
+            } else {
+                const failHint = stats.hasFailRisk ? ' | 실패가능성!' : '';
+                const summaryLine =
+                    `선택 사각형 픽셀값 min ${stats.minVal}, max ${stats.maxVal}, avg ${stats.avgVal.toFixed(1)} | 흰색기준 ${stats.whiteThreshold}${failHint}`;
+
+                const maxDigits = String(stats.maxVal).length;
+                const matrixText = stats.values2d
+                    .map(row => row.map(v => String(v).padStart(maxDigits, ' ')).join(' '))
+                    .join('\n');
+
+                content.textContent =
+                    `${summaryLine}\n\n` +
+                    `${matrixText}`;
+            }
 
             overlay.classList.add('is-open');
             overlay.setAttribute('aria-hidden', 'false');
