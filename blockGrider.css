@@ -153,3 +153,72 @@ canvas {
     background-color: #b8f3c4;
     border: 1px solid #66b87b;
 }
+
+.stats-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.stats-overlay.is-open {
+    display: flex;
+}
+
+.stats-overlay__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.58);
+}
+
+.stats-overlay__panel {
+    position: relative;
+    width: min(700px, calc(100vw - 40px));
+    max-height: min(80vh, 740px);
+    overflow: auto;
+    border-radius: 10px;
+    border: 1px solid #4f6fa8;
+    background: #182236;
+    color: #f2f7ff;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.5);
+    padding: 16px 18px;
+}
+
+.stats-overlay__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.stats-overlay__header h3 {
+    margin: 0;
+    color: #ffe082;
+    font-size: 18px;
+}
+
+.stats-overlay__close {
+    border: 1px solid #6e89b7;
+    background: #1f3b6d;
+    color: #ffffff;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.stats-overlay__close:hover {
+    background: #275092;
+}
+
+.stats-overlay__content {
+    border-radius: 8px;
+    border: 1px solid #37517b;
+    background: #101828;
+    padding: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}

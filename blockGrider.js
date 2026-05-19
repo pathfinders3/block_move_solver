@@ -2232,6 +2232,47 @@ function countWhitePixels(ctx, x, y, size) {
             }
         }
 
+        let statsOverlayAutoHideTimer = null;
+
+        function hideStatsOverlayModal() {
+            const overlay = document.getElementById('statsOverlayModal');
+            if (!overlay) return;
+
+            overlay.classList.remove('is-open');
+            overlay.setAttribute('aria-hidden', 'true');
+
+            if (statsOverlayAutoHideTimer !== null) {
+                clearTimeout(statsOverlayAutoHideTimer);
+                statsOverlayAutoHideTimer = null;
+            }
+        }
+
+        function showStatsOverlayModal() {
+            const overlay = document.getElementById('statsOverlayModal');
+            const content = document.getElementById('statsOverlayContent');
+            if (!overlay || !content) {
+                showRoleActionErrorMessage('상세 통계 모달 요소를 찾을 수 없습니다.');
+                return;
+            }
+
+            const pointText = selectedPixel ? `${selectedPixel.x},${selectedPixel.y}` : '-,-';
+            content.textContent =
+                `Shift+F1 상세 통계 모달이 열렸습니다.\n` +
+                `선택 좌표: ${pointText}\n` +
+                `세부 데이터는 다음 단계에서 정의됩니다.`;
+
+            overlay.classList.add('is-open');
+            overlay.setAttribute('aria-hidden', 'false');
+
+            if (statsOverlayAutoHideTimer !== null) {
+                clearTimeout(statsOverlayAutoHideTimer);
+            }
+
+            statsOverlayAutoHideTimer = setTimeout(() => {
+                hideStatsOverlayModal();
+            }, 2600);
+        }
+
         function adjustCornerSize(delta) {
             const cornerSizeInput = document.getElementById('cornerSize');
             if (!cornerSizeInput) return;
@@ -2462,7 +2503,11 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             if (!isTypingTarget && e.key === 'F1') {
-                computeSelectedRectPixelStats();
+                if (e.shiftKey) {
+                    showStatsOverlayModal();
+                } else {
+                    computeSelectedRectPixelStats();
+                }
                 e.preventDefault();
             }
 
@@ -2646,6 +2691,15 @@ function countWhitePixels(ctx, x, y, size) {
         document.addEventListener('contextmenu', (e) => {
             if (Date.now() - lastShiftF10Timestamp < 800) {
                 e.preventDefault();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            const target = e.target;
+            if (!(target instanceof Element)) return;
+
+            if (target.id === 'statsOverlayClose' || target.getAttribute('data-overlay-close') === 'true') {
+                hideStatsOverlayModal();
             }
         });
         
