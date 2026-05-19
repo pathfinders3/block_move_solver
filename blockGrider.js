@@ -1503,6 +1503,7 @@ function countWhitePixels(ctx, x, y, size) {
         // 자동 F10 실패 시: 각도 차이가 가장 작은 후보 1개를 기본 선택
         function selectClosestAnglePathButton(buttons) {
             if (!Array.isArray(buttons) || buttons.length === 0) return null;
+            const maxAllowedAngleDiff = 120;
 
             const uniqueButtonMap = new Map();
             buttons.forEach(btn => {
@@ -1583,7 +1584,7 @@ function countWhitePixels(ctx, x, y, size) {
 
             // 기대 각도가 있으면 각도 차이 우선, 동률은 테두리 우선순위로 선택
             if (expectedAngle !== null) {
-                const withAngle = scored.filter(item => item.angleDiff !== null);
+                const withAngle = scored.filter(item => item.angleDiff !== null && item.angleDiff <= maxAllowedAngleDiff);
                 if (withAngle.length > 0) {
                     withAngle.sort((a, b) => {
                         if (a.angleDiff !== b.angleDiff) return a.angleDiff - b.angleDiff;
