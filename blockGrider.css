@@ -228,6 +228,13 @@ canvas {
     font-weight: 600;
 }
 
+.stats-overlay__section-title {
+    margin: 6px 0;
+    color: #c3d8ff;
+    font-size: 13px;
+    font-weight: 700;
+}
+
 .stats-overlay__matrix {
     display: inline-flex;
     flex-direction: column;
@@ -264,4 +271,17 @@ canvas {
     color: #e7ffed;
     background: #14532d;
     border-color: #1f7a40;
+}
+
+.stats-overlay__matrix--color {
+    padding: 8px;
+}
+
+.stats-overlay__color-cell {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-sizing: border-box;
+    display: inline-block;
 }

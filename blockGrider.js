@@ -2201,6 +2201,7 @@ function countWhitePixels(ctx, x, y, size) {
                 const imageData = ctx1.getImageData(x0, y0, width, height);
                 const data = imageData.data;
                 const values2d = [];
+                const colors2d = [];
                 let minVal = 255;
                 let maxVal = 0;
                 let sum = 0;
@@ -2208,6 +2209,7 @@ function countWhitePixels(ctx, x, y, size) {
 
                 for (let row = 0; row < height; row++) {
                     const rowValues = [];
+                    const rowColors = [];
                     for (let col = 0; col < width; col++) {
                         const i = (row * width + col) * 4;
                         const r = data[i];
@@ -2216,12 +2218,14 @@ function countWhitePixels(ctx, x, y, size) {
                         const value = Math.round((r + g + b) / 3);
 
                         rowValues.push(value);
+                        rowColors.push({ r, g, b });
                         minVal = Math.min(minVal, value);
                         maxVal = Math.max(maxVal, value);
                         sum += value;
                         count += 1;
                     }
                     values2d.push(rowValues);
+                    colors2d.push(rowColors);
                 }
 
                 const avgVal = count > 0 ? (sum / count) : 0;
@@ -2239,7 +2243,8 @@ function countWhitePixels(ctx, x, y, size) {
                     maxVal,
                     avgVal,
                     hasFailRisk,
-                    values2d
+                    values2d,
+                    colors2d
                 };
             } catch (err) {
                 console.error('픽셀값 계산 오류:', err);
@@ -2307,9 +2312,24 @@ function countWhitePixels(ctx, x, y, size) {
                     })
                     .join('');
 
+                const colorRowsHtml = stats.colors2d
+                    .map((row, rowIndex) => {
+                        const rowCellsHtml = row
+                            .map((color, colIndex) => {
+                                const value = stats.values2d[rowIndex][colIndex];
+                                return `<span class="stats-overlay__color-cell" style="background: rgb(${color.r}, ${color.g}, ${color.b});" title="RGB(${color.r}, ${color.g}, ${color.b}) | 값 ${value}"></span>`;
+                            })
+                            .join('');
+                        return `<div class="stats-overlay__row">${rowCellsHtml}</div>`;
+                    })
+                    .join('');
+
                 content.innerHTML =
                     `<div class="stats-overlay__summary">${summaryLine}</div>` +
-                    `<div class="stats-overlay__matrix">${matrixRowsHtml}</div>`;
+                    `<div class="stats-overlay__section-title">밝기값 표</div>` +
+                    `<div class="stats-overlay__matrix">${matrixRowsHtml}</div>` +
+                    `<div class="stats-overlay__section-title" style="margin-top:10px;">실제 색상 표</div>` +
+                    `<div class="stats-overlay__matrix stats-overlay__matrix--color">${colorRowsHtml}</div>`;
             }
 
             overlay.classList.add('is-open');
