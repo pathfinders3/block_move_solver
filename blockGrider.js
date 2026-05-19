@@ -2270,7 +2270,7 @@ function countWhitePixels(ctx, x, y, size) {
 
             statsOverlayAutoHideTimer = setTimeout(() => {
                 hideStatsOverlayModal();
-            }, 2600);
+            }, 12600);
         }
 
         function adjustCornerSize(delta) {
