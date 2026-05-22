@@ -49,6 +49,7 @@
   let connectionSeq = 1;
 
   let currentGroups = [];
+  let importedCanvas1ClipboardScale = null;
   let selectedRect = null;
   let selectedSelections = [];
   let mergeUndoStack = [];
@@ -132,6 +133,31 @@
 
   function cloneGroups(groups) {
     return groups.map(cloneGroup);
+  }
+
+  function normalizeCanvas1ClipboardScale(meta) {
+    if (!meta || typeof meta !== 'object') return null;
+
+    const scalePercent = Number(meta.scalePercent);
+    const scale = Number(meta.scale);
+    if (!Number.isFinite(scalePercent) || !Number.isFinite(scale)) return null;
+
+    return {
+      scalePercent,
+      scale,
+      sourceWidth: Number.isFinite(Number(meta.sourceWidth)) ? Number(meta.sourceWidth) : null,
+      sourceHeight: Number.isFinite(Number(meta.sourceHeight)) ? Number(meta.sourceHeight) : null,
+      appliedWidth: Number.isFinite(Number(meta.appliedWidth)) ? Number(meta.appliedWidth) : null,
+      appliedHeight: Number.isFinite(Number(meta.appliedHeight)) ? Number(meta.appliedHeight) : null,
+      mode: typeof meta.mode === 'string' ? meta.mode : null
+    };
+  }
+
+  function extractCanvas1ClipboardScale(parsed) {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+
+    const raw = parsed.canvas1ClipboardScale ?? parsed.canvas1ClipboardScaleMeta;
+    return normalizeCanvas1ClipboardScale(raw);
   }
 
   function createGroupFromPoints(points) {
@@ -2601,6 +2627,7 @@
 
       const importedGroup = createGroupFromImportedPayload(parsed, normalizedResult);
       const nextGroups = currentGroups.concat([importedGroup]);
+      importedCanvas1ClipboardScale = extractCanvas1ClipboardScale(parsed);
       renderGroups(nextGroups);
       console.log(`🖼️ 실제 해상도: ${baseCanvas.width}x${baseCanvas.height}`);
 
@@ -2619,6 +2646,9 @@
       version: 1,
       groups: cloneGroups(currentGroups)
     };
+    if (importedCanvas1ClipboardScale) {
+      payload.canvas1ClipboardScale = { ...importedCanvas1ClipboardScale };
+    }
     const text = JSON.stringify(payload, null, 2);
     jsonOutput.value = text;
 
