@@ -164,6 +164,7 @@ function countWhitePixels(ctx, x, y, size) {
     const CORNER_SIZE_STORAGE_KEY = 'blockGrider.cornerSize';
     const WHITE_THRESHOLD_STORAGE_KEY = 'blockGrider.whiteThreshold';
     const CANVAS1_IMAGE_STORAGE_KEY = 'blockGrider.canvas1ImageDataUrl';
+    const CANVAS1_CLIPBOARD_SCALE_STORAGE_KEY = 'blockGrider.canvas1ClipboardScaleMeta';
     const ALLOWED_CANVAS_SIZES = ['64x64', '128x128', '256x256', '64x128'];
     let currentCanvasWidth = 64;
     let currentCanvasHeight = 64;
@@ -224,11 +225,44 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         let hasShownCanvasCacheSaveWarning = false;
+        let canvas1ClipboardScaleMeta = null;
 
-        function saveCanvas1ImageToStorage() {
+        function normalizeCanvas1ClipboardScaleMeta(meta) {
+            if (!meta || typeof meta !== 'object') return null;
+
+            const scalePercent = Number(meta.scalePercent);
+            const scale = Number(meta.scale);
+            if (!Number.isFinite(scalePercent) || !Number.isFinite(scale)) return null;
+
+            return {
+                scalePercent: scalePercent,
+                scale: scale,
+                sourceWidth: Number.isFinite(Number(meta.sourceWidth)) ? Number(meta.sourceWidth) : null,
+                sourceHeight: Number.isFinite(Number(meta.sourceHeight)) ? Number(meta.sourceHeight) : null,
+                appliedWidth: Number.isFinite(Number(meta.appliedWidth)) ? Number(meta.appliedWidth) : null,
+                appliedHeight: Number.isFinite(Number(meta.appliedHeight)) ? Number(meta.appliedHeight) : null,
+                mode: typeof meta.mode === 'string' ? meta.mode : null
+            };
+        }
+
+        function saveCanvas1ImageToStorage(clipboardScaleMeta) {
             try {
                 const dataUrl = canvas1.toDataURL('image/png');
                 localStorage.setItem(CANVAS1_IMAGE_STORAGE_KEY, dataUrl);
+
+                // 인자를 넘기지 않으면 기존 메타를 유지하고, null을 명시적으로 넘기면 메타를 제거한다.
+                if (arguments.length > 0) {
+                    const normalizedMeta = normalizeCanvas1ClipboardScaleMeta(clipboardScaleMeta);
+                    canvas1ClipboardScaleMeta = normalizedMeta;
+                    if (normalizedMeta) {
+                        localStorage.setItem(CANVAS1_CLIPBOARD_SCALE_STORAGE_KEY, JSON.stringify(normalizedMeta));
+                    } else {
+                        localStorage.removeItem(CANVAS1_CLIPBOARD_SCALE_STORAGE_KEY);
+                    }
+                } else if (canvas1ClipboardScaleMeta) {
+                    localStorage.setItem(CANVAS1_CLIPBOARD_SCALE_STORAGE_KEY, JSON.stringify(canvas1ClipboardScaleMeta));
+                }
+
                 hasShownCanvasCacheSaveWarning = false;
             } catch (ex) {
                 if (!hasShownCanvasCacheSaveWarning) {
@@ -243,8 +277,19 @@ function countWhitePixels(ctx, x, y, size) {
                 try {
                     const dataUrl = localStorage.getItem(CANVAS1_IMAGE_STORAGE_KEY);
                     if (!dataUrl) {
+                        canvas1ClipboardScaleMeta = null;
                         resolve(false);
                         return;
+                    }
+
+                    let restoredScaleMeta = null;
+                    try {
+                        const rawMeta = localStorage.getItem(CANVAS1_CLIPBOARD_SCALE_STORAGE_KEY);
+                        if (rawMeta) {
+                            restoredScaleMeta = normalizeCanvas1ClipboardScaleMeta(JSON.parse(rawMeta));
+                        }
+                    } catch (metaError) {
+                        restoredScaleMeta = null;
                     }
 
                     const img = new Image();
@@ -260,12 +305,15 @@ function countWhitePixels(ctx, x, y, size) {
                             canvas1ClipboardImageInfo.textContent = `캐시 복원: Canvas1 결과 ${canvasWidth}x${canvasHeight}`;
                         }
 
+                        canvas1ClipboardScaleMeta = restoredScaleMeta;
+
                         showCanvas1ClipboardScaleMessage('저장된 이미지를 자동 복원했습니다.');
                         scaleCanvas();
                         resolve(true);
                     };
 
                     img.onerror = function() {
+                        canvas1ClipboardScaleMeta = null;
                         resolve(false);
                     };
 
@@ -411,7 +459,7 @@ function countWhitePixels(ctx, x, y, size) {
                 updateCornerAndPathInfo();
             }
             scaleCanvas();
-            saveCanvas1ImageToStorage();
+            saveCanvas1ImageToStorage(null);
         }
 
         canvasSizeSelect.addEventListener('change', (e) => {
@@ -495,7 +543,7 @@ function countWhitePixels(ctx, x, y, size) {
 
             // Canvas2 확대 뷰를 즉시 갱신
             scaleCanvas();
-            saveCanvas1ImageToStorage();
+            saveCanvas1ImageToStorage(null);
         }
         
         // 클립보드에서 이미지 가져오기
@@ -526,6 +574,15 @@ function countWhitePixels(ctx, x, y, size) {
                                 const offsetY = (canvasHeight - scaledHeight) / 2;
                                 const croppedOriginalWidth = Math.max(1, Math.min(img.width, canvasWidth / scale));
                                 const croppedOriginalHeight = Math.max(1, Math.min(img.height, canvasHeight / scale));
+                                const clipboardScaleMeta = {
+                                    scalePercent: scalePercentInt,
+                                    scale,
+                                    sourceWidth: img.width,
+                                    sourceHeight: img.height,
+                                    appliedWidth: Math.round(scaledWidth),
+                                    appliedHeight: Math.round(scaledHeight),
+                                    mode: 'cover-5pct-ceil'
+                                };
                                 
                                 // 빈 영역을 검은색으로 채움
                                 ctx1.fillStyle = 'black';
@@ -539,7 +596,7 @@ function countWhitePixels(ctx, x, y, size) {
                                 if (canvas1ClipboardImageInfo) {
                                     canvas1ClipboardImageInfo.textContent = `원본: ${img.width}x${img.height} | 잘라낸 영역(원본 기준): ${Math.round(croppedOriginalWidth)}x${Math.round(croppedOriginalHeight)} | Canvas1 결과: ${canvasWidth}x${canvasHeight}`;
                                 }
-                                saveCanvas1ImageToStorage();
+                                saveCanvas1ImageToStorage(clipboardScaleMeta);
                                 console.log('클립보드에서 이미지를 가져왔습니다.');
                                 scaleCanvas();
                             };
@@ -4306,6 +4363,18 @@ function countWhitePixels(ctx, x, y, size) {
                 rects: rectsForCopy,
                 polylines: polylinesForCopy
             };
+
+            if (canvas1ClipboardScaleMeta) {
+                exportPayload.canvas1ClipboardScale = {
+                    scalePercent: canvas1ClipboardScaleMeta.scalePercent,
+                    scale: canvas1ClipboardScaleMeta.scale,
+                    sourceWidth: canvas1ClipboardScaleMeta.sourceWidth,
+                    sourceHeight: canvas1ClipboardScaleMeta.sourceHeight,
+                    appliedWidth: canvas1ClipboardScaleMeta.appliedWidth,
+                    appliedHeight: canvas1ClipboardScaleMeta.appliedHeight,
+                    mode: canvas1ClipboardScaleMeta.mode
+                };
+            }
 
             const jsonText = JSON.stringify(exportPayload, null, 2);
 
