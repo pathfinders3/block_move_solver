@@ -15,6 +15,7 @@
   const baseCanvas = document.getElementById('baseCanvas');
   const zoomCanvas = document.getElementById('zoomCanvas');
   const baseCanvasTitle = document.getElementById('baseCanvasTitle');
+  const clipboardScaleInfo = document.getElementById('clipboardScaleInfo');
   const scaleRange = document.getElementById('scaleRange');
   const scaleDisplay = document.getElementById('scaleDisplay');
   const dpToleranceRange = document.getElementById('dpToleranceRange');
@@ -41,6 +42,7 @@
     baseCanvas,
     zoomCanvas,
     baseCanvasTitle,
+    clipboardScaleInfo,
     scaleRange,
     scaleDisplay,
     dpToleranceRange,
@@ -237,6 +239,25 @@
     badgeMethod.textContent = `전달 방식: ${methodText}`;
     badgeGroups.textContent = `그룹: ${groups.length}`;
     badgePoints.textContent = `점: ${countPoints(groups)}`;
+  }
+
+  function getCanvas1ClipboardScaleValue(payload) {
+    const rawScale = payload && typeof payload === 'object'
+      ? (payload.canvas1ClipboardScale && payload.canvas1ClipboardScale.scale)
+        ?? (payload.canvas1ClipboardScaleMeta && payload.canvas1ClipboardScaleMeta.scale)
+      : null;
+    const scale = Number(rawScale);
+    return Number.isFinite(scale) ? scale : null;
+  }
+
+  function formatScaleValue(scale) {
+    if (!Number.isFinite(scale)) return '-';
+    return Number.isInteger(scale) ? String(scale) : String(Number(scale.toFixed(4)));
+  }
+
+  function updateClipboardScaleInfo(payload) {
+    const scale = getCanvas1ClipboardScaleValue(payload);
+    clipboardScaleInfo.textContent = `canvas1ClipboardScale.scale: ${formatScaleValue(scale)}`;
   }
 
   function getCurrentScale() {
@@ -653,6 +674,7 @@
 
   function renderPayload(payload) {
     currentPayload = payload;
+    updateClipboardScaleInfo(payload);
     drawBaseCanvas(payload);
     drawZoomCanvas();
   }

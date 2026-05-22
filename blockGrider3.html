@@ -112,6 +112,12 @@
       font-size: 13px;
     }
 
+    .viewer-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
     canvas {
       border: 1px solid var(--border);
       background: #030712;
@@ -212,6 +218,7 @@
     <div class="viewer">
       <div class="viewer-block">
         <div class="viewer-title" id="baseCanvasTitle">원본 64x64</div>
+        <div class="viewer-meta" id="clipboardScaleInfo">canvas1ClipboardScale.scale: -</div>
         <canvas id="baseCanvas" width="64" height="64"></canvas>
       </div>
       <div class="viewer-block">
@@ -235,6 +242,6 @@
     <textarea id="output" placeholder="전달된 JSON이 여기 표시됩니다."></textarea>
   </div>
 
-  <script src="blockGrider3.js?v=13"></script>
+  <script src="blockGrider3.js?v=14"></script>
 </body>
 </html>
