@@ -4323,6 +4323,7 @@ function countWhitePixels(ctx, x, y, size) {
         document.getElementById('btnCopyRects').addEventListener('click', async () => {
             if (yellowRects.length === 0) {
                 console.log('❌ 복사할 노란색 사각형이 없습니다.');
+                showCanvas1ClipboardScaleMessage('복사할 노란색 사각형이 없습니다.', true);
                 return;
             }
 
@@ -4383,6 +4384,7 @@ function countWhitePixels(ctx, x, y, size) {
                 console.log(`✅ Copy Rects 완료: 사각형 ${rectsForCopy.length}개, 폴리라인 ${polylinesForCopy.length}개가 클립보드에 복사되었습니다.`);
             } catch (err) {
                 console.error('❌ 클립보드 복사 실패:', err);
+                showCanvas1ClipboardScaleMessage('클립보드 복사에 실패했습니다.', true);
             }
         });
 
