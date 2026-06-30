@@ -85,6 +85,7 @@
   const BITMAP_SCALE_MIN = 0.1;
   const BITMAP_SCALE_MAX = 8.0;
   const BITMAP_SCALE_STORAGE_KEY = 'blockGrider3.bitmapScale';
+  const CANVAS_PADDING_STEP = 10;
   const COLOR_MODE_MONO = 'mono';
   const COLOR_MODE_SEGMENT = 'segment';
   const MONO_COLOR_GRAY = '#9ca3af';
@@ -94,6 +95,7 @@
   let dpSourcePayload = null;
   let dpAutoApplyTimer = null;
   let showPathLines = false;
+  let canvasPadding = 0;
 
   function setStatus(message, warn) {
     status.textContent = message;
@@ -411,14 +413,14 @@
   }
 
   function getBitmapCanvasPixelSize(payload, exportScale) {
-    const baseSize = calculateCanvasSize(payload);
+    const baseSize = getRenderedCanvasSize(payload);
     const scale = sanitizeBitmapScale(exportScale);
     return Math.max(1, Math.floor(baseSize * scale));
   }
 
   function updateBitmapScaleSizeInfo(payload) {
     const sourcePayload = payload || currentPayload || { version: 1, groups: [] };
-    const baseSize = calculateCanvasSize(sourcePayload);
+    const baseSize = getRenderedCanvasSize(sourcePayload);
     const exportSize = getBitmapCanvasPixelSize(sourcePayload, getCurrentBitmapScale());
     bitmapScaleSizeInfo.textContent = `예상 출력 크기: ${exportSize}x${exportSize} (원본 ${baseSize}x${baseSize})`;
   }
@@ -461,6 +463,11 @@
 
     const required = Math.max(MIN_CANVAS_SIZE, maxRight, maxBottom);
     return Math.min(MAX_CANVAS_SIZE, required);
+  }
+
+  function getRenderedCanvasSize(payload) {
+    const baseSize = calculateCanvasSize(payload);
+    return Math.min(MAX_CANVAS_SIZE, baseSize + Math.max(0, canvasPadding));
   }
 
   /**
@@ -695,7 +702,7 @@
   }
 
   function drawBaseCanvas(payload) {
-    const size = calculateCanvasSize(payload);
+    const size = getRenderedCanvasSize(payload);
     baseCanvas.width = size;
     baseCanvas.height = size;
 
@@ -939,6 +946,21 @@
     applyMovedPayload(moved, `전체 점을 (${dx}, ${dy})만큼 이동했습니다.`);
   }
 
+  function increaseCanvasPadding(amount) {
+    const nextPadding = Math.max(0, canvasPadding + amount);
+    if (nextPadding === canvasPadding) return;
+
+    canvasPadding = nextPadding;
+    if (!currentPayload) {
+      updateBitmapScaleSizeInfo();
+      setStatus(`PNG 우하단 여백을 ${canvasPadding}px로 설정했습니다.`, false);
+      return;
+    }
+
+    renderPayload(currentPayload);
+    setStatus(`PNG 우하단 여백을 ${canvasPadding}px로 늘렸습니다.`, false);
+  }
+
   btnCopy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(output.value || '');
@@ -1045,6 +1067,12 @@
       j: { dx: -10, dy: 0 },
       l: { dx: 10, dy: 0 }
     };
+
+    if (key === 'm') {
+      event.preventDefault();
+      increaseCanvasPadding(CANVAS_PADDING_STEP);
+      return;
+    }
 
     const move = moveMap[key];
     if (!move) return;
