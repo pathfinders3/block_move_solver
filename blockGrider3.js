@@ -594,8 +594,8 @@
     if (!ctx) return null;
 
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#030712';
-    ctx.fillRect(0, 0, size, size);
+    // PNG 내보내기 배경은 투명으로 유지합니다.
+    ctx.clearRect(0, 0, size, size);
 
     const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
     const thickness = Math.max(1, Math.min(5, Math.round(Number(lineThickness) || DEFAULT_LINE_THICKNESS))) * scale;
