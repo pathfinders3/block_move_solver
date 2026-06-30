@@ -25,6 +25,8 @@
   const lineThicknessRange = document.getElementById('lineThicknessRange');
   const lineThicknessDisplay = document.getElementById('lineThicknessDisplay');
   const colorModeSelect = document.getElementById('colorModeSelect');
+  const bitmapScaleInput = document.getElementById('bitmapScaleInput');
+  const bitmapScalePresetButtons = Array.from(document.querySelectorAll('.preset-scale'));
 
   const required = [
     output,
@@ -51,7 +53,8 @@
     mergeStatePolicyDisplay,
     lineThicknessRange,
     lineThicknessDisplay,
-    colorModeSelect
+    colorModeSelect,
+    bitmapScaleInput
   ];
   if (required.some(el => !el)) {
     console.error('blockGrider3 init 실패: 필수 DOM 요소를 찾지 못했습니다. blockGrider3.html에서만 실행해주세요.');
@@ -76,6 +79,10 @@
   const MERGE_STATE_MUST_KEEP_STORAGE_KEY = 'blockGrider3.mergeStateMustKeep';
   const DEFAULT_LINE_THICKNESS = 1;
   const LINE_THICKNESS_STORAGE_KEY = 'blockGrider3.lineThickness';
+  const DEFAULT_BITMAP_SCALE = 1.0;
+  const BITMAP_SCALE_MIN = 0.1;
+  const BITMAP_SCALE_MAX = 8.0;
+  const BITMAP_SCALE_STORAGE_KEY = 'blockGrider3.bitmapScale';
   const COLOR_MODE_MONO = 'mono';
   const COLOR_MODE_SEGMENT = 'segment';
   const MONO_COLOR_GRAY = '#9ca3af';
@@ -353,6 +360,40 @@
     }
   }
 
+  function sanitizeBitmapScale(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return DEFAULT_BITMAP_SCALE;
+    const clamped = Math.max(BITMAP_SCALE_MIN, Math.min(BITMAP_SCALE_MAX, num));
+    return Math.round(clamped * 10) / 10;
+  }
+
+  function getCurrentBitmapScale() {
+    return sanitizeBitmapScale(bitmapScaleInput.value);
+  }
+
+  function updateBitmapScaleInputValue(value) {
+    const safe = sanitizeBitmapScale(value);
+    bitmapScaleInput.value = safe.toFixed(1);
+  }
+
+  function loadBitmapScaleFromStorage() {
+    try {
+      const raw = localStorage.getItem(BITMAP_SCALE_STORAGE_KEY);
+      if (raw == null) return DEFAULT_BITMAP_SCALE;
+      return sanitizeBitmapScale(raw);
+    } catch (error) {
+      return DEFAULT_BITMAP_SCALE;
+    }
+  }
+
+  function saveBitmapScaleToStorage(value) {
+    try {
+      localStorage.setItem(BITMAP_SCALE_STORAGE_KEY, String(sanitizeBitmapScale(value)));
+    } catch (error) {
+      // 저장 불가 환경(private mode 등)에서는 무시
+    }
+  }
+
   function calculateCanvasSize(payload) {
     const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
     let maxRight = MIN_CANVAS_SIZE;
@@ -489,7 +530,7 @@
   }
 
   function renderBitmapForClipboard(payload, lineThickness, exportScale) {
-    const scale = Math.max(1, Math.round(Number(exportScale) || 1));
+    const scale = sanitizeBitmapScale(exportScale);
     const size = calculateCanvasSize(payload) * scale;
     const bitmapCanvas = document.createElement('canvas');
     bitmapCanvas.width = size;
@@ -884,7 +925,7 @@
 
     try {
       const lineThickness = getCurrentLineThickness();
-      const exportScale = getCurrentScale();
+      const exportScale = getCurrentBitmapScale();
       const bitmapCanvas = renderBitmapForClipboard(currentPayload, lineThickness, exportScale);
       if (!bitmapCanvas) {
         setStatus('비트맵 캔버스 생성에 실패했습니다.', true);
@@ -899,13 +940,13 @@
           })
         ]);
 
-        setStatus(`비트맵(PNG)을 ${exportScale}배 확대 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
+        setStatus(`비트맵(PNG)을 ${formatScaleValue(exportScale)}배 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
         return;
       }
 
       const copiedByLegacy = tryLegacyImageCopy(bitmapCanvas);
       if (copiedByLegacy) {
-        setStatus(`비트맵(PNG)을 ${exportScale}배 확대 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드, 선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
+        setStatus(`비트맵(PNG)을 ${formatScaleValue(exportScale)}배 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드, 선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
       } else {
         setStatus('현재 브라우저는 이미지 클립보드 쓰기를 지원하지 않습니다. 크롬 최신 버전(HTTPS/localhost)에서 다시 시도해주세요.', true);
       }
@@ -965,6 +1006,20 @@
     drawZoomCanvas();
   });
 
+  bitmapScaleInput.addEventListener('change', () => {
+    const safe = sanitizeBitmapScale(bitmapScaleInput.value);
+    updateBitmapScaleInputValue(safe);
+    saveBitmapScaleToStorage(safe);
+  });
+
+  bitmapScalePresetButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const scale = sanitizeBitmapScale(button.dataset.scale);
+      updateBitmapScaleInputValue(scale);
+      saveBitmapScaleToStorage(scale);
+    });
+  });
+
   output.addEventListener('input', () => {
     try {
       const parsed = parseOutputPayload();
@@ -979,6 +1034,7 @@
   dpToleranceRange.value = String(loadDpToleranceFromStorage());
   mergeStateMustKeep.checked = loadKeepMergeStateFromStorage();
   lineThicknessRange.value = String(loadLineThicknessFromStorage());
+  updateBitmapScaleInputValue(loadBitmapScaleFromStorage());
 
   updateDpToleranceDisplay();
   updateMergeStatePolicyDisplay();
