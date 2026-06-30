@@ -126,6 +126,11 @@
       border-radius: 8px;
     }
 
+    canvas:focus {
+      outline: 2px solid #7dd3fc;
+      outline-offset: 2px;
+    }
+
     .zoom-scroll {
       width: 100%;
       max-width: 100%;
@@ -260,7 +265,7 @@
       <div class="viewer-block">
         <div class="viewer-title" id="baseCanvasTitle">원본 64x64</div>
         <div class="viewer-meta" id="clipboardScaleInfo">canvas1ClipboardScale.scale: -</div>
-        <canvas id="baseCanvas" width="64" height="64"></canvas>
+        <canvas id="baseCanvas" width="64" height="64" tabindex="0" title="클릭 후 IJKL로 전체 점 이동"></canvas>
       </div>
       <div class="viewer-block">
         <div class="viewer-title">확대 보기</div>

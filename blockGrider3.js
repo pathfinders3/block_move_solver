@@ -243,6 +243,38 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  function shiftPayload(payload, dx, dy) {
+    return {
+      ...payload,
+      groups: Array.isArray(payload && payload.groups)
+        ? payload.groups.map(group => ({
+            ...group,
+            segments: Array.isArray(group.segments)
+              ? group.segments.map(segment => ({
+                  ...segment,
+                  points: Array.isArray(segment.points)
+                    ? segment.points.map(point => ({
+                        ...point,
+                        x: Number(point.x) + dx,
+                        y: Number(point.y) + dy
+                      }))
+                    : []
+                }))
+              : []
+          }))
+        : []
+    };
+  }
+
+  function applyMovedPayload(payload, message) {
+    currentPayload = payload;
+    dpSourcePayload = deepCloneJson(payload);
+    output.value = JSON.stringify(payload, null, 2);
+    updateMeta(payload, 'transferKey(localStorage)');
+    renderPayload(payload);
+    setStatus(message, false);
+  }
+
   function updateMeta(payload, methodText) {
     const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
     badgeMethod.textContent = `전달 방식: ${methodText}`;
@@ -897,6 +929,16 @@
     setStatus('원본 데이터로 복원했습니다.', false);
   }
 
+  function moveCurrentPayloadBy(dx, dy) {
+    if (!currentPayload || !Array.isArray(currentPayload.groups)) {
+      setStatus('이동할 데이터가 없습니다. 먼저 데이터를 수신해주세요.', true);
+      return;
+    }
+
+    const moved = shiftPayload(currentPayload, dx, dy);
+    applyMovedPayload(moved, `전체 점을 (${dx}, ${dy})만큼 이동했습니다.`);
+  }
+
   btnCopy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(output.value || '');
@@ -989,6 +1031,26 @@
     if (!currentPayload) return;
     drawBaseCanvas(currentPayload);
     drawZoomCanvas();
+  });
+
+  baseCanvas.addEventListener('click', () => {
+    baseCanvas.focus();
+  });
+
+  baseCanvas.addEventListener('keydown', event => {
+    const key = String(event.key || '').toLowerCase();
+    const moveMap = {
+      i: { dx: 0, dy: -10 },
+      k: { dx: 0, dy: 10 },
+      j: { dx: -10, dy: 0 },
+      l: { dx: 10, dy: 0 }
+    };
+
+    const move = moveMap[key];
+    if (!move) return;
+
+    event.preventDefault();
+    moveCurrentPayloadBy(move.dx, move.dy);
   });
 
   scaleRange.addEventListener('input', () => {
