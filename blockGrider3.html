@@ -165,6 +165,47 @@
       flex-wrap: wrap;
     }
 
+    .bitmap-scale-controls {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #0a1425;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .bitmap-scale-controls input[type="number"] {
+      width: 92px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      background: #030712;
+      color: var(--text);
+      font-family: "Consolas", "Menlo", "Monaco", monospace;
+      font-size: 13px;
+    }
+
+    .preset-scale {
+      border: 1px solid #1f2937;
+      background: #1b2940;
+      color: #dbe7f5;
+      padding: 5px 9px;
+      font-size: 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .bitmap-scale-hint {
+      color: #93c5fd;
+      font-size: 12px;
+    }
+
     button {
       border: 1px solid #0ea5e9;
       background: var(--accent);
@@ -239,9 +280,19 @@
       <button id="btnTogglePathLines" type="button">경로 선 보기: OFF</button>
     </div>
 
+    <div class="bitmap-scale-controls">
+      <label for="bitmapScaleInput">PNG 배율:</label>
+      <input id="bitmapScaleInput" type="number" min="0.1" max="8" step="0.1" value="1.0">
+      <button class="preset-scale" type="button" data-scale="0.5">0.5x</button>
+      <button class="preset-scale" type="button" data-scale="0.3">0.3x</button>
+      <button class="preset-scale" type="button" data-scale="0.2">0.2x</button>
+      <button class="preset-scale" type="button" data-scale="0.1">0.1x</button>
+      <span class="bitmap-scale-hint">미리보기 확대 배율과 별개로 PNG 복사에만 적용됩니다.</span>
+    </div>
+
     <textarea id="output" placeholder="전달된 JSON이 여기 표시됩니다."></textarea>
   </div>
 
-  <script src="blockGrider3.js?v=14"></script>
+  <script src="blockGrider3.js?v=15"></script>
 </body>
 </html>
