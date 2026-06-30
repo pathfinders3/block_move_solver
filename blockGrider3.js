@@ -26,6 +26,7 @@
   const lineThicknessDisplay = document.getElementById('lineThicknessDisplay');
   const colorModeSelect = document.getElementById('colorModeSelect');
   const bitmapScaleInput = document.getElementById('bitmapScaleInput');
+  const bitmapScaleSizeInfo = document.getElementById('bitmapScaleSizeInfo');
   const bitmapScalePresetButtons = Array.from(document.querySelectorAll('.preset-scale'));
 
   const required = [
@@ -54,7 +55,8 @@
     lineThicknessRange,
     lineThicknessDisplay,
     colorModeSelect,
-    bitmapScaleInput
+    bitmapScaleInput,
+    bitmapScaleSizeInfo
   ];
   if (required.some(el => !el)) {
     console.error('blockGrider3 init 실패: 필수 DOM 요소를 찾지 못했습니다. blockGrider3.html에서만 실행해주세요.');
@@ -376,6 +378,19 @@
     bitmapScaleInput.value = safe.toFixed(1);
   }
 
+  function getBitmapCanvasPixelSize(payload, exportScale) {
+    const baseSize = calculateCanvasSize(payload);
+    const scale = sanitizeBitmapScale(exportScale);
+    return Math.max(1, Math.floor(baseSize * scale));
+  }
+
+  function updateBitmapScaleSizeInfo(payload) {
+    const sourcePayload = payload || currentPayload || { version: 1, groups: [] };
+    const baseSize = calculateCanvasSize(sourcePayload);
+    const exportSize = getBitmapCanvasPixelSize(sourcePayload, getCurrentBitmapScale());
+    bitmapScaleSizeInfo.textContent = `예상 출력 크기: ${exportSize}x${exportSize} (원본 ${baseSize}x${baseSize})`;
+  }
+
   function loadBitmapScaleFromStorage() {
     try {
       const raw = localStorage.getItem(BITMAP_SCALE_STORAGE_KEY);
@@ -531,7 +546,7 @@
 
   function renderBitmapForClipboard(payload, lineThickness, exportScale) {
     const scale = sanitizeBitmapScale(exportScale);
-    const size = calculateCanvasSize(payload) * scale;
+    const size = getBitmapCanvasPixelSize(payload, scale);
     const bitmapCanvas = document.createElement('canvas');
     bitmapCanvas.width = size;
     bitmapCanvas.height = size;
@@ -716,6 +731,7 @@
   function renderPayload(payload) {
     currentPayload = payload;
     updateClipboardScaleInfo(payload);
+    updateBitmapScaleSizeInfo(payload);
     drawBaseCanvas(payload);
     drawZoomCanvas();
   }
@@ -1006,10 +1022,18 @@
     drawZoomCanvas();
   });
 
+  bitmapScaleInput.addEventListener('input', () => {
+    const safe = sanitizeBitmapScale(bitmapScaleInput.value);
+    updateBitmapScaleInputValue(safe);
+    saveBitmapScaleToStorage(safe);
+    updateBitmapScaleSizeInfo();
+  });
+
   bitmapScaleInput.addEventListener('change', () => {
     const safe = sanitizeBitmapScale(bitmapScaleInput.value);
     updateBitmapScaleInputValue(safe);
     saveBitmapScaleToStorage(safe);
+    updateBitmapScaleSizeInfo();
   });
 
   bitmapScalePresetButtons.forEach(button => {
@@ -1017,6 +1041,7 @@
       const scale = sanitizeBitmapScale(button.dataset.scale);
       updateBitmapScaleInputValue(scale);
       saveBitmapScaleToStorage(scale);
+      updateBitmapScaleSizeInfo();
     });
   });
 
@@ -1035,6 +1060,7 @@
   mergeStateMustKeep.checked = loadKeepMergeStateFromStorage();
   lineThicknessRange.value = String(loadLineThicknessFromStorage());
   updateBitmapScaleInputValue(loadBitmapScaleFromStorage());
+  updateBitmapScaleSizeInfo();
 
   updateDpToleranceDisplay();
   updateMergeStatePolicyDisplay();
