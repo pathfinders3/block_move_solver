@@ -598,8 +598,9 @@
     ctx.clearRect(0, 0, size, size);
 
     const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
-    const thickness = Math.max(1, Math.min(5, Math.round(Number(lineThickness) || DEFAULT_LINE_THICKNESS))) * scale;
+    const thickness = Math.max(1, Math.min(5, Math.round(Number(lineThickness) || DEFAULT_LINE_THICKNESS)));
 
+    console.log('thickness:', thickness);
     groups.forEach((group, groupIndex) => {
       (group.segments || []).forEach((segment, segmentIndex) => {
         const points = Array.isArray(segment.points) ? segment.points : [];
