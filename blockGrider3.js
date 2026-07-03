@@ -87,8 +87,10 @@
   const BITMAP_SCALE_STORAGE_KEY = 'blockGrider3.bitmapScale';
   const CANVAS_PADDING_STEP = 10;
   const COLOR_MODE_MONO = 'mono';
+  const COLOR_MODE_MONO_DARK = 'mono-dark';
   const COLOR_MODE_SEGMENT = 'segment';
   const MONO_COLOR_GRAY = '#9ca3af';
+  const MONO_COLOR_DARK_GRAY = '#333333';
 
   let currentPayload = null;
   let originalPayload = null;
@@ -484,14 +486,22 @@
 
   function getCurrentColorMode() {
     if (!colorModeSelect) return COLOR_MODE_MONO;
-    return colorModeSelect.value === COLOR_MODE_SEGMENT ? COLOR_MODE_SEGMENT : COLOR_MODE_MONO;
+    if (colorModeSelect.value === COLOR_MODE_SEGMENT) return COLOR_MODE_SEGMENT;
+    if (colorModeSelect.value === COLOR_MODE_MONO_DARK) return COLOR_MODE_MONO_DARK;
+    return COLOR_MODE_MONO;
+  }
+
+  function getCurrentColorModeLabel() {
+    if (getCurrentColorMode() === COLOR_MODE_SEGMENT) return '채색';
+    if (getCurrentColorMode() === COLOR_MODE_MONO_DARK) return '단색 DarkGray';
+    return '단색 Gray';
   }
 
   function getDrawColor(groupIndex, segmentIndex) {
     if (getCurrentColorMode() === COLOR_MODE_SEGMENT) {
       return getSegmentColor(groupIndex, segmentIndex);
     }
-    return MONO_COLOR_GRAY;
+    return getCurrentColorMode() === COLOR_MODE_MONO_DARK ? MONO_COLOR_DARK_GRAY : MONO_COLOR_GRAY;
   }
 
 
@@ -1021,13 +1031,13 @@
           })
         ]);
 
-        setStatus(`비트맵(PNG)을 ${formatScaleValue(exportScale)}배 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
+        setStatus(`비트맵(PNG)을 ${formatScaleValue(exportScale)}배 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (선 두께=${lineThickness}, 색상=${getCurrentColorModeLabel()})`, false);
         return;
       }
 
       const copiedByLegacy = tryLegacyImageCopy(bitmapCanvas);
       if (copiedByLegacy) {
-        setStatus(`비트맵(PNG)을 ${formatScaleValue(exportScale)}배 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드, 선 두께=${lineThickness}, 색상=${getCurrentColorMode() === COLOR_MODE_MONO ? '단색 Gray' : '채색'})`, false);
+        setStatus(`비트맵(PNG)을 ${formatScaleValue(exportScale)}배 크기 ${bitmapCanvas.width}x${bitmapCanvas.height}로 클립보드에 복사했습니다. (레거시 모드, 선 두께=${lineThickness}, 색상=${getCurrentColorModeLabel()})`, false);
       } else {
         setStatus('현재 브라우저는 이미지 클립보드 쓰기를 지원하지 않습니다. 크롬 최신 버전(HTTPS/localhost)에서 다시 시도해주세요.', true);
       }
