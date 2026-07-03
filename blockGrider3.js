@@ -9,6 +9,8 @@
   const btnCopyForBg2 = document.getElementById('btnCopyForBg2');
   const btnCopyBitmap = document.getElementById('btnCopyBitmap');
   const btnRestoreOriginal = document.getElementById('btnRestoreOriginal');
+  const btnScaleDown = document.getElementById('btnScaleDown');
+  const btnScaleUp = document.getElementById('btnScaleUp');
   const btnReload = document.getElementById('btnReload');
   const btnSimplifyDp = document.getElementById('btnSimplifyDp');
   const btnTogglePathLines = document.getElementById('btnTogglePathLines');
@@ -39,6 +41,8 @@
     btnCopyForBg2,
     btnCopyBitmap,
     btnRestoreOriginal,
+    btnScaleDown,
+    btnScaleUp,
     btnReload,
     btnSimplifyDp,
     btnTogglePathLines,
@@ -267,6 +271,54 @@
               : []
           }))
         : []
+    };
+  }
+
+  function scalePayloadFromFirstPoint(payload, factor) {
+    const groups = Array.isArray(payload && payload.groups) ? payload.groups : [];
+    const points = [];
+
+    groups.forEach(group => {
+      (group.segments || []).forEach(segment => {
+        (segment.points || []).forEach(point => {
+          const x = Number(point.x);
+          const y = Number(point.y);
+          if (Number.isFinite(x) && Number.isFinite(y)) {
+            points.push({ x, y });
+          }
+        });
+      });
+    });
+
+    if (points.length === 0) return null;
+
+    const anchor = points[0];
+
+    return {
+      ...payload,
+      groups: groups.map(group => ({
+        ...group,
+        segments: Array.isArray(group.segments)
+          ? group.segments.map(segment => ({
+              ...segment,
+              points: Array.isArray(segment.points)
+                ? segment.points.map(point => {
+                    const x = Number(point.x);
+                    const y = Number(point.y);
+                    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+                      return { ...point };
+                    }
+
+                    return {
+                      ...point,
+                      x: anchor.x + (x - anchor.x) * factor,
+                      y: anchor.y + (y - anchor.y) * factor
+                    };
+                  })
+                : []
+            }))
+          : []
+      }))
     };
   }
 
@@ -957,6 +1009,21 @@
     applyMovedPayload(moved, `전체 점을 (${dx}, ${dy})만큼 이동했습니다.`);
   }
 
+  function scaleCurrentPayloadFromFirstPoint(factor, label) {
+    if (!currentPayload || !Array.isArray(currentPayload.groups)) {
+      setStatus('스케일할 데이터가 없습니다. 먼저 데이터를 수신해주세요.', true);
+      return;
+    }
+
+    const scaled = scalePayloadFromFirstPoint(currentPayload, factor);
+    if (!scaled) {
+      setStatus('스케일 기준이 될 유효한 점을 찾지 못했습니다.', true);
+      return;
+    }
+
+    applyMovedPayload(scaled, `첫 번째 점을 기준으로 전체 간격을 ${label}했습니다.`);
+  }
+
   function increaseCanvasPadding(amount) {
     const nextPadding = Math.max(0, canvasPadding + amount);
     if (nextPadding === canvasPadding) return;
@@ -1052,6 +1119,14 @@
 
   btnRestoreOriginal.addEventListener('click', () => {
     restoreOriginalData();
+  });
+
+  btnScaleDown.addEventListener('click', () => {
+    scaleCurrentPayloadFromFirstPoint(0.9, '10% 줄이기');
+  });
+
+  btnScaleUp.addEventListener('click', () => {
+    scaleCurrentPayloadFromFirstPoint(1.1, '10% 늘리기');
   });
 
   btnSimplifyDp.addEventListener('click', () => {
