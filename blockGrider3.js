@@ -5,6 +5,7 @@
   const badgeMethod = document.getElementById('badgeMethod');
   const badgeGroups = document.getElementById('badgeGroups');
   const badgePoints = document.getElementById('badgePoints');
+  const btnLoadJson = document.getElementById('btnLoadJson');
   const btnCopy = document.getElementById('btnCopy');
   const btnCopyForBg2 = document.getElementById('btnCopyForBg2');
   const btnCopyBitmap = document.getElementById('btnCopyBitmap');
@@ -37,6 +38,7 @@
     badgeMethod,
     badgeGroups,
     badgePoints,
+    btnLoadJson,
     btnCopy,
     btnCopyForBg2,
     btnCopyBitmap,
@@ -844,6 +846,86 @@
     return JSON.parse(text);
   }
 
+  function normalizeBlockGrider3Payload(parsed) {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    if (!Array.isArray(parsed.groups)) return null;
+
+    const groups = parsed.groups.map(group => {
+      const segments = Array.isArray(group && group.segments)
+        ? group.segments.map(segment => {
+            const points = Array.isArray(segment && segment.points)
+              ? segment.points
+                  .map(point => {
+                    const x = Number(point && point.x);
+                    const y = Number(point && point.y);
+                    const size = Number(point && point.size);
+                    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size) || size <= 0) {
+                      return null;
+                    }
+
+                    return {
+                      x,
+                      y,
+                      size,
+                      canConnect: !!(point && point.canConnect),
+                      mergeState: !!(point && point.mergeState)
+                    };
+                  })
+                  .filter(Boolean)
+              : [];
+
+            return {
+              points
+            };
+          })
+        : [];
+
+      return {
+        segments
+      };
+    });
+
+    return {
+      version: Number.isFinite(Number(parsed.version)) ? Number(parsed.version) : 1,
+      groups
+    };
+  }
+
+  async function loadJsonFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) {
+        setStatus('클립보드에 텍스트가 없습니다.', true);
+        return;
+      }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (parseError) {
+        setStatus('클립보드 텍스트가 JSON 형식이 아닙니다.', true);
+        output.value = text;
+        return;
+      }
+
+      const normalized = normalizeBlockGrider3Payload(parsed);
+      if (!normalized) {
+        setStatus('blockGrider3 형식 JSON이 아닙니다. { version, groups:[{segments:[{points:[...]}]}] } 구조가 필요합니다.', true);
+        output.value = JSON.stringify(parsed, null, 2);
+        return;
+      }
+
+      output.value = JSON.stringify(normalized, null, 2);
+      originalPayload = deepCloneJson(normalized);
+      dpSourcePayload = deepCloneJson(normalized);
+      updateMeta(normalized, 'clipboard(blockGrider3 JSON)');
+      renderPayload(normalized);
+      setStatus('JSON 가져오기 완료. 클립보드의 blockGrider3 JSON을 렌더링했습니다.', false);
+    } catch (error) {
+      setStatus('클립보드 접근에 실패했습니다. 브라우저 권한을 확인해주세요.', true);
+    }
+  }
+
   function toBlockGrider2Payload(payload) {
     const groups = payload && Array.isArray(payload.groups) ? payload.groups : [];
     const rects = [];
@@ -1038,6 +1120,8 @@
     renderPayload(currentPayload);
     setStatus(`PNG 우하단 여백을 ${canvasPadding}px로 늘렸습니다.`, false);
   }
+
+  btnLoadJson.addEventListener('click', loadJsonFromClipboard);
 
   btnCopy.addEventListener('click', async () => {
     try {
