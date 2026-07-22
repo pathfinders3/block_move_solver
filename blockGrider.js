@@ -1840,7 +1840,51 @@ function countWhitePixels(ctx, x, y, size) {
             return true;
         }
 
+        const AUTO_F10_STOP_REASON_DEFS = {
+            tempConfirmFailed: {
+                code: 'E01',
+                label: '이미 잡혀 있던 임시 점(tempYellowRect)을 확정하지 못한 경우'
+            },
+            pathAreaMissing: {
+                code: 'E02',
+                label: '경로 후보 영역(pathWhiteContent)을 찾지 못한 경우'
+            },
+            uniqueCandidateViolation: {
+                code: 'E03',
+                label: '유일 후보 조건이 깨진 경우'
+            },
+            invalidTargetData: {
+                code: 'E04',
+                label: '선택된 후보의 좌표나 크기 데이터가 잘못된 경우'
+            },
+            nonWhiteRect: {
+                code: 'E05',
+                label: '선택된 후보 사각형이 전부 흰색이 아닌 경우'
+            },
+            confirmAfterClickFailed: {
+                code: 'E06',
+                label: '후보 버튼을 클릭했지만 최종 확정(confirmTempYellowRect)에 실패한 경우'
+            },
+            safetyLimitReached: {
+                code: 'E07',
+                label: '안전 제한 횟수에 도달한 경우'
+            }
+        };
+
         let lastAutoF9StopReason = '';
+
+        function formatAutoF10StopReason(reasonKey, detail = '') {
+            const reasonDef = AUTO_F10_STOP_REASON_DEFS[reasonKey];
+            const code = reasonDef?.code || 'EXX';
+            const label = reasonDef?.label || reasonKey || '알 수 없는 중단 사유';
+            const head = `[${code}] ${label}`;
+            return detail ? `${head} | ${detail}` : head;
+        }
+
+        function setAutoF10StopReason(reasonKey, detail = '') {
+            lastAutoF9StopReason = formatAutoF10StopReason(reasonKey, detail);
+            return lastAutoF9StopReason;
+        }
 
         // 자동 F9 한 스텝: 빨간 테두리 1개 우선, 없으면 주황 테두리 1개를 대체 선택
         function runAutoF9Step(options = {}) {
@@ -1855,7 +1899,7 @@ function countWhitePixels(ctx, x, y, size) {
                     console.log('✅ 자동 F10: 기존 임시 선택 점을 우선 확정했습니다.');
                     return true;
                 }
-                lastAutoF9StopReason = '임시 점 확정에 실패했습니다.';
+                setAutoF10StopReason('tempConfirmFailed');
                 if (strictUniqueOnly) {
                     if (showStopMessage) {
                         showCanvas1AutoF9Message(lastAutoF9StopReason);
@@ -1868,7 +1912,7 @@ function countWhitePixels(ctx, x, y, size) {
             const pathWhiteContent = document.getElementById('pathWhiteContent');
             if (!pathWhiteContent) {
                 console.log('❌ 경로별 흰색점 영역을 찾을 수 없습니다.');
-                lastAutoF9StopReason = '경로별 흰색점 영역을 찾을 수 없습니다.';
+                setAutoF10StopReason('pathAreaMissing');
                 flashAutoF9ButtonError();
                 return false;
             }
@@ -1907,14 +1951,14 @@ function countWhitePixels(ctx, x, y, size) {
                                 ? `빨간 테두리 후보(중복제거) 수가 1개가 아님 (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`
                                 : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`
                         );
-                const autoF9FailMessage = `자동 F9 조건 불만족: ${reason}`;
-                lastAutoF9StopReason = reason;
+                const categorizedReason = setAutoF10StopReason('uniqueCandidateViolation', reason);
+                const autoF9FailMessage = `자동 F9 조건 불만족: ${categorizedReason}`;
 
                 if (strictUniqueOnly) {
                     if (showStopMessage) {
-                        showCanvas1AutoF9InfoMessage(`연속 F10 중지: ${reason}`);
+                        showCanvas1AutoF9InfoMessage(`연속 F10 중지: ${categorizedReason}`);
                     }
-                    console.log(`⏹️ 연속 F10 중지: ${reason}`);
+                    console.log(`⏹️ 연속 F10 중지: ${categorizedReason}`);
                     return false;
                 }
 
@@ -1964,7 +2008,7 @@ function countWhitePixels(ctx, x, y, size) {
             const targetSize = parseInt(targetButton.getAttribute('data-size'), 10);
             if (!Number.isFinite(targetX) || !Number.isFinite(targetY) || !Number.isFinite(targetSize)) {
                 console.log('❌ 자동 F9 후보의 좌표/크기 데이터가 올바르지 않습니다.');
-                lastAutoF9StopReason = '자동 F9 후보의 좌표/크기 데이터가 올바르지 않습니다.';
+                setAutoF10StopReason('invalidTargetData');
                 flashAutoF9ButtonError();
                 return false;
             }
@@ -1976,7 +2020,7 @@ function countWhitePixels(ctx, x, y, size) {
                     `❌ 자동 F9 후보가 흰색 사각형이 아닙니다. ` +
                     `(흰색: ${whiteCheck.whiteCount}/${whiteCheck.maxPixels}, 좌표: ${targetX},${targetY}, 크기: ${targetSize})`
                 );
-                lastAutoF9StopReason = `흰색 사각형 아님 (${whiteCheck.whiteCount}/${whiteCheck.maxPixels})`;
+                setAutoF10StopReason('nonWhiteRect', `흰색 ${whiteCheck.whiteCount}/${whiteCheck.maxPixels}`);
                 flashAutoF9ButtonError();
                 return false;
             }
@@ -1990,14 +2034,14 @@ function countWhitePixels(ctx, x, y, size) {
                 console.log(`✅ 자동 F9 한 스텝 완료 (${selectedBorderLabel} 후보 1개 선택 + 확정).`);
                 lastAutoF9StopReason = '';
             } else {
-                lastAutoF9StopReason = '후보를 클릭했지만 확정에 실패했습니다.';
+                setAutoF10StopReason('confirmAfterClickFailed');
             }
             return confirmed;
         }
 
         function runContinuousAutoF10(maxSteps = 300) {
             let confirmedCount = 0;
-            let stopReason = '추천 후보가 없거나 2개 이상입니다.';
+            let stopReason = formatAutoF10StopReason('uniqueCandidateViolation', '추천 후보가 없거나 2개 이상입니다.');
 
             for (let i = 0; i < maxSteps; i++) {
                 const confirmed = runAutoF9Step({
@@ -2014,7 +2058,7 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             if (confirmedCount === maxSteps) {
-                stopReason = `안전 제한(${maxSteps}회)에 도달했습니다.`;
+                stopReason = formatAutoF10StopReason('safetyLimitReached', `${maxSteps}회`);
             }
 
             if (confirmedCount === 0) {
