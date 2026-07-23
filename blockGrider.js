@@ -1853,6 +1853,18 @@ function countWhitePixels(ctx, x, y, size) {
                 code: 'E03',
                 label: '유일 후보 조건이 깨진 경우'
             },
+            uniqueCandidateViolationRedCount: {
+                code: 'E03-1',
+                label: '빨간 후보가 정확히 1개가 아니어서 멈춘 경우'
+            },
+            uniqueCandidateViolationThirdExists: {
+                code: 'E03-2',
+                label: '빨간 후보가 0개이고 주황 후보 1개는 있지만 3순위 후보가 존재해서 멈춘 경우'
+            },
+            uniqueCandidateViolationOrangeCount: {
+                code: 'E03-3',
+                label: '빨간 후보가 0개인데 주황 후보가 정확히 1개가 아니어서 멈춘 경우'
+            },
             invalidTargetData: {
                 code: 'E04',
                 label: '선택된 후보의 좌표나 크기 데이터가 잘못된 경우'
@@ -1943,15 +1955,21 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             if (!targetButton) {
-                const reason =
+                const reasonKey =
                     (strictUniqueOnly && uniqueRedButtonMap.size === 0 && uniqueOrangeButtonMap.size === 1 && uniqueThirdButtonMap.size > 0)
-                        ? `주황 테두리 후보(중복제거) 1개이지만 #A39908 후보도 존재 (중복제거 ${uniqueThirdButtonMap.size}개 / 중복포함 ${thirdButtons.length}개)`
+                        ? 'uniqueCandidateViolationThirdExists'
                         : (
                             uniqueRedButtonMap.size > 0
-                                ? `빨간 테두리 후보(중복제거) 수가 1개가 아님 (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`
-                                : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`
+                                ? 'uniqueCandidateViolationRedCount'
+                                : 'uniqueCandidateViolationOrangeCount'
                         );
-                const categorizedReason = setAutoF10StopReason('uniqueCandidateViolation', reason);
+                const reason =
+                    reasonKey === 'uniqueCandidateViolationThirdExists'
+                        ? `주황 테두리 후보(중복제거) 1개이지만 #A39908 후보도 존재 (중복제거 ${uniqueThirdButtonMap.size}개 / 중복포함 ${thirdButtons.length}개)`
+                        : reasonKey === 'uniqueCandidateViolationRedCount'
+                            ? `빨간 테두리 후보(중복제거) 수가 1개가 아님 (현재 ${uniqueRedButtonMap.size}개 / 중복포함 ${redButtons.length}개)`
+                            : `빨간 테두리 후보 0개이며 주황 테두리 후보(중복제거)도 1개가 아님 (현재 ${uniqueOrangeButtonMap.size}개 / 중복포함 ${orangeButtons.length}개)`;
+                const categorizedReason = setAutoF10StopReason(reasonKey, reason);
                 const autoF9FailMessage = `자동 F9 조건 불만족: ${categorizedReason}`;
 
                 if (strictUniqueOnly) {
@@ -2041,7 +2059,7 @@ function countWhitePixels(ctx, x, y, size) {
 
         function runContinuousAutoF10(maxSteps = 300) {
             let confirmedCount = 0;
-            let stopReason = formatAutoF10StopReason('uniqueCandidateViolation', '추천 후보가 없거나 2개 이상입니다.');
+            let stopReason = formatAutoF10StopReason('uniqueCandidateViolationOrangeCount', '추천 후보가 없거나 2개 이상입니다.');
 
             for (let i = 0; i < maxSteps; i++) {
                 const confirmed = runAutoF9Step({
