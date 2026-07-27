@@ -14,6 +14,7 @@
   const btnScaleUp = document.getElementById('btnScaleUp');
   const btnReload = document.getElementById('btnReload');
   const btnSimplifyDp = document.getElementById('btnSimplifyDp');
+  const btnSimplifyDpToN = document.getElementById('btnSimplifyDpToN');
   const btnTogglePathLines = document.getElementById('btnTogglePathLines');
   const baseCanvas = document.getElementById('baseCanvas');
   const zoomCanvas = document.getElementById('zoomCanvas');
@@ -23,6 +24,7 @@
   const scaleDisplay = document.getElementById('scaleDisplay');
   const dpToleranceRange = document.getElementById('dpToleranceRange');
   const dpToleranceDisplay = document.getElementById('dpToleranceDisplay');
+  const dpTargetCountInput = document.getElementById('dpTargetCountInput');
   const mergeStateMustKeep = document.getElementById('mergeStateMustKeep');
   const mergeStatePolicyDisplay = document.getElementById('mergeStatePolicyDisplay');
   const lineThicknessRange = document.getElementById('lineThicknessRange');
@@ -47,6 +49,7 @@
     btnScaleUp,
     btnReload,
     btnSimplifyDp,
+    btnSimplifyDpToN,
     btnTogglePathLines,
     baseCanvas,
     zoomCanvas,
@@ -56,6 +59,7 @@
     scaleDisplay,
     dpToleranceRange,
     dpToleranceDisplay,
+    dpTargetCountInput,
     mergeStateMustKeep,
     mergeStatePolicyDisplay,
     lineThicknessRange,
@@ -147,6 +151,113 @@
     return Math.abs(dy * px - dx * py + x2 * y1 - y2 * x1) / Math.hypot(dx, dy);
   }
 
+  function walkRdpPartitions(points, startIdx, endIdx, visitor) {
+    if (endIdx - startIdx <= 1) return;
+
+    let maxDist = -1;
+    let farthestIdx = -1;
+    for (let i = startIdx + 1; i < endIdx; i++) {
+      const dist = perpendicularDistance(points[i], points[startIdx], points[endIdx]);
+      if (dist > maxDist) {
+        maxDist = dist;
+        farthestIdx = i;
+      }
+    }
+
+    if (farthestIdx < 0) return;
+
+    const shouldDescend = visitor({
+      startIdx,
+      endIdx,
+      farthestIdx,
+      maxDist
+    });
+
+    if (shouldDescend === false) return;
+    walkRdpPartitions(points, startIdx, farthestIdx, visitor);
+    walkRdpPartitions(points, farthestIdx, endIdx, visitor);
+  }
+
+  function rankPoints(points) {
+    if (!Array.isArray(points)) {
+      throw new TypeError('rankPoints(points): points는 배열이어야 합니다.');
+    }
+
+    const len = points.length;
+    if (len === 0) return [];
+    if (len === 1) return [Infinity];
+
+    const scores = new Array(len).fill(0);
+    scores[0] = Infinity;
+    scores[len - 1] = Infinity;
+
+    walkRdpPartitions(points, 0, len - 1, ({ farthestIdx, maxDist }) => {
+      scores[farthestIdx] = maxDist;
+      return true;
+    });
+
+    return scores;
+  }
+
+  function simplifyToN(points, n) {
+    if (!Array.isArray(points)) {
+      throw new TypeError('simplifyToN(points, n): points는 배열이어야 합니다.');
+    }
+
+    const len = points.length;
+    if (len === 0) {
+      return {
+        points: [],
+        epsilon: 0,
+        epsilonRange: [0, 0]
+      };
+    }
+
+    const target = Number(n);
+    if (!Number.isInteger(target) || target <= 0) {
+      throw new RangeError('simplifyToN(points, n): n은 1 이상의 정수여야 합니다.');
+    }
+
+    if (len >= 2 && target < 2) {
+      throw new RangeError('simplifyToN(points, n): 점이 2개 이상일 때 n은 최소 2여야 합니다.');
+    }
+
+    if (target >= len) {
+      return {
+        points: points.map(clonePoint),
+        epsilon: 0,
+        epsilonRange: [0, 0]
+      };
+    }
+
+    const scores = rankPoints(points);
+    const ranked = scores
+      .map((score, index) => ({ index, score }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.index - b.index;
+      });
+
+    const selected = ranked.slice(0, target);
+    const dropped = ranked.slice(target);
+
+    const selectedIndexSet = new Set(selected.map(item => item.index));
+    const selectedPoints = points
+      .map((point, index) => ({ point, index }))
+      .filter(item => selectedIndexSet.has(item.index))
+      .sort((a, b) => a.index - b.index)
+      .map(item => clonePoint(item.point));
+
+    const minKeptScore = selected.reduce((minValue, item) => Math.min(minValue, item.score), Infinity);
+    const maxDroppedScore = dropped.reduce((maxValue, item) => Math.max(maxValue, item.score), -Infinity);
+
+    return {
+      points: selectedPoints,
+      epsilon: minKeptScore,
+      epsilonRange: [maxDroppedScore, minKeptScore]
+    };
+  }
+
   function simplifySegmentDp(points, epsilon, options) {
     const opts = options || {};
     const keepMergeState = !!opts.keepMergeState;
@@ -165,27 +276,13 @@
       }
     }
 
-    function mark(startIdx, endIdx) {
-      if (endIdx - startIdx <= 1) return;
-
-      let maxDist = -1;
-      let farthestIdx = -1;
-      for (let i = startIdx + 1; i < endIdx; i++) {
-        const dist = perpendicularDistance(points[i], points[startIdx], points[endIdx]);
-        if (dist > maxDist) {
-          maxDist = dist;
-          farthestIdx = i;
-        }
-      }
-
-      if (farthestIdx >= 0 && maxDist > epsilon) {
+    walkRdpPartitions(points, 0, len - 1, ({ farthestIdx, maxDist }) => {
+      if (maxDist > epsilon) {
         keep[farthestIdx] = true;
-        mark(startIdx, farthestIdx);
-        mark(farthestIdx, endIdx);
+        return true;
       }
-    }
-
-    mark(0, len - 1);
+      return false;
+    });
 
     const simplified = [];
     for (let i = 0; i < len; i++) {
@@ -247,6 +344,39 @@
     };
 
     return next;
+  }
+
+  function simplifyPayloadToN(payload, n) {
+    let shortSegments = 0;
+    const epsilonStats = [];
+
+    const next = {
+      ...payload,
+      groups: Array.isArray(payload.groups)
+        ? payload.groups.map(group => ({
+            ...group,
+            segments: Array.isArray(group.segments)
+              ? group.segments.map(segment => {
+                  const sourcePoints = Array.isArray(segment.points) ? segment.points : [];
+                  const simplified = simplifyToN(sourcePoints, n);
+                  if (sourcePoints.length < n) shortSegments += 1;
+                  epsilonStats.push(simplified.epsilonRange);
+
+                  return {
+                    ...segment,
+                    points: simplified.points
+                  };
+                })
+              : []
+          }))
+        : []
+    };
+
+    return {
+      payload: next,
+      shortSegments,
+      epsilonStats
+    };
   }
 
   function deepCloneJson(value) {
@@ -1021,6 +1151,58 @@
     return true;
   }
 
+  function getTargetPointCount() {
+    const raw = Number(dpTargetCountInput.value);
+    if (!Number.isInteger(raw) || raw <= 0) return null;
+    return raw;
+  }
+
+  function applyDpSimplificationToN() {
+    try {
+      const parsed = parseOutputPayload();
+      if (!parsed || !Array.isArray(parsed.groups)) {
+        setStatus('적용할 groups 데이터가 없습니다.', true);
+        return false;
+      }
+
+      const n = getTargetPointCount();
+      if (n == null) {
+        setStatus('N 값은 1 이상의 정수여야 합니다.', true);
+        return false;
+      }
+
+      const beforePoints = countPoints(parsed.groups);
+      const result = simplifyPayloadToN(parsed, n);
+      const afterPoints = countPoints(result.payload.groups || []);
+
+      output.value = JSON.stringify(result.payload, null, 2);
+      dpSourcePayload = result.payload;
+      updateMeta(result.payload, 'transferKey(localStorage)');
+      renderPayload(result.payload);
+
+      const hasRanges = result.epsilonStats.length > 0;
+      const globalMaxDropped = hasRanges
+        ? result.epsilonStats.reduce((maxValue, range) => Math.max(maxValue, Number(range[0])), -Infinity)
+        : 0;
+      const globalMinKept = hasRanges
+        ? result.epsilonStats.reduce((minValue, range) => Math.min(minValue, Number(range[1])), Infinity)
+        : 0;
+      const shortInfo = result.shortSegments > 0
+        ? `, 길이 부족 세그먼트 ${result.shortSegments}개는 가능한 만큼 유지`
+        : '';
+
+      setStatus(
+        `DP N-고정 단순화 완료 (세그먼트별 n=${n}): ${beforePoints} -> ${afterPoints} 점, epsilonRange≈[${globalMaxDropped.toFixed(4)}, ${globalMinKept.toFixed(4)}]${shortInfo}`,
+        false
+      );
+      return true;
+    } catch (error) {
+      const reason = error && error.message ? error.message : String(error || 'unknown');
+      setStatus(`DP N-고정 단순화 실패: ${reason}`, true);
+      return false;
+    }
+  }
+
   function scheduleAutoDpApply() {
     if (dpAutoApplyTimer) {
       clearTimeout(dpAutoApplyTimer);
@@ -1215,6 +1397,10 @@
 
   btnSimplifyDp.addEventListener('click', () => {
     applyDpSimplification({ refreshSourceFromTextarea: true, isAuto: false });
+  });
+
+  btnSimplifyDpToN.addEventListener('click', () => {
+    applyDpSimplificationToN();
   });
 
   btnTogglePathLines.addEventListener('click', () => {
