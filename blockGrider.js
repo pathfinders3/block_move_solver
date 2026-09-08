@@ -2650,6 +2650,44 @@ function countWhitePixels(ctx, x, y, size) {
 
         let lastShiftF10Timestamp = 0;
 
+        function findLargestWhiteSquareFromSelectedPixel() {
+            if (!selectedPixel || !showCorners) {
+                return null;
+            }
+
+            const maxSize = Math.min(
+                currentCanvasWidth - selectedPixel.x,
+                currentCanvasHeight - selectedPixel.y,
+                Math.max(0, currentCanvasWidth),
+                Math.max(0, currentCanvasHeight)
+            );
+
+            if (!Number.isFinite(maxSize) || maxSize <= 0) {
+                return null;
+            }
+
+            let bestSize = 0;
+            for (let size = 1; size <= maxSize; size += 1) {
+                const whiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, size);
+                const maxPixels = size * size;
+                if (whiteCount === maxPixels) {
+                    bestSize = size;
+                } else {
+                    break;
+                }
+            }
+
+            if (bestSize <= 0) {
+                return null;
+            }
+
+            return {
+                x: selectedPixel.x,
+                y: selectedPixel.y,
+                size: bestSize
+            };
+        }
+
         // F2, F4, F8, F9, F10, Shift+F10, F11, DEL, IJKL 키 이벤트 리스너
         document.addEventListener('keydown', (e) => {
             const activeElement = document.activeElement;
@@ -2747,6 +2785,33 @@ function countWhitePixels(ctx, x, y, size) {
             if (e.key === 'F2') {
                 e.preventDefault();
                 scaleCanvas();
+            }
+            if (e.key === 'F8' && e.shiftKey) {
+                if (selectedPixel && showCorners) {
+                    const autoRect = findLargestWhiteSquareFromSelectedPixel();
+                    if (!autoRect) {
+                        showRoleActionErrorMessage('선택 지점에서 1x1 이상 연속 흰색 영역이 없습니다.');
+                        console.log('❌ Shift+F8: 선택 지점에서 연속 흰색 영역이 없습니다.');
+                    } else {
+                        autoCloseLatestPointAsEndBeforeStart();
+                        const nextPolylineId = createPolylineId();
+                        activePolylineId = nextPolylineId;
+                        addYellowRectWithAngleCheck(autoRect.x, autoRect.y, autoRect.size, {
+                            role: 'start',
+                            polylineId: nextPolylineId
+                        });
+                        showMergeStateMessage('Shift+F8', yellowRects[yellowRects.length - 1]);
+                        showRoleActionInfoMessage(`Shift+F8 자동 시작 저장: ${autoRect.size}x${autoRect.size}`);
+
+                        if (showCorners && selectedPixel) {
+                            updateCornerAndPathInfo();
+                        }
+
+                        scaleCanvas();
+                    }
+                }
+                e.preventDefault();
+                return;
             }
             if (e.key === 'F8') {
                 // 선택된 픽셀과 showCorners가 활성화되어 있고, 기준 사각형이 모두 흰색일 때만
