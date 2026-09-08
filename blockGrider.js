@@ -156,6 +156,16 @@ function countWhitePixels(ctx, x, y, size) {
         const ctx1 = canvas1.getContext('2d', { willReadFrequently: true });
         const canvas2 = document.getElementById('canvas2');
         const ctx2 = canvas2.getContext('2d', { willReadFrequently: true });
+
+        function setCanvasNoSmoothing(ctx) {
+            if (!ctx) return;
+            ctx.imageSmoothingEnabled = false;
+            ctx.webkitImageSmoothingEnabled = false;
+            ctx.mozImageSmoothingEnabled = false;
+        }
+
+        setCanvasNoSmoothing(ctx1);
+        setCanvasNoSmoothing(ctx2);
     const canvasSizeSelect = document.getElementById('canvasSizeSelect');
     const canvas1SizeLabel = document.getElementById('canvas1SizeLabel');
         const canvas1ClipboardImageInfo = document.getElementById('canvas1ClipboardImageInfo');
@@ -430,6 +440,7 @@ function countWhitePixels(ctx, x, y, size) {
             backupCanvas.width = prevWidth;
             backupCanvas.height = prevHeight;
             const backupCtx = backupCanvas.getContext('2d');
+            setCanvasNoSmoothing(backupCtx);
             backupCtx.drawImage(canvas1, 0, 0);
 
             currentCanvasWidth = width;
