@@ -2922,6 +2922,20 @@ function countWhitePixels(ctx, x, y, size) {
                     }
                 }
 
+                const isPageUp = e.key === 'PageUp';
+                const isPageDown = e.key === 'PageDown';
+                if (isPageUp || isPageDown) {
+                    const direction = isPageUp ? 1 : -1;
+                    const currentIndex = pendingSquareSelection.currentIndex ?? 0;
+                    const nextIndex = (currentIndex + direction + pendingSquareSelection.candidates.length) % pendingSquareSelection.candidates.length;
+                    pendingSquareSelection.currentIndex = nextIndex;
+                    const candidate = pendingSquareSelection.candidates[nextIndex];
+                    showPersistentRoleActionMessage(`Shift+F8 선택 중: ${nextIndex + 1}/${pendingSquareSelection.candidates.length} - (${candidate.y}, ${candidate.x}) ${candidate.size}x${candidate.size}`);
+                    scaleCanvas();
+                    e.preventDefault();
+                    return;
+                }
+
                 if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
                     const nextIndex = ((pendingSquareSelection.currentIndex ?? 0) + 1) % pendingSquareSelection.candidates.length;
                     pendingSquareSelection.currentIndex = nextIndex;
