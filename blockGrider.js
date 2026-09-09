@@ -2731,6 +2731,16 @@ function countWhitePixels(ctx, x, y, size) {
             const candidate = pendingSquareSelection.candidates[safeIndex];
             pendingSquareSelection = null;
 
+            selectedPixel = { x: candidate.x, y: candidate.y };
+            const rectSizeInput = document.getElementById('rectSize');
+            if (rectSizeInput) {
+                rectSizeInput.value = String(candidate.size);
+            }
+            const coordDisplay = document.getElementById('coordDisplay');
+            if (coordDisplay) {
+                coordDisplay.textContent = `${candidate.x}, ${candidate.y}`;
+            }
+
             autoCloseLatestPointAsEndBeforeStart();
             const nextPolylineId = createPolylineId();
             activePolylineId = nextPolylineId;
@@ -2955,10 +2965,21 @@ function countWhitePixels(ctx, x, y, size) {
                         showRoleActionErrorMessage('선택 지점에서 1x1 이상 연속 흰색 영역이 없습니다.');
                         console.log('❌ Shift+F8: 선택 지점에서 연속 흰색 영역이 없습니다.');
                     } else if (autoRect.candidateCount <= 1) {
+                        const chosen = autoRect.topCandidate;
+                        selectedPixel = { x: chosen.x, y: chosen.y };
+                        const rectSizeInput = document.getElementById('rectSize');
+                        if (rectSizeInput) {
+                            rectSizeInput.value = String(chosen.size);
+                        }
+                        const coordDisplay = document.getElementById('coordDisplay');
+                        if (coordDisplay) {
+                            coordDisplay.textContent = `${chosen.x}, ${chosen.y}`;
+                        }
+
                         autoCloseLatestPointAsEndBeforeStart();
                         const nextPolylineId = createPolylineId();
                         activePolylineId = nextPolylineId;
-                        addYellowRectWithAngleCheck(autoRect.topCandidate.x, autoRect.topCandidate.y, autoRect.topCandidate.size, {
+                        addYellowRectWithAngleCheck(chosen.x, chosen.y, chosen.size, {
                             role: 'start',
                             polylineId: nextPolylineId
                         });
