@@ -1722,7 +1722,7 @@ function countWhitePixels(ctx, x, y, size) {
 
         function getAutoF10PreviewTarget() {
             if (tempYellowRect) {
-                const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
+                const rectSize = getCurrentSelectionBaseSize();
                 const tempAngle = selectedPixel
                     ? calculateRectToRectAngle(
                         selectedPixel.x,
@@ -1776,7 +1776,7 @@ function countWhitePixels(ctx, x, y, size) {
                 const size = parseInt(btn.getAttribute('data-size'), 10);
                 let angle = parseFloat(btn.getAttribute('data-angle'));
                 if (!Number.isFinite(angle) && selectedPixel) {
-                    const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
+                    const rectSize = getCurrentSelectionBaseSize();
                     const baseX = selectedPixel.x + rectSize / 2;
                     const baseY = selectedPixel.y + rectSize / 2;
                     const targetX = x + size / 2;
@@ -2600,6 +2600,17 @@ function countWhitePixels(ctx, x, y, size) {
             return map[direction] || '-';
         }
 
+        function getCurrentSelectionBaseSize() {
+            const lastRect = yellowRects.length > 0 ? yellowRects[yellowRects.length - 1] : null;
+            if (lastRect && Number.isFinite(lastRect.size) && lastRect.size > 0) {
+                return Math.max(1, Math.round(lastRect.size));
+            }
+
+            const rectSizeInput = document.getElementById('rectSize');
+            const parsed = rectSizeInput ? parseInt(rectSizeInput.value, 10) : NaN;
+            return Number.isFinite(parsed) && parsed > 0 ? Math.max(1, Math.round(parsed)) : 4;
+        }
+
         function alignRectToDirectionCenter(rect, anchorRect, requestedDirection) {
             if (!rect || !anchorRect || !requestedDirection) return rect;
             const anchorCenterX = anchorRect.x + anchorRect.size / 2;
@@ -2747,7 +2758,7 @@ function countWhitePixels(ctx, x, y, size) {
 
                     let angle = parseFloat(btn.getAttribute('data-angle'));
                     if (!Number.isFinite(angle) && selectedPixel) {
-                        const rectSize = parseInt(document.getElementById('rectSize').value, 10) || 4;
+                        const rectSize = getCurrentSelectionBaseSize();
                         const baseX = selectedPixel.x + rectSize / 2;
                         const baseY = selectedPixel.y + rectSize / 2;
                         const targetX = x + size / 2;
@@ -3580,7 +3591,7 @@ function countWhitePixels(ctx, x, y, size) {
 
             const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
             const primaryCornerSize = parseInt(document.getElementById('cornerSize').value, 10) || 4;
-            const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+            const rectSize = getCurrentSelectionBaseSize();
             const baseX = selectedPixel.x + rectSize / 2;
             const baseY = selectedPixel.y + rectSize / 2;
             
@@ -3786,7 +3797,7 @@ function countWhitePixels(ctx, x, y, size) {
             }
             
             const tolerance = parseInt(document.getElementById('angleTolerance').value) || 30;
-            const rectSize = parseInt(document.getElementById('rectSize').value) || 4;
+            const rectSize = getCurrentSelectionBaseSize();
             const baseX = selectedPixel.x + rectSize / 2;
             const baseY = selectedPixel.y + rectSize / 2;
             
@@ -3882,7 +3893,7 @@ function countWhitePixels(ctx, x, y, size) {
                         const anchorRect = {
                             x: selectedPixel ? selectedPixel.x : finalRect.x,
                             y: selectedPixel ? selectedPixel.y : finalRect.y,
-                            size: parseInt(document.getElementById('rectSize').value, 10) || 4
+                            size: getCurrentSelectionBaseSize()
                         };
                         const anchoredRect = selectedPixel && resolvedDirectionKey
                             ? alignRectToDirectionCenter(finalRect, anchorRect, resolvedDirectionKey)
