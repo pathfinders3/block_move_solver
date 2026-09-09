@@ -2581,6 +2581,47 @@ function countWhitePixels(ctx, x, y, size) {
             return map[direction] || '-';
         }
 
+        function alignRectToDirectionCenter(rect, anchorRect, requestedDirection) {
+            if (!rect || !anchorRect || !requestedDirection) return rect;
+            const anchorCenterX = anchorRect.x + anchorRect.size / 2;
+            const anchorCenterY = anchorRect.y + anchorRect.size / 2;
+            const rectCenterX = rect.x + rect.size / 2;
+            const rectCenterY = rect.y + rect.size / 2;
+            const deltaX = rectCenterX - anchorCenterX;
+            const deltaY = rectCenterY - anchorCenterY;
+
+            let targetCenterX = rectCenterX;
+            let targetCenterY = rectCenterY;
+
+            if (requestedDirection === 'up' || requestedDirection === 'down') {
+                targetCenterX = anchorCenterX;
+                const magnitude = Math.max(Math.abs(deltaY) || 1, 1);
+                targetCenterY = anchorCenterY + (requestedDirection === 'down' ? magnitude : -magnitude);
+            } else if (requestedDirection === 'left' || requestedDirection === 'right') {
+                targetCenterY = anchorCenterY;
+                const magnitude = Math.max(Math.abs(deltaX) || 1, 1);
+                targetCenterX = anchorCenterX + (requestedDirection === 'right' ? magnitude : -magnitude);
+            } else if (requestedDirection === 'upLeft') {
+                targetCenterX = anchorCenterX - Math.max(Math.abs(deltaX) || 1, 1);
+                targetCenterY = anchorCenterY - Math.max(Math.abs(deltaY) || 1, 1);
+            } else if (requestedDirection === 'upRight') {
+                targetCenterX = anchorCenterX + Math.max(Math.abs(deltaX) || 1, 1);
+                targetCenterY = anchorCenterY - Math.max(Math.abs(deltaY) || 1, 1);
+            } else if (requestedDirection === 'downLeft') {
+                targetCenterX = anchorCenterX - Math.max(Math.abs(deltaX) || 1, 1);
+                targetCenterY = anchorCenterY + Math.max(Math.abs(deltaY) || 1, 1);
+            } else if (requestedDirection === 'downRight') {
+                targetCenterX = anchorCenterX + Math.max(Math.abs(deltaX) || 1, 1);
+                targetCenterY = anchorCenterY + Math.max(Math.abs(deltaY) || 1, 1);
+            }
+
+            return {
+                x: targetCenterX - rect.size / 2,
+                y: targetCenterY - rect.size / 2,
+                size: rect.size
+            };
+        }
+
         function triggerPathButtonByNumpadKey(rawKey) {
             const key = (rawKey || '').toUpperCase();
             const keyToDirection = {
@@ -2668,7 +2709,9 @@ function countWhitePixels(ctx, x, y, size) {
                 fallbackCandidates[0];
             if (!target) return false;
 
+            target.btn.setAttribute('data-direction-key', requestedDirection);
             target.btn.click();
+            target.btn.removeAttribute('data-direction-key');
             return true;
         }
 
@@ -3746,18 +3789,27 @@ function countWhitePixels(ctx, x, y, size) {
                             y: normalizedTarget.y,
                             size: normalizedTarget.size
                         };
+                        const directionKey = btn.getAttribute('data-direction-key');
+                        const anchoredRect = selectedPixel && directionKey
+                            ? alignRectToDirectionCenter(finalRect, {
+                                x: selectedPixel.x,
+                                y: selectedPixel.y,
+                                size: parseInt(document.getElementById('rectSize').value, 10) || 4
+                            }, directionKey)
+                            : finalRect;
                         
                         console.log(
                             `✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${candidateSize}x${candidateSize}, 각도: ${angle}°` +
                             (normalizedTarget.snapped
                                 ? ` → full-overlap 정규화: (${finalRect.x}, ${finalRect.y}), 크기: ${finalRect.size}x${finalRect.size}`
-                                : '')
+                                : '') +
+                            (directionKey ? ` | 방향 고정: ${directionKey} -> (${anchoredRect.x}, ${anchoredRect.y})` : '')
                         );
                         
                         // 임시 노란색 사각형만 설정 (F9로 확정 전까지는 이동 안 함)
                         tempYellowClickVariant = (tempYellowClickVariant + 1) % 2;
                         tempYellowRect = {
-                            ...finalRect,
+                            ...anchoredRect,
                             clickVariant: tempYellowClickVariant
                         };
                         
