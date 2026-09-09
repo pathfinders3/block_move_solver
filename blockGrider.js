@@ -2017,7 +2017,16 @@ function countWhitePixels(ctx, x, y, size) {
 
                 const fallbackTarget = selectClosestAnglePathButton(allButtons);
                 if (fallbackTarget && fallbackTarget.btn) {
+                    const fallbackDirectionKey = Number.isFinite(fallbackTarget.angle)
+                        ? classifyDirectionFromAngle(fallbackTarget.angle)
+                        : null;
+                    fallbackTarget.btn.setAttribute('data-auto-expand', '1');
+                    if (fallbackDirectionKey) {
+                        fallbackTarget.btn.setAttribute('data-direction-key', fallbackDirectionKey);
+                    }
                     fallbackTarget.btn.click();
+                    fallbackTarget.btn.removeAttribute('data-auto-expand');
+                    fallbackTarget.btn.removeAttribute('data-direction-key');
 
                     const fallbackX = fallbackTarget.x;
                     const fallbackY = fallbackTarget.y;
@@ -2079,7 +2088,17 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             // 1) 우선순위(빨강>주황)에 따라 선택된 버튼 클릭으로 임시 노란색 지정
+            const targetAngleRaw = parseFloat(targetButton.getAttribute('data-angle'));
+            const targetDirectionKey = Number.isFinite(targetAngleRaw)
+                ? classifyDirectionFromAngle(targetAngleRaw)
+                : null;
+            targetButton.setAttribute('data-auto-expand', '1');
+            if (targetDirectionKey) {
+                targetButton.setAttribute('data-direction-key', targetDirectionKey);
+            }
             targetButton.click();
+            targetButton.removeAttribute('data-auto-expand');
+            targetButton.removeAttribute('data-direction-key');
 
             // 2) F9 동작으로 확정
             const confirmed = confirmTempYellowRect('F10');
@@ -3858,16 +3877,18 @@ function countWhitePixels(ctx, x, y, size) {
                             size: normalizedTarget.size
                         };
                         const directionKey = btn.getAttribute('data-direction-key');
+                        const autoExpand = btn.getAttribute('data-auto-expand') === '1';
+                        const resolvedDirectionKey = directionKey || (autoExpand ? classifyDirectionFromAngle(angle) : null);
                         const anchorRect = {
                             x: selectedPixel ? selectedPixel.x : finalRect.x,
                             y: selectedPixel ? selectedPixel.y : finalRect.y,
                             size: parseInt(document.getElementById('rectSize').value, 10) || 4
                         };
-                        const anchoredRect = selectedPixel && directionKey
-                            ? alignRectToDirectionCenter(finalRect, anchorRect, directionKey)
+                        const anchoredRect = selectedPixel && resolvedDirectionKey
+                            ? alignRectToDirectionCenter(finalRect, anchorRect, resolvedDirectionKey)
                             : finalRect;
-                        const expandedRect = (selectedPixel && directionKey)
-                            ? findLargestDirectionalWhiteRect(anchoredRect, anchorRect, directionKey, 2)
+                        const expandedRect = (selectedPixel && (resolvedDirectionKey || autoExpand))
+                            ? findLargestDirectionalWhiteRect(anchoredRect, anchorRect, resolvedDirectionKey || 'center', 2)
                             : anchoredRect;
                         
                         console.log(
@@ -3875,8 +3896,8 @@ function countWhitePixels(ctx, x, y, size) {
                             (normalizedTarget.snapped
                                 ? ` → full-overlap 정규화: (${finalRect.x}, ${finalRect.y}), 크기: ${finalRect.size}x${finalRect.size}`
                                 : '') +
-                            (directionKey ? ` | 방향 고정: ${directionKey} -> (${anchoredRect.x}, ${anchoredRect.y})` : '') +
-                            ((directionKey && expandedRect.size > anchoredRect.size)
+                            (resolvedDirectionKey ? ` | 방향 고정: ${resolvedDirectionKey} -> (${anchoredRect.x}, ${anchoredRect.y})` : '') +
+                            ((selectedPixel && (resolvedDirectionKey || autoExpand) && expandedRect.size > anchoredRect.size)
                                 ? ` | 2배 한도 확장: ${anchoredRect.size} -> ${expandedRect.size}`
                                 : '')
                         );
