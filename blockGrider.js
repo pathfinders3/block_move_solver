@@ -2616,9 +2616,77 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             return {
-                x: targetCenterX - rect.size / 2,
-                y: targetCenterY - rect.size / 2,
+                x: Math.round(targetCenterX - rect.size / 2),
+                y: Math.round(targetCenterY - rect.size / 2),
                 size: rect.size
+            };
+        }
+
+        function findLargestDirectionalWhiteRect(baseRect, anchorRect, requestedDirection, maxMultiplier = 2) {
+            if (!baseRect || !anchorRect || !requestedDirection) {
+                return baseRect;
+            }
+
+            const baseSize = Math.max(1, Math.round(baseRect.size));
+            const anchorSize = Math.max(1, Math.round(anchorRect.size));
+            const maxSize = Math.min(
+                Math.max(1, Math.floor(anchorSize * maxMultiplier)),
+                currentCanvasWidth,
+                currentCanvasHeight
+            );
+
+            const anchorCenterX = anchorRect.x + anchorRect.size / 2;
+            const anchorCenterY = anchorRect.y + anchorRect.size / 2;
+            const anchorRight = anchorRect.x + anchorRect.size;
+            const anchorBottom = anchorRect.y + anchorRect.size;
+
+            for (let size = maxSize; size >= baseSize; size -= 1) {
+                let x = Math.round(baseRect.x);
+                let y = Math.round(baseRect.y);
+
+                // 크기를 키울 때도 "방향 + 비겹침"을 유지하도록, 각 size마다 위치를 다시 계산
+                if (requestedDirection === 'up') {
+                    x = Math.round(anchorCenterX - size / 2);
+                    y = Math.round(anchorRect.y - size);
+                } else if (requestedDirection === 'down') {
+                    x = Math.round(anchorCenterX - size / 2);
+                    y = Math.round(anchorBottom);
+                } else if (requestedDirection === 'left') {
+                    x = Math.round(anchorRect.x - size);
+                    y = Math.round(anchorCenterY - size / 2);
+                } else if (requestedDirection === 'right') {
+                    x = Math.round(anchorRight);
+                    y = Math.round(anchorCenterY - size / 2);
+                } else if (requestedDirection === 'upLeft') {
+                    x = Math.round(anchorRect.x - size);
+                    y = Math.round(anchorRect.y - size);
+                } else if (requestedDirection === 'upRight') {
+                    x = Math.round(anchorRight);
+                    y = Math.round(anchorRect.y - size);
+                } else if (requestedDirection === 'downLeft') {
+                    x = Math.round(anchorRect.x - size);
+                    y = Math.round(anchorBottom);
+                } else if (requestedDirection === 'downRight') {
+                    x = Math.round(anchorRight);
+                    y = Math.round(anchorBottom);
+                } else if (requestedDirection === 'center') {
+                    x = Math.round(anchorCenterX - size / 2);
+                    y = Math.round(anchorCenterY - size / 2);
+                }
+
+                if (x < 0 || y < 0 || x + size > currentCanvasWidth || y + size > currentCanvasHeight) {
+                    continue;
+                }
+
+                if (countWhitePixels(ctx1, x, y, size) === size * size) {
+                    return { x, y, size };
+                }
+            }
+
+            return {
+                x: Math.round(baseRect.x),
+                y: Math.round(baseRect.y),
+                size: baseSize
             };
         }
 
@@ -3790,34 +3858,37 @@ function countWhitePixels(ctx, x, y, size) {
                             size: normalizedTarget.size
                         };
                         const directionKey = btn.getAttribute('data-direction-key');
+                        const anchorRect = {
+                            x: selectedPixel ? selectedPixel.x : finalRect.x,
+                            y: selectedPixel ? selectedPixel.y : finalRect.y,
+                            size: parseInt(document.getElementById('rectSize').value, 10) || 4
+                        };
                         const anchoredRect = selectedPixel && directionKey
-                            ? alignRectToDirectionCenter(finalRect, {
-                                x: selectedPixel.x,
-                                y: selectedPixel.y,
-                                size: parseInt(document.getElementById('rectSize').value, 10) || 4
-                            }, directionKey)
+                            ? alignRectToDirectionCenter(finalRect, anchorRect, directionKey)
                             : finalRect;
+                        const expandedRect = (selectedPixel && directionKey)
+                            ? findLargestDirectionalWhiteRect(anchoredRect, anchorRect, directionKey, 2)
+                            : anchoredRect;
                         
                         console.log(
                             `✅ 경로 ${pathName} [${idx}] 클릭: (${x}, ${y}), 크기: ${candidateSize}x${candidateSize}, 각도: ${angle}°` +
                             (normalizedTarget.snapped
                                 ? ` → full-overlap 정규화: (${finalRect.x}, ${finalRect.y}), 크기: ${finalRect.size}x${finalRect.size}`
                                 : '') +
-                            (directionKey ? ` | 방향 고정: ${directionKey} -> (${anchoredRect.x}, ${anchoredRect.y})` : '')
+                            (directionKey ? ` | 방향 고정: ${directionKey} -> (${anchoredRect.x}, ${anchoredRect.y})` : '') +
+                            ((directionKey && expandedRect.size > anchoredRect.size)
+                                ? ` | 2배 한도 확장: ${anchoredRect.size} -> ${expandedRect.size}`
+                                : '')
                         );
                         
                         // 임시 노란색 사각형만 설정 (F9로 확정 전까지는 이동 안 함)
                         tempYellowClickVariant = (tempYellowClickVariant + 1) % 2;
                         tempYellowRect = {
-                            ...anchoredRect,
+                            ...expandedRect,
                             clickVariant: tempYellowClickVariant
                         };
                         
-                        if (normalizedTarget.snapped) {
-                            updateTempYellowAngle();
-                        } else {
-                            updateTempYellowAngle(angle); // 미리 계산된 각도 전달
-                        }
+                        updateTempYellowAngle();
                         
                         console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
                         scaleCanvas();
