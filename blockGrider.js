@@ -2017,13 +2017,8 @@ function countWhitePixels(ctx, x, y, size) {
 
                 const fallbackTarget = selectClosestAnglePathButton(allButtons);
                 if (fallbackTarget && fallbackTarget.btn) {
-                    const fallbackDirectionKey = Number.isFinite(fallbackTarget.angle)
-                        ? classifyDirectionFromAngle(fallbackTarget.angle)
-                        : null;
+                    // F10은 이전 방향을 고정하지 않고, 후보를 다시 재평가해 가장 큰 유효 사각형을 선택해야 한다.
                     fallbackTarget.btn.setAttribute('data-auto-expand', '1');
-                    if (fallbackDirectionKey) {
-                        fallbackTarget.btn.setAttribute('data-direction-key', fallbackDirectionKey);
-                    }
                     fallbackTarget.btn.click();
                     fallbackTarget.btn.removeAttribute('data-auto-expand');
                     fallbackTarget.btn.removeAttribute('data-direction-key');
@@ -2088,14 +2083,9 @@ function countWhitePixels(ctx, x, y, size) {
             }
 
             // 1) 우선순위(빨강>주황)에 따라 선택된 버튼 클릭으로 임시 노란색 지정
-            const targetAngleRaw = parseFloat(targetButton.getAttribute('data-angle'));
-            const targetDirectionKey = Number.isFinite(targetAngleRaw)
-                ? classifyDirectionFromAngle(targetAngleRaw)
-                : null;
+            // F10 자동 선택은 이전 각도/방향을 고정하지 않고,
+            // 현재 선택 기준점에서 가능한 큰 사각형을 다시 검토해야 한다.
             targetButton.setAttribute('data-auto-expand', '1');
-            if (targetDirectionKey) {
-                targetButton.setAttribute('data-direction-key', targetDirectionKey);
-            }
             targetButton.click();
             targetButton.removeAttribute('data-auto-expand');
             targetButton.removeAttribute('data-direction-key');
@@ -2793,11 +2783,18 @@ function countWhitePixels(ctx, x, y, size) {
                 return Array.from(unique.values());
             };
 
-            const redCandidates = uniqueByRect(filteredByDirection.filter(item => item.isRed));
-            const orangeCandidates = uniqueByRect(filteredByDirection.filter(item => !item.isRed && item.isOrange));
-            const thirdCandidates = uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && item.isThird));
-            const blueCandidates = uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && !item.isThird && item.isBlue));
-            const fallbackCandidates = uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && !item.isThird && !item.isBlue));
+            const sortBySizeDesc = (items) => [...items].sort((a, b) => {
+                if (b.size !== a.size) return b.size - a.size;
+                if (a.y !== b.y) return a.y - b.y;
+                if (a.x !== b.x) return a.x - b.x;
+                return 0;
+            });
+
+            const redCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection.filter(item => item.isRed)));
+            const orangeCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection.filter(item => !item.isRed && item.isOrange)));
+            const thirdCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && item.isThird)));
+            const blueCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && !item.isThird && item.isBlue)));
+            const fallbackCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && !item.isThird && !item.isBlue)));
 
             const target =
                 redCandidates[0] ||
@@ -3889,7 +3886,9 @@ function countWhitePixels(ctx, x, y, size) {
                         };
                         const directionKey = btn.getAttribute('data-direction-key');
                         const autoExpand = btn.getAttribute('data-auto-expand') === '1';
-                        const resolvedDirectionKey = directionKey || (autoExpand ? classifyDirectionFromAngle(angle) : null);
+                        // 사용자 키(QWE/ASD/ZXC)로 방향을 명시한 경우에만 해당 방향을 유지한다.
+                        // 자동 F10은 이전 각도에 묶이지 않고, 현재 anchor 기준으로 다시 검사한다.
+                        const resolvedDirectionKey = directionKey || null;
                         const anchorRect = {
                             x: selectedPixel ? selectedPixel.x : finalRect.x,
                             y: selectedPixel ? selectedPixel.y : finalRect.y,
