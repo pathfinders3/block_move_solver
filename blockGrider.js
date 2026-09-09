@@ -1337,6 +1337,18 @@ function countWhitePixels(ctx, x, y, size) {
             });
         }
 
+        function clearRoleActionDisplay() {
+            const display = document.getElementById('roleActionDisplay');
+            if (display) {
+                display.textContent = '';
+                display.className = '';
+            }
+            if (roleActionDisplayTimer !== null) {
+                clearTimeout(roleActionDisplayTimer);
+                roleActionDisplayTimer = null;
+            }
+        }
+
         function showRoleActionInfoMessage(message) {
             roleActionDisplayTimer = showTempMessage({
                 elementId: 'roleActionDisplay',
@@ -1344,6 +1356,18 @@ function countWhitePixels(ctx, x, y, size) {
                 className: 'status-role-start',
                 previousTimerId: roleActionDisplayTimer
             });
+        }
+
+        function showPersistentRoleActionMessage(message, className = 'status-role-start') {
+            if (roleActionDisplayTimer !== null) {
+                clearTimeout(roleActionDisplayTimer);
+                roleActionDisplayTimer = null;
+            }
+
+            const display = document.getElementById('roleActionDisplay');
+            if (!display) return;
+            display.textContent = `✅ ${message}`;
+            display.className = `status-message ${className}`.trim();
         }
 
         function showHistoryActionMessage(actionLabel, sourceLabel = '') {
@@ -2649,6 +2673,81 @@ function countWhitePixels(ctx, x, y, size) {
         }
 
         let lastShiftF10Timestamp = 0;
+        let pendingSquareSelection = null;
+
+        function sortSquareCandidates(candidates) {
+            return [...candidates].sort((a, b) => {
+                if (b.size !== a.size) return b.size - a.size;
+                if (a.y !== b.y) return a.y - b.y;
+                if (a.x !== b.x) return a.x - b.x;
+                return 0;
+            });
+        }
+
+        function getSquareSelectionSummary(candidates) {
+            const preview = candidates.slice(0, Math.min(9, candidates.length)).map((candidate, index) => {
+                return `${index + 1}:(${candidate.y}, ${candidate.x}) ${candidate.size}x${candidate.size}`;
+            });
+            return preview.join(' | ');
+        }
+
+        function drawPendingSquareSelectionOverlay(scale) {
+            if (!pendingSquareSelection || !pendingSquareSelection.candidates || pendingSquareSelection.candidates.length === 0) {
+                return;
+            }
+
+            const currentIndex = pendingSquareSelection.currentIndex ?? 0;
+            const candidates = pendingSquareSelection.candidates;
+
+            ctx2.save();
+            for (let i = 0; i < candidates.length; i++) {
+                const candidate = candidates[i];
+                const isCurrent = i === currentIndex;
+                const x = candidate.x * scale;
+                const y = candidate.y * scale;
+                const w = candidate.size * scale;
+                const h = candidate.size * scale;
+
+                ctx2.fillStyle = isCurrent ? 'rgba(255, 215, 0, 0.34)' : 'rgba(76, 149, 255, 0.18)';
+                ctx2.strokeStyle = isCurrent ? 'rgba(255, 180, 0, 1.0)' : 'rgba(70, 120, 255, 0.95)';
+                ctx2.lineWidth = Math.max(2, scale / 6);
+                ctx2.fillRect(x, y, w, h);
+                ctx2.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+                ctx2.fillStyle = '#000000';
+                ctx2.font = `${Math.max(10, scale * 0.7)}px sans-serif`;
+                ctx2.textBaseline = 'top';
+                ctx2.fillText(String(i + 1), x + 3, y + 2);
+            }
+            ctx2.restore();
+        }
+
+        function commitPendingSquareSelection(index) {
+            if (!pendingSquareSelection || !pendingSquareSelection.candidates || pendingSquareSelection.candidates.length === 0) {
+                return false;
+            }
+
+            const safeIndex = ((index % pendingSquareSelection.candidates.length) + pendingSquareSelection.candidates.length) % pendingSquareSelection.candidates.length;
+            const candidate = pendingSquareSelection.candidates[safeIndex];
+            pendingSquareSelection = null;
+
+            autoCloseLatestPointAsEndBeforeStart();
+            const nextPolylineId = createPolylineId();
+            activePolylineId = nextPolylineId;
+            addYellowRectWithAngleCheck(candidate.x, candidate.y, candidate.size, {
+                role: 'start',
+                polylineId: nextPolylineId
+            });
+            showMergeStateMessage('Shift+F8', yellowRects[yellowRects.length - 1]);
+            showRoleActionInfoMessage(`Shift+F8 시작 영역: (${candidate.y}, ${candidate.x}) ${candidate.size}x${candidate.size}`);
+
+            if (showCorners && selectedPixel) {
+                updateCornerAndPathInfo();
+            }
+
+            scaleCanvas();
+            return true;
+        }
 
         function findLargestWhiteSquareFromSelectedPixel() {
             if (!selectedPixel || !showCorners) {
@@ -2686,20 +2785,18 @@ function countWhitePixels(ctx, x, y, size) {
                 }
 
                 largestSize = size;
-                largestCandidates = validCandidates;
+                largestCandidates = sortSquareCandidates(validCandidates);
             }
 
             if (largestSize <= 0 || largestCandidates.length === 0) {
                 return null;
             }
 
-            const chosen = largestCandidates[Math.floor(Math.random() * largestCandidates.length)];
             return {
-                x: chosen.x,
-                y: chosen.y,
                 size: largestSize,
                 candidateCount: largestCandidates.length,
-                candidates: largestCandidates
+                candidates: largestCandidates,
+                topCandidate: largestCandidates[0]
             };
         }
 
@@ -2797,6 +2894,56 @@ function countWhitePixels(ctx, x, y, size) {
                 e.preventDefault();
             }
 
+            if (pendingSquareSelection && !isTypingTarget) {
+                if (e.key === 'Escape') {
+                    pendingSquareSelection = null;
+                    clearRoleActionDisplay();
+                    showRoleActionInfoMessage('Shift+F8 후보 선택 취소');
+                    e.preventDefault();
+                    return;
+                }
+
+                if (e.key === 'Enter') {
+                    const selected = pendingSquareSelection.currentIndex ?? 0;
+                    if (commitPendingSquareSelection(selected)) {
+                        clearRoleActionDisplay();
+                        e.preventDefault();
+                        return;
+                    }
+                }
+
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    const nextIndex = ((pendingSquareSelection.currentIndex ?? 0) + 1) % pendingSquareSelection.candidates.length;
+                    pendingSquareSelection.currentIndex = nextIndex;
+                    const candidate = pendingSquareSelection.candidates[nextIndex];
+                    showPersistentRoleActionMessage(`Shift+F8 선택 중: ${nextIndex + 1}/${pendingSquareSelection.candidates.length} - (${candidate.y}, ${candidate.x}) ${candidate.size}x${candidate.size}`);
+                    scaleCanvas();
+                    e.preventDefault();
+                    return;
+                }
+
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    const nextIndex = (((pendingSquareSelection.currentIndex ?? 0) - 1) + pendingSquareSelection.candidates.length) % pendingSquareSelection.candidates.length;
+                    pendingSquareSelection.currentIndex = nextIndex;
+                    const candidate = pendingSquareSelection.candidates[nextIndex];
+                    showPersistentRoleActionMessage(`Shift+F8 선택 중: ${nextIndex + 1}/${pendingSquareSelection.candidates.length} - (${candidate.y}, ${candidate.x}) ${candidate.size}x${candidate.size}`);
+                    scaleCanvas();
+                    e.preventDefault();
+                    return;
+                }
+
+                if (/^[1-9]$/.test(e.key)) {
+                    const numericIndex = Number(e.key) - 1;
+                    if (numericIndex < pendingSquareSelection.candidates.length) {
+                        pendingSquareSelection.currentIndex = numericIndex;
+                        commitPendingSquareSelection(numericIndex);
+                        clearRoleActionDisplay();
+                        e.preventDefault();
+                        return;
+                    }
+                }
+            }
+
             if (e.key === 'F2') {
                 e.preventDefault();
                 scaleCanvas();
@@ -2807,26 +2954,31 @@ function countWhitePixels(ctx, x, y, size) {
                     if (!autoRect) {
                         showRoleActionErrorMessage('선택 지점에서 1x1 이상 연속 흰색 영역이 없습니다.');
                         console.log('❌ Shift+F8: 선택 지점에서 연속 흰색 영역이 없습니다.');
-                    } else {
+                    } else if (autoRect.candidateCount <= 1) {
                         autoCloseLatestPointAsEndBeforeStart();
                         const nextPolylineId = createPolylineId();
                         activePolylineId = nextPolylineId;
-                        addYellowRectWithAngleCheck(autoRect.x, autoRect.y, autoRect.size, {
+                        addYellowRectWithAngleCheck(autoRect.topCandidate.x, autoRect.topCandidate.y, autoRect.topCandidate.size, {
                             role: 'start',
                             polylineId: nextPolylineId
                         });
                         showMergeStateMessage('Shift+F8', yellowRects[yellowRects.length - 1]);
-                        if (autoRect.candidateCount > 1) {
-                            showRoleActionInfoMessage(`Shift+F8 자동 시작: ${autoRect.size}x${autoRect.size} 후보 ${autoRect.candidateCount}개, 랜덤 선택`);
-                        } else {
-                            showRoleActionInfoMessage(`Shift+F8 자동 시작 저장: ${autoRect.size}x${autoRect.size}`);
-                        }
+                        showRoleActionInfoMessage(`Shift+F8 자동 시작 저장: ${autoRect.size}x${autoRect.size}`);
 
                         if (showCorners && selectedPixel) {
                             updateCornerAndPathInfo();
                         }
 
                         scaleCanvas();
+                    } else {
+                        pendingSquareSelection = {
+                            candidates: autoRect.candidates,
+                            currentIndex: 0
+                        };
+                        const firstCandidate = autoRect.candidates[0];
+                        showPersistentRoleActionMessage(`Shift+F8 후보 ${autoRect.candidateCount}개 발견. 1-${Math.min(9, autoRect.candidateCount)} 선택: ${getSquareSelectionSummary(autoRect.candidates)}`);
+                        scaleCanvas();
+                        console.log(`📌 Shift+F8 후보 선택 준비: ${autoRect.candidateCount}개 | 첫 후보: (${firstCandidate.y}, ${firstCandidate.x}) ${firstCandidate.size}x${firstCandidate.size}`);
                     }
                 }
                 e.preventDefault();
@@ -5010,6 +5162,10 @@ function countWhitePixels(ctx, x, y, size) {
                     ctx2.fillRect(tempYellowRect.x * scale, tempYellowRect.y * scale, tempYellowRect.size * scale, tempYellowRect.size * scale);
                     ctx2.strokeRect(tempYellowRect.x * scale+0.5, tempYellowRect.y * scale+0.5, tempYellowRect.size * scale-1, tempYellowRect.size * scale-1);
                     ctx2.setLineDash([]); // 점선 해제
+                }
+
+                if (pendingSquareSelection) {
+                    drawPendingSquareSelectionOverlay(scale);
                 }
 
             ctx2.restore();
