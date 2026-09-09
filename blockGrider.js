@@ -2655,36 +2655,51 @@ function countWhitePixels(ctx, x, y, size) {
                 return null;
             }
 
-            const maxSize = Math.min(
-                currentCanvasWidth - selectedPixel.x,
-                currentCanvasHeight - selectedPixel.y,
-                Math.max(0, currentCanvasWidth),
-                Math.max(0, currentCanvasHeight)
-            );
+            const rr = selectedPixel.y;
+            const rc = selectedPixel.x;
+            const maxGridSize = Math.min(currentCanvasWidth, currentCanvasHeight);
+            let largestSize = 0;
+            let largestCandidates = [];
 
-            if (!Number.isFinite(maxSize) || maxSize <= 0) {
-                return null;
-            }
+            for (let size = 2; size <= maxGridSize; size += 1) {
+                const r0Min = Math.max(0, rr - size + 1);
+                const r0Max = Math.min(currentCanvasHeight - size, rr);
+                const c0Min = Math.max(0, rc - size + 1);
+                const c0Max = Math.min(currentCanvasWidth - size, rc);
 
-            let bestSize = 0;
-            for (let size = 1; size <= maxSize; size += 1) {
-                const whiteCount = countWhitePixels(ctx1, selectedPixel.x, selectedPixel.y, size);
-                const maxPixels = size * size;
-                if (whiteCount === maxPixels) {
-                    bestSize = size;
-                } else {
+                if (r0Min > r0Max || c0Min > c0Max) {
                     break;
                 }
+
+                const validCandidates = [];
+                for (let r0 = r0Min; r0 <= r0Max; r0 += 1) {
+                    for (let c0 = c0Min; c0 <= c0Max; c0 += 1) {
+                        const whiteCount = countWhitePixels(ctx1, c0, r0, size);
+                        if (whiteCount === size * size) {
+                            validCandidates.push({ x: c0, y: r0, size });
+                        }
+                    }
+                }
+
+                if (validCandidates.length === 0) {
+                    break;
+                }
+
+                largestSize = size;
+                largestCandidates = validCandidates;
             }
 
-            if (bestSize <= 0) {
+            if (largestSize <= 0 || largestCandidates.length === 0) {
                 return null;
             }
 
+            const chosen = largestCandidates[Math.floor(Math.random() * largestCandidates.length)];
             return {
-                x: selectedPixel.x,
-                y: selectedPixel.y,
-                size: bestSize
+                x: chosen.x,
+                y: chosen.y,
+                size: largestSize,
+                candidateCount: largestCandidates.length,
+                candidates: largestCandidates
             };
         }
 
@@ -2801,7 +2816,11 @@ function countWhitePixels(ctx, x, y, size) {
                             polylineId: nextPolylineId
                         });
                         showMergeStateMessage('Shift+F8', yellowRects[yellowRects.length - 1]);
-                        showRoleActionInfoMessage(`Shift+F8 자동 시작 저장: ${autoRect.size}x${autoRect.size}`);
+                        if (autoRect.candidateCount > 1) {
+                            showRoleActionInfoMessage(`Shift+F8 자동 시작: ${autoRect.size}x${autoRect.size} 후보 ${autoRect.candidateCount}개, 랜덤 선택`);
+                        } else {
+                            showRoleActionInfoMessage(`Shift+F8 자동 시작 저장: ${autoRect.size}x${autoRect.size}`);
+                        }
 
                         if (showCorners && selectedPixel) {
                             updateCornerAndPathInfo();
