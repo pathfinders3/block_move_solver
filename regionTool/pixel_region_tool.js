@@ -1188,15 +1188,24 @@
       const xMax =
         Math.min(bx, w - size);
 
-      if(xMin > xMax) continue;
-
       const yMin =
         Math.max(0, by + bs - size);
 
       const yMax =
         Math.min(by, h - size);
 
-      if(yMin > yMax) continue;
+      if(xMin > xMax || yMin > yMax){
+        console.log('[findMaxExpansionCandidates] skip size', {
+          size,
+          baseRegion,
+          xMin,
+          xMax,
+          yMin,
+          yMax,
+          reason: 'range invalid'
+        });
+        continue;
+      }
 
       const candidates = [];
 
@@ -1217,10 +1226,27 @@
         }
       }
 
+      console.log('[findMaxExpansionCandidates] size', {
+        size,
+        xMin,
+        xMax,
+        yMin,
+        yMax,
+        candidateCount: candidates.length,
+        firstCandidate: candidates[0] || null
+      });
+
       if(candidates.length > 0){
         return candidates;
       }
     }
+
+    console.log('[findMaxExpansionCandidates] no candidate found', {
+      baseRegion,
+      width: w,
+      height: h,
+      tolerance: state.tolerance
+    });
 
     return [];
   }
@@ -1240,28 +1266,57 @@
       let bestScore = -Infinity;
       bestCandidates.length = 0;
 
-      for(let y = 0; y <= h - size; y++){
-        for(let x = 0; x <= w - size; x++){
+      const xMin = Math.max(0, baseRegion.x - size);
+      const xMax = Math.min(w - size, baseRegion.x + baseRegion.size + size);
+      const yMin = Math.max(0, baseRegion.y - size);
+      const yMax = Math.min(h - size, baseRegion.y + baseRegion.size + size);
 
-          if(
+      if(xMin > xMax || yMin > yMax){
+        continue;
+      }
+
+      for(let y = yMin; y <= yMax; y++){
+        for(let x = xMin; x <= xMax; x++){
+
+          const candidate = { x, y, size };
+          const whiteCount =
             nonWhiteCount(
               prefix,
               stride,
               x,
               y,
               size
-            ) !== 0
-          ){
-            continue;
-          }
+            );
 
-          const candidate = { x, y, size };
+          const touch =
+            squaresTouchOrCorner(baseRegion, candidate);
 
-          if(!squaresTouchOrCorner(baseRegion, candidate)) continue;
-          if(!directionMatchesCandidate(baseRegion, candidate, directionKey)) continue;
+          const dirMatch =
+            directionMatchesCandidate(baseRegion, candidate, directionKey);
 
           const score =
             directionAlignmentScore(baseRegion, candidate, directionKey);
+
+          if(size === 7 && whiteCount === 49){
+            console.log('[debug size7 candidate]', {
+              directionKey,
+              x,
+              y,
+              size,
+              whiteCount,
+              touch,
+              dirMatch,
+              score,
+              xMin,
+              xMax,
+              yMin,
+              yMax
+            });
+          }
+
+          if(whiteCount !== 0) continue;
+          if(!touch) continue;
+          if(!dirMatch) continue;
 
           if(score > bestScore + 1e-12){
             bestScore = score;
@@ -1273,10 +1328,32 @@
         }
       }
 
+      console.log('[findDirectionalCandidates] size', {
+        directionKey,
+        size,
+        candidateCount: bestCandidates.length,
+        bestScore,
+        firstCandidate: bestCandidates[0] || null
+      });
+
       if(bestCandidates.length > 0){
+        console.log('[findDirectionalCandidates] matched size', {
+          directionKey,
+          size,
+          count: bestCandidates.length,
+          candidates: bestCandidates.slice(0, 5)
+        });
         return bestCandidates;
       }
     }
+
+    console.log('[findDirectionalCandidates] no candidate found', {
+      directionKey,
+      baseRegion,
+      width: w,
+      height: h,
+      tolerance: state.tolerance
+    });
 
     return [];
   }
