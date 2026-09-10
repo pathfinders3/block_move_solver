@@ -55,7 +55,9 @@
     tolerance: parseInt(toleranceInput.value, 10),
     selection: null,          // {x,y,size}
     yellowRegions: [],        // [{x,y,size}]
-    selectedRegionIndex: null
+    selectedRegionIndex: null,
+    candidateSquares: [],     // Shift+F8 후보 목록 [{x,y,size}]
+    selectedCandidateIndex: 0
   };
 
 
@@ -390,6 +392,68 @@
   }
 
 
+  function drawCandidateSquaresOn(ctx, scale){
+
+    if(state.candidateSquares.length === 0) return;
+
+    state.candidateSquares.forEach((c, idx)=>{
+
+      const isSelected =
+        idx === state.selectedCandidateIndex;
+
+      const displayX = c.x * scale;
+      const displayY = c.y * scale;
+      const displaySize = c.size * scale;
+
+      ctx.fillStyle =
+        isSelected
+          ? 'rgba(255, 107, 107, 0.12)'
+          : 'rgba(138, 180, 255, 0.06)';
+
+      ctx.fillRect(
+        displayX,
+        displayY,
+        displaySize,
+        displaySize
+      );
+
+      // 후보 테두리도 영역 바깥쪽에 그려 내부 픽셀을 가리지 않는다.
+      ctx.fillStyle =
+        isSelected
+          ? '#ff6b6b'
+          : '#8ab4ff';
+
+      ctx.fillRect(
+        displayX - 1,
+        displayY - 1,
+        displaySize + 2,
+        1
+      );
+
+      ctx.fillRect(
+        displayX - 1,
+        displayY + displaySize,
+        displaySize + 2,
+        1
+      );
+
+      ctx.fillRect(
+        displayX - 1,
+        displayY - 1,
+        1,
+        displaySize + 2
+      );
+
+      ctx.fillRect(
+        displayX + displaySize,
+        displayY - 1,
+        1,
+        displaySize + 2
+      );
+    });
+  }
+
+
   function render(){
 
     if(!state.img) return;
@@ -426,6 +490,7 @@
 
     drawRegionsOn(sctx, 1);
     drawSelectionOn(sctx, 1);
+    drawCandidateSquaresOn(sctx, 1);
 
 
     // =====================================================
@@ -488,6 +553,7 @@
 
     // 선택 영역 역시 zoom 배율로 표시
     drawSelectionOn(tctx, z);
+    drawCandidateSquaresOn(tctx, z);
 
 
     updateInfo();
@@ -530,6 +596,12 @@
   }
 
 
+  function clearCandidateSquares(){
+    state.candidateSquares = [];
+    state.selectedCandidateIndex = 0;
+  }
+
+
   // ---------- paste handling ----------
 
   window.addEventListener('paste', async (e)=>{
@@ -556,6 +628,8 @@
         try{
 
           await loadImageBlob(blob, true);
+
+          clearCandidateSquares();
 
           render();
 
@@ -664,6 +738,8 @@
         );
     }
 
+      clearCandidateSquares();
+
     render();
 
     saveMeta();
@@ -690,6 +766,10 @@
 
     state.tolerance = v;
 
+    clearCandidateSquares();
+
+    render();
+
     saveMeta();
   });
 
@@ -698,6 +778,7 @@
 
     state.yellowRegions = [];
     state.selectedRegionIndex = null;
+    clearCandidateSquares();
 
     render();
 
@@ -724,6 +805,7 @@
     state.yellowRegions = [];
     state.selection = null;
     state.selectedRegionIndex = null;
+    clearCandidateSquares();
 
     srcCanvas.width = 1;
     srcCanvas.height = 1;
@@ -805,6 +887,7 @@
     if(idx >= 0){
 
       state.selectedRegionIndex = idx;
+      clearCandidateSquares();
 
       setStatus(
         '노란 영역을 선택했습니다. ' +
@@ -842,6 +925,8 @@
         y,
         size
       };
+
+      clearCandidateSquares();
 
       setStatus(
         '선택 영역을 이동했습니다.',
@@ -900,6 +985,267 @@
         )
       );
 
+    clearCandidateSquares();
+
+    render();
+  }
+
+
+  function getExpansionBaseRegion(){
+
+    if(
+      state.selectedRegionIndex !== null &&
+      state.yellowRegions[state.selectedRegionIndex]
+    ){
+      return state.yellowRegions[state.selectedRegionIndex];
+    }
+
+    if(!state.selection) return null;
+
+    const sx = state.selection.x;
+    const sy = state.selection.y;
+
+    return (
+      state.yellowRegions.find((r)=>
+        sx >= r.x &&
+        sx < r.x + r.size &&
+        sy >= r.y &&
+        sy < r.y + r.size
+      ) || null
+    );
+  }
+
+
+  function buildNonWhitePrefix(tolerance){
+
+    const w = state.width;
+    const h = state.height;
+
+    const pixels =
+      baseCtx.getImageData(0, 0, w, h).data;
+
+    const stride = w + 1;
+    const prefix =
+      new Uint32Array((w + 1) * (h + 1));
+
+    for(let y = 1; y <= h; y++){
+
+      let rowAcc = 0;
+
+      for(let x = 1; x <= w; x++){
+
+        const p = ((y - 1) * w + (x - 1)) * 4;
+
+        const r = pixels[p];
+        const g = pixels[p + 1];
+        const b = pixels[p + 2];
+
+        const isNonWhite =
+          (r < tolerance ||
+           g < tolerance ||
+           b < tolerance)
+            ? 1
+            : 0;
+
+        rowAcc += isNonWhite;
+
+        prefix[y * stride + x] =
+          prefix[(y - 1) * stride + x] + rowAcc;
+      }
+    }
+
+    return { prefix, stride };
+  }
+
+
+  function nonWhiteCount(prefix, stride, x, y, size){
+
+    const x2 = x + size;
+    const y2 = y + size;
+
+    return (
+      prefix[y2 * stride + x2] -
+      prefix[y * stride + x2] -
+      prefix[y2 * stride + x] +
+      prefix[y * stride + x]
+    );
+  }
+
+
+  function findMaxExpansionCandidates(baseRegion){
+
+    const w = state.width;
+    const h = state.height;
+
+    const bx = baseRegion.x;
+    const by = baseRegion.y;
+    const bs = baseRegion.size;
+
+    const { prefix, stride } =
+      buildNonWhitePrefix(state.tolerance);
+
+    for(let size = Math.min(w, h); size >= bs; size--){
+
+      const xMin =
+        Math.max(0, bx + bs - size);
+
+      const xMax =
+        Math.min(bx, w - size);
+
+      if(xMin > xMax) continue;
+
+      const yMin =
+        Math.max(0, by + bs - size);
+
+      const yMax =
+        Math.min(by, h - size);
+
+      if(yMin > yMax) continue;
+
+      const candidates = [];
+
+      for(let y = yMin; y <= yMax; y++){
+        for(let x = xMin; x <= xMax; x++){
+
+          if(
+            nonWhiteCount(
+              prefix,
+              stride,
+              x,
+              y,
+              size
+            ) === 0
+          ){
+            candidates.push({ x, y, size });
+          }
+        }
+      }
+
+      if(candidates.length > 0){
+        return candidates;
+      }
+    }
+
+    return [];
+  }
+
+
+  function startExpansionCandidates(){
+
+    const baseRegion =
+      getExpansionBaseRegion();
+
+    if(!baseRegion){
+
+      clearCandidateSquares();
+
+      setStatus(
+        'Shift+F8은 노란 기준 사각형 위에서 실행하세요.',
+        true
+      );
+
+      render();
+      return;
+    }
+
+    const candidates =
+      findMaxExpansionCandidates(baseRegion);
+
+    if(candidates.length === 0){
+
+      clearCandidateSquares();
+
+      setStatus(
+        '기준 사각형을 포함하는 유효한 확장 후보를 찾지 못했습니다.',
+        true
+      );
+
+      render();
+      return;
+    }
+
+    state.candidateSquares = candidates;
+    state.selectedCandidateIndex = 0;
+
+    const c = candidates[0];
+
+    setStatus(
+      '후보 ' +
+      1 +
+      '/' +
+      candidates.length +
+      ' | 크기 ' +
+      c.size +
+      'x' +
+      c.size +
+      ' | PgUp/PgDn으로 순환, Enter로 확정',
+      false
+    );
+
+    render();
+  }
+
+
+  function cycleCandidate(step){
+
+    const total =
+      state.candidateSquares.length;
+
+    if(total === 0){
+      setStatus(
+        '순환할 후보가 없습니다. Shift+F8로 먼저 후보를 찾으세요.',
+        true
+      );
+      return;
+    }
+
+    state.selectedCandidateIndex =
+      (state.selectedCandidateIndex + step + total) % total;
+
+    const idx = state.selectedCandidateIndex;
+    const c = state.candidateSquares[idx];
+
+    setStatus(
+      '후보 ' +
+      (idx + 1) +
+      '/' +
+      total +
+      ' | 크기 ' +
+      c.size +
+      'x' +
+      c.size +
+      ' | PgUp/PgDn으로 순환, Enter로 확정',
+      false
+    );
+
+    render();
+  }
+
+
+  function acceptSelectedCandidate(){
+
+    if(state.candidateSquares.length === 0){
+      return;
+    }
+
+    const c =
+      state.candidateSquares[
+        state.selectedCandidateIndex
+      ];
+
+    state.selection = {
+      x: c.x,
+      y: c.y,
+      size: c.size
+    };
+
+    clearCandidateSquares();
+
+    setStatus(
+      '후보 사각형을 선택 영역으로 확정했습니다.',
+      false
+    );
+
     render();
   }
 
@@ -956,6 +1302,8 @@
         size: s.size
       });
 
+      clearCandidateSquares();
+
       setStatus(
         '흰색 영역을 확인하여 노란색으로 칠했습니다. ' +
         '(톨러런스 ' + T + ')',
@@ -989,6 +1337,7 @@
     );
 
     state.selectedRegionIndex = null;
+    clearCandidateSquares();
 
     render();
 
@@ -1039,7 +1388,26 @@
         break;
 
       case 'F8':
-        checkAndPaint();
+        if(e.shiftKey){
+          startExpansionCandidates();
+        }else{
+          checkAndPaint();
+        }
+        e.preventDefault();
+        break;
+
+      case 'PageDown':
+        cycleCandidate(1);
+        e.preventDefault();
+        break;
+
+      case 'PageUp':
+        cycleCandidate(-1);
+        e.preventDefault();
+        break;
+
+      case 'Enter':
+        acceptSelectedCandidate();
         e.preventDefault();
         break;
 
