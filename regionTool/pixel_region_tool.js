@@ -58,6 +58,8 @@
     selectedRegionIndex: null,
     candidateSquares: [],     // Shift+F8 후보 목록 [{x,y,size}]
     selectedCandidateIndex: 0,
+    candidateMode: null,      // 'expansion' | 'directional'
+    candidateDirectionKey: null,
     expansionBaseRegionIndex: null
   };
 
@@ -600,7 +602,90 @@
   function clearCandidateSquares(){
     state.candidateSquares = [];
     state.selectedCandidateIndex = 0;
+    state.candidateMode = null;
+    state.candidateDirectionKey = null;
     state.expansionBaseRegionIndex = null;
+  }
+
+
+  function getRegionCenter(region){
+    return {
+      x: region.x + region.size / 2,
+      y: region.y + region.size / 2
+    };
+  }
+
+
+  function getDirectionVector(directionKey){
+    switch(directionKey){
+      case 'Q': return { x: -1, y: -1, label: '위왼쪽' };
+      case 'W': return { x: 0, y: -1, label: '위' };
+      case 'E': return { x: 1, y: -1, label: '위오른쪽' };
+      case 'A': return { x: -1, y: 0, label: '왼쪽' };
+      case 'D': return { x: 1, y: 0, label: '오른쪽' };
+      case 'Z': return { x: -1, y: 1, label: '아래왼쪽' };
+      case 'X': return { x: 0, y: 1, label: '아래' };
+      case 'C': return { x: 1, y: 1, label: '아래오른쪽' };
+      default: return null;
+    }
+  }
+
+
+  function squaresTouchOrCorner(base, candidate){
+    const baseX2 = base.x + base.size;
+    const baseY2 = base.y + base.size;
+    const candidateX2 = candidate.x + candidate.size;
+    const candidateY2 = candidate.y + candidate.size;
+
+    const touchX = candidate.x <= baseX2 && candidateX2 >= base.x;
+    const touchY = candidate.y <= baseY2 && candidateY2 >= base.y;
+
+    const overlapX = candidate.x < baseX2 && candidateX2 > base.x;
+    const overlapY = candidate.y < baseY2 && candidateY2 > base.y;
+
+    return touchX && touchY && !(overlapX && overlapY);
+  }
+
+
+  function directionMatchesCandidate(base, candidate, directionKey){
+    const baseCenter = getRegionCenter(base);
+    const candidateCenter = getRegionCenter(candidate);
+    const dx = candidateCenter.x - baseCenter.x;
+    const dy = candidateCenter.y - baseCenter.y;
+
+    switch(directionKey){
+      case 'Q': return dx < 0 && dy < 0;
+      case 'W': return dy < 0;
+      case 'E': return dx > 0 && dy < 0;
+      case 'A': return dx < 0;
+      case 'D': return dx > 0;
+      case 'Z': return dx < 0 && dy > 0;
+      case 'X': return dy > 0;
+      case 'C': return dx > 0 && dy > 0;
+      default: return false;
+    }
+  }
+
+
+  function directionAlignmentScore(base, candidate, directionKey){
+    const dir = getDirectionVector(directionKey);
+
+    if(!dir) return -Infinity;
+
+    const baseCenter = getRegionCenter(base);
+    const candidateCenter = getRegionCenter(candidate);
+    const vx = candidateCenter.x - baseCenter.x;
+    const vy = candidateCenter.y - baseCenter.y;
+    const magnitude = Math.hypot(vx, vy);
+
+    if(magnitude === 0) return 1;
+
+    const dirMagnitude = Math.hypot(dir.x, dir.y);
+
+    return (
+      (vx * dir.x + vy * dir.y) /
+      (magnitude * dirMagnitude)
+    );
   }
 
 
@@ -1141,6 +1226,78 @@
   }
 
 
+  function findDirectionalCandidates(baseRegion, directionKey){
+
+    const w = state.width;
+    const h = state.height;
+    const bestCandidates = [];
+
+    const { prefix, stride } =
+      buildNonWhitePrefix(state.tolerance);
+
+    for(let size = Math.min(w, h); size >= 1; size--){
+
+      let bestScore = -Infinity;
+      bestCandidates.length = 0;
+
+      for(let y = 0; y <= h - size; y++){
+        for(let x = 0; x <= w - size; x++){
+
+          if(
+            nonWhiteCount(
+              prefix,
+              stride,
+              x,
+              y,
+              size
+            ) !== 0
+          ){
+            continue;
+          }
+
+          const candidate = { x, y, size };
+
+          if(!squaresTouchOrCorner(baseRegion, candidate)) continue;
+          if(!directionMatchesCandidate(baseRegion, candidate, directionKey)) continue;
+
+          const score =
+            directionAlignmentScore(baseRegion, candidate, directionKey);
+
+          if(score > bestScore + 1e-12){
+            bestScore = score;
+            bestCandidates.length = 0;
+            bestCandidates.push(candidate);
+          }else if(Math.abs(score - bestScore) <= 1e-12){
+            bestCandidates.push(candidate);
+          }
+        }
+      }
+
+      if(bestCandidates.length > 0){
+        return bestCandidates;
+      }
+    }
+
+    return [];
+  }
+
+
+  function formatCandidateStatus(prefixText, index, total, size){
+    return (
+      prefixText +
+      ' 후보 ' +
+      (index + 1) +
+      '/' +
+      total +
+      ' | 크기 ' +
+      size +
+      'x' +
+      size +
+      ' | PgUp/PgDn으로 순환, Enter로 확정'
+    );
+  }
+
+
   function startExpansionCandidates(){
 
     const baseInfo =
@@ -1177,20 +1334,66 @@
 
     state.candidateSquares = candidates;
     state.selectedCandidateIndex = 0;
-  state.expansionBaseRegionIndex = baseInfo.index;
+    state.candidateMode = 'expansion';
+    state.candidateDirectionKey = null;
+    state.expansionBaseRegionIndex = baseInfo.index;
 
     const c = candidates[0];
 
     setStatus(
-      '후보 ' +
-      1 +
-      '/' +
-      candidates.length +
-      ' | 크기 ' +
-      c.size +
-      'x' +
-      c.size +
-      ' | PgUp/PgDn으로 순환, Enter로 확정',
+      formatCandidateStatus('확장', 0, candidates.length, c.size),
+      false
+    );
+
+    render();
+  }
+
+
+  function startDirectionalCandidates(directionKey){
+
+    const dir = getDirectionVector(directionKey);
+
+    if(!dir) return;
+
+    const baseInfo = getExpansionBaseRegion();
+
+    if(!baseInfo){
+      clearCandidateSquares();
+
+      setStatus(
+        '방향 후보는 노란 기준 사각형 위에서 실행하세요.',
+        true
+      );
+
+      render();
+      return;
+    }
+
+    const candidates =
+      findDirectionalCandidates(baseInfo.region, directionKey);
+
+    if(candidates.length === 0){
+      clearCandidateSquares();
+
+      setStatus(
+        dir.label + ' 방향에 맞는 붙은 후보를 찾지 못했습니다.',
+        true
+      );
+
+      render();
+      return;
+    }
+
+    state.candidateSquares = candidates;
+    state.selectedCandidateIndex = 0;
+    state.candidateMode = 'directional';
+    state.candidateDirectionKey = directionKey;
+    state.expansionBaseRegionIndex = baseInfo.index;
+
+    const c = candidates[0];
+
+    setStatus(
+      formatCandidateStatus(dir.label, 0, candidates.length, c.size),
       false
     );
 
@@ -1216,17 +1419,13 @@
 
     const idx = state.selectedCandidateIndex;
     const c = state.candidateSquares[idx];
+    const prefixText =
+      state.candidateMode === 'directional' && state.candidateDirectionKey
+        ? (getDirectionVector(state.candidateDirectionKey)?.label || '방향')
+        : '확장';
 
     setStatus(
-      '후보 ' +
-      (idx + 1) +
-      '/' +
-      total +
-      ' | 크기 ' +
-      c.size +
-      'x' +
-      c.size +
-      ' | PgUp/PgDn으로 순환, Enter로 확정',
+      formatCandidateStatus(prefixText, idx, total, c.size),
       false
     );
 
@@ -1245,31 +1444,59 @@
         state.selectedCandidateIndex
       ];
 
-    const baseIdx =
-      state.expansionBaseRegionIndex;
+    const baseIdx = state.expansionBaseRegionIndex;
 
-    if(
-      baseIdx === null ||
-      !state.yellowRegions[baseIdx]
-    ){
+    if(state.candidateMode === 'expansion'){
+
+      if(
+        baseIdx === null ||
+        !state.yellowRegions[baseIdx]
+      ){
+        clearCandidateSquares();
+
+        setStatus(
+          '기준 사각형 정보가 사라져 확정할 수 없습니다. Shift+F8을 다시 실행하세요.',
+          true
+        );
+
+        render();
+        return;
+      }
+
+      state.yellowRegions[baseIdx] = {
+        x: c.x,
+        y: c.y,
+        size: c.size
+      };
+
+      state.selectedRegionIndex = baseIdx;
+
+      state.selection = {
+        x: c.x,
+        y: c.y,
+        size: c.size
+      };
+
       clearCandidateSquares();
 
+      saveMeta();
+
       setStatus(
-        '기준 사각형 정보가 사라져 확정할 수 없습니다. Shift+F8을 다시 실행하세요.',
-        true
+        '후보 사각형으로 기준 노란 영역을 확장 대체했습니다.',
+        false
       );
 
       render();
       return;
     }
 
-    state.yellowRegions[baseIdx] = {
+    state.yellowRegions.push({
       x: c.x,
       y: c.y,
       size: c.size
-    };
+    });
 
-    state.selectedRegionIndex = baseIdx;
+    state.selectedRegionIndex = state.yellowRegions.length - 1;
 
     state.selection = {
       x: c.x,
@@ -1282,7 +1509,7 @@
     saveMeta();
 
     setStatus(
-      '후보 사각형으로 기준 노란 영역을 확장 대체했습니다.',
+      '후보 사각형을 노란 사각형 배열에 추가했습니다.',
       false
     );
 
@@ -1433,6 +1660,54 @@
         }else{
           checkAndPaint();
         }
+        e.preventDefault();
+        break;
+
+      case 'q':
+      case 'Q':
+        startDirectionalCandidates('Q');
+        e.preventDefault();
+        break;
+
+      case 'w':
+      case 'W':
+        startDirectionalCandidates('W');
+        e.preventDefault();
+        break;
+
+      case 'e':
+      case 'E':
+        startDirectionalCandidates('E');
+        e.preventDefault();
+        break;
+
+      case 'a':
+      case 'A':
+        startDirectionalCandidates('A');
+        e.preventDefault();
+        break;
+
+      case 'd':
+      case 'D':
+        startDirectionalCandidates('D');
+        e.preventDefault();
+        break;
+
+      case 'z':
+      case 'Z':
+        startDirectionalCandidates('Z');
+        e.preventDefault();
+        break;
+
+      case 'x':
+      case 'X':
+        startDirectionalCandidates('X');
+        e.preventDefault();
+        break;
+
+      case 'c':
+      case 'C':
+        startDirectionalCandidates('C');
         e.preventDefault();
         break;
 
