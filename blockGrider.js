@@ -2576,6 +2576,30 @@ function countWhitePixels(ctx, x, y, size) {
             return 'downRight';
         }
 
+        function isAngleWithinRequestedDirection(angle, requestedDirection, toleranceDeg = 10) {
+            if (!Number.isFinite(angle) || !requestedDirection) {
+                return false;
+            }
+
+            const targetAngles = {
+                right: 0,
+                upRight: 45,
+                up: 90,
+                upLeft: 135,
+                left: 180,
+                downLeft: 225,
+                down: 270,
+                downRight: 315
+            };
+
+            const target = targetAngles[requestedDirection];
+            if (target === undefined) {
+                return classifyDirectionFromAngle(angle) === requestedDirection;
+            }
+
+            return Math.abs(getCircularAngleDiff(angle, target, false)) <= toleranceDeg;
+        }
+
         function getDirectionArrowLabel(direction) {
             const map = {
                 right: '→ 우',
@@ -2764,6 +2788,7 @@ function countWhitePixels(ctx, x, y, size) {
                         isOrange,
                         isThird,
                         isBlue,
+                        angle,
                         direction: classifyDirectionFromAngle(angle)
                     };
                 })
@@ -2771,7 +2796,10 @@ function countWhitePixels(ctx, x, y, size) {
 
             const filteredByDirection = requestedDirection === 'center'
                 ? withPriority
-                : withPriority.filter(item => item.direction === requestedDirection);
+                : withPriority.filter(item => {
+                    if (item.direction === requestedDirection) return true;
+                    return isAngleWithinRequestedDirection(item.angle, requestedDirection, 10);
+                });
 
             const uniqueByRect = (items) => {
                 const unique = new Map();
@@ -2790,18 +2818,58 @@ function countWhitePixels(ctx, x, y, size) {
                 return 0;
             });
 
-            const redCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection.filter(item => item.isRed)));
-            const orangeCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection.filter(item => !item.isRed && item.isOrange)));
-            const thirdCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && item.isThird)));
-            const blueCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && !item.isThird && item.isBlue)));
-            const fallbackCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection.filter(item => !item.isRed && !item.isOrange && !item.isThird && !item.isBlue)));
+            const directionTargetAngle = {
+                right: 0,
+                upRight: 45,
+                up: 90,
+                upLeft: 135,
+                left: 180,
+                downLeft: 225,
+                down: 270,
+                downRight: 315
+            }[requestedDirection];
 
-            const target =
-                redCandidates[0] ||
-                orangeCandidates[0] ||
-                thirdCandidates[0] ||
-                blueCandidates[0] ||
-                fallbackCandidates[0];
+            const priorityWeight = item => {
+                if (item.isRed) return 0;
+                if (item.isOrange) return 1;
+                if (item.isThird) return 2;
+                if (item.isBlue) return 3;
+                return 4;
+            };
+
+            const combinedCandidates = sortBySizeDesc(uniqueByRect(filteredByDirection))
+                .map(item => ({
+                    ...item,
+                    angleDiff: Number.isFinite(item.angle) && Number.isFinite(directionTargetAngle)
+                        ? Math.abs(getCircularAngleDiff(item.angle, directionTargetAngle, false))
+                        : Infinity,
+                    priority: priorityWeight(item)
+                }))
+                .sort((a, b) => {
+                    if (b.size !== a.size) return b.size - a.size;
+                    if (a.angleDiff !== b.angleDiff) return a.angleDiff - b.angleDiff;
+                    if (a.priority !== b.priority) return a.priority - b.priority;
+                    if (a.y !== b.y) return a.y - b.y;
+                    if (a.x !== b.x) return a.x - b.x;
+                    return 0;
+                });
+
+            const candidateStats = {
+                total: combinedCandidates.length,
+                red: combinedCandidates.filter(item => item.isRed).length,
+                orange: combinedCandidates.filter(item => !item.isRed && item.isOrange).length,
+                third: combinedCandidates.filter(item => !item.isRed && !item.isOrange && item.isThird).length,
+                blue: combinedCandidates.filter(item => !item.isRed && !item.isOrange && !item.isThird && item.isBlue).length,
+                maxSize: combinedCandidates.length > 0 ? Math.max(...combinedCandidates.map(item => item.size)) : 0,
+                minAngleDiff: combinedCandidates.length > 0 ? Math.min(...combinedCandidates.map(item => item.angleDiff)) : null
+            };
+
+            if (candidateStats.total > 0) {
+                const summary = `X ${requestedDirection} 후보: 총 ${candidateStats.total} / red ${candidateStats.red} / orange ${candidateStats.orange} / third ${candidateStats.third} / blue ${candidateStats.blue} | max ${candidateStats.maxSize}x${candidateStats.maxSize} | minΔ ${candidateStats.minAngleDiff === null ? '-' : `${candidateStats.minAngleDiff.toFixed(1)}°`}`;
+                showCanvas1AutoF9InfoMessage(summary);
+            }
+
+            const target = combinedCandidates[0];
             if (!target) return false;
 
             target.btn.setAttribute('data-direction-key', requestedDirection);
@@ -3921,7 +3989,6 @@ function countWhitePixels(ctx, x, y, size) {
                         
                         updateTempYellowAngle();
                         
-                        console.log(`   임시 노란색 사각형 설정됨. F9 키를 눌러 확정하세요.`);
                         scaleCanvas();
                     };
                 }
