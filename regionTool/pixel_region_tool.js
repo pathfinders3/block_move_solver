@@ -57,7 +57,8 @@
     yellowRegions: [],        // [{x,y,size}]
     selectedRegionIndex: null,
     candidateSquares: [],     // Shift+F8 후보 목록 [{x,y,size}]
-    selectedCandidateIndex: 0
+    selectedCandidateIndex: 0,
+    expansionBaseRegionIndex: null
   };
 
 
@@ -599,6 +600,7 @@
   function clearCandidateSquares(){
     state.candidateSquares = [];
     state.selectedCandidateIndex = 0;
+    state.expansionBaseRegionIndex = null;
   }
 
 
@@ -997,7 +999,10 @@
       state.selectedRegionIndex !== null &&
       state.yellowRegions[state.selectedRegionIndex]
     ){
-      return state.yellowRegions[state.selectedRegionIndex];
+      return {
+        region: state.yellowRegions[state.selectedRegionIndex],
+        index: state.selectedRegionIndex
+      };
     }
 
     if(!state.selection) return null;
@@ -1005,14 +1010,20 @@
     const sx = state.selection.x;
     const sy = state.selection.y;
 
-    return (
-      state.yellowRegions.find((r)=>
+    const idx =
+      state.yellowRegions.findIndex((r)=>
         sx >= r.x &&
         sx < r.x + r.size &&
         sy >= r.y &&
         sy < r.y + r.size
-      ) || null
-    );
+      );
+
+    if(idx < 0) return null;
+
+    return {
+      region: state.yellowRegions[idx],
+      index: idx
+    };
   }
 
 
@@ -1132,10 +1143,10 @@
 
   function startExpansionCandidates(){
 
-    const baseRegion =
+    const baseInfo =
       getExpansionBaseRegion();
 
-    if(!baseRegion){
+    if(!baseInfo){
 
       clearCandidateSquares();
 
@@ -1149,7 +1160,7 @@
     }
 
     const candidates =
-      findMaxExpansionCandidates(baseRegion);
+      findMaxExpansionCandidates(baseInfo.region);
 
     if(candidates.length === 0){
 
@@ -1166,6 +1177,7 @@
 
     state.candidateSquares = candidates;
     state.selectedCandidateIndex = 0;
+  state.expansionBaseRegionIndex = baseInfo.index;
 
     const c = candidates[0];
 
@@ -1233,6 +1245,32 @@
         state.selectedCandidateIndex
       ];
 
+    const baseIdx =
+      state.expansionBaseRegionIndex;
+
+    if(
+      baseIdx === null ||
+      !state.yellowRegions[baseIdx]
+    ){
+      clearCandidateSquares();
+
+      setStatus(
+        '기준 사각형 정보가 사라져 확정할 수 없습니다. Shift+F8을 다시 실행하세요.',
+        true
+      );
+
+      render();
+      return;
+    }
+
+    state.yellowRegions[baseIdx] = {
+      x: c.x,
+      y: c.y,
+      size: c.size
+    };
+
+    state.selectedRegionIndex = baseIdx;
+
     state.selection = {
       x: c.x,
       y: c.y,
@@ -1241,8 +1279,10 @@
 
     clearCandidateSquares();
 
+    saveMeta();
+
     setStatus(
-      '후보 사각형을 선택 영역으로 확정했습니다.',
+      '후보 사각형으로 기준 노란 영역을 확장 대체했습니다.',
       false
     );
 
