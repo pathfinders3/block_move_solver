@@ -357,35 +357,35 @@
     );
 
 
-    // 선택 영역의 테두리도 확대된 픽셀 영역의 외곽에 표시한다.
+    // 테두리를 영역 바깥쪽에 그려 내부 픽셀이 가려지지 않게 한다.
     ctx.fillStyle = '#5ee6c8';
 
     ctx.fillRect(
-      displayX,
-      displayY,
-      displaySize,
+      displayX - 1,
+      displayY - 1,
+      displaySize + 2,
       1
     );
 
     ctx.fillRect(
-      displayX,
-      displayY + displaySize - 1,
-      displaySize,
+      displayX - 1,
+      displayY + displaySize,
+      displaySize + 2,
       1
     );
 
     ctx.fillRect(
-      displayX,
-      displayY,
+      displayX - 1,
+      displayY - 1,
       1,
-      displaySize
+      displaySize + 2
     );
 
     ctx.fillRect(
-      displayX + displaySize - 1,
-      displayY,
+      displayX + displaySize,
+      displayY - 1,
       1,
-      displaySize
+      displaySize + 2
     );
   }
 
