@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>?쎌? ?곸뿭 寃???꾧뎄</title>
+<title>픽셀 영역 검사 도구</title>
 <style>
   :root{
     --bg: #14171c;
@@ -178,47 +178,47 @@
 <body>
 
 <header>
-  <h1>?쎌? ?곸뿭 寃???꾧뎄</h1>
-  <div class="subtitle">?대┰蹂대뱶 ?대?吏瑜?遺숈뿬?ｊ퀬(Ctrl+V), ?뺣? 罹붾쾭?ㅼ뿉???뺤궗媛??곸뿭??怨⑤씪 ?곗깋 ?щ?瑜?寃?ы빀?덈떎.</div>
+  <h1>픽셀 영역 검사 도구</h1>
+  <div class="subtitle">클립보드 이미지를 붙여넣고(Ctrl+V), 확대 캔버스에서 정사각 영역을 골라 흰색 여부를 검사합니다.</div>
 </header>
 
 <div class="layout">
 
   <div class="controls">
     <div class="field">
-      <label for="zoomSelect">?뺣? 諛곗쑉 (tarCanvas)</label>
+      <label for="zoomSelect">확대 배율 (tarCanvas)</label>
       <select id="zoomSelect"></select>
     </div>
 
     <div class="field">
-      <label for="sizeSelect">?좏깮 ?곸뿭 ??蹂 湲몄씠 (px)</label>
+      <label for="sizeSelect">선택 영역 한 변 길이 (px)</label>
       <select id="sizeSelect"></select>
     </div>
 
     <div class="field">
-      <label for="toleranceInput">?곗깋 ?먯젙 ?⑤윭?곗뒪 (0~255)</label>
+      <label for="toleranceInput">흰색 판정 톨러런스 (0~255)</label>
       <input type="number" id="toleranceInput" min="0" max="255" value="255">
     </div>
 
     <div class="divider"></div>
 
-    <div class="info-line"><span>?대?吏 ?ш린</span><span id="infoSize">-</span></div>
-    <div class="info-line"><span>?좏깮 ?꾩튂</span><span id="infoSel">-</span></div>
-    <div class="info-line"><span>?몃? ?곸뿭 媛쒖닔</span><span class="region-count" id="infoCount">0</span></div>
+    <div class="info-line"><span>이미지 크기</span><span id="infoSize">-</span></div>
+    <div class="info-line"><span>선택 위치</span><span id="infoSel">-</span></div>
+    <div class="info-line"><span>노란 영역 개수</span><span class="region-count" id="infoCount">0</span></div>
 
     <div class="divider"></div>
 
-    <button id="clearRegionsBtn">?몃? ?곸뿭 ?꾩껜 ?댁젣</button>
-    <button id="resetAllBtn">?대?吏 諛?????곗씠??珥덇린??/button>
+    <button id="clearRegionsBtn">노란 영역 전체 해제</button>
+    <button id="resetAllBtn">이미지 및 저장 데이터 초기화</button>
 
     <div class="divider"></div>
 
     <div class="keys">
-      <div><b>Ctrl+V</b> ?대?吏 遺숈뿬?ｊ린</div>
-      <div><b>?대┃</b> ?뺣? 罹붾쾭?ㅼ뿉???좏깮 ?곸뿭 ?대룞 / ?몃? ?곸뿭 ?좏깮</div>
-      <div><b>I J K L</b> ?좏깮 ?곸뿭 ??醫??????대룞</div>
-      <div><b>F8</b> ?곗깋 寃?????몃???移좏븯湲?/div>
-      <div><b>Delete</b> ?좏깮???몃? ?곸뿭 ?댁젣</div>
+      <div><b>Ctrl+V</b> 이미지 붙여넣기</div>
+      <div><b>클릭</b> 확대 캔버스에서 선택 영역 이동 / 노란 영역 선택</div>
+      <div><b>I J K L</b> 선택 영역 상 좌 하 우 이동</div>
+      <div><b>F8</b> 흰색 검사 후 노란색 칠하기</div>
+      <div><b>Delete</b> 선택된 노란 영역 해제</div>
     </div>
 
     <div class="status" id="statusLine"></div>
@@ -226,15 +226,15 @@
 
   <div class="canvases">
     <div class="canvas-block">
-      <h2>?먮낯 罹붾쾭??(srcCanvas)</h2>
+      <h2>원본 캔버스 (srcCanvas)</h2>
       <div class="canvas-scroll">
         <canvas id="srcCanvas" width="1" height="1"></canvas>
-        <div class="empty-hint" id="emptyHintSrc">?대?吏媛 ?놁뒿?덈떎. ?붾㈃???ъ빱?ㅻ? ???곹깭?먯꽌 Ctrl+V濡??대?吏瑜?遺숈뿬?ｌ쑝?몄슂.</div>
+        <div class="empty-hint" id="emptyHintSrc">이미지가 없습니다. 화면에 포커스를 둔 상태에서 Ctrl+V로 이미지를 붙여넣으세요.</div>
       </div>
     </div>
 
     <div class="canvas-block">
-      <h2>?뺣? 罹붾쾭??(tarCanvas) ???대┃?쇰줈 ?곸뿭 ?좏깮, IJKL濡??대룞, F8濡?寃??/h2>
+      <h2>확대 캔버스 (tarCanvas) — 클릭으로 영역 선택, IJKL로 이동, F8로 검사</h2>
       <div class="canvas-scroll">
         <canvas id="tarCanvas" width="1" height="1"></canvas>
       </div>
@@ -247,7 +247,7 @@
 (function(){
   "use strict";
 
-  const MAX_TAR_DIM = 8000; // ?덉쟾 ?곹븳: ?뺣? 罹붾쾭?ㅺ? ?덈Т 而ㅼ???寃껋쓣 諛⑹?
+  const MAX_TAR_DIM = 8000; // 안전 상한: 확대 캔버스가 너무 커지는 것을 방지
 
   const srcCanvas = document.getElementById('srcCanvas');
   const tarCanvas = document.getElementById('tarCanvas');
@@ -265,7 +265,7 @@
   // populate zoom select 2..16
   for(let z=2; z<=16; z++){
     const opt = document.createElement('option');
-    opt.value = z; opt.textContent = z + '諛?;
+    opt.value = z; opt.textContent = z + '배';
     if(z===4) opt.selected = true;
     zoomSelect.appendChild(opt);
   }
@@ -359,7 +359,7 @@
         }
         state.selection = { x:0, y:0, size: state.squareSize };
         render();
-        setStatus('?댁쟾 ?몄뀡???대?吏瑜?遺덈윭?붿뒿?덈떎.', false);
+        setStatus('이전 세션의 이미지를 불러왔습니다.', false);
       }
     }catch(e){ /* no saved image, ignore */ }
   }
@@ -393,7 +393,7 @@
         if(safeZoom !== state.zoom){
           state.zoom = safeZoom;
           zoomSelect.value = safeZoom;
-          setStatus('?대?吏媛 而ㅼ꽌 ?뺣? 諛곗쑉??' + safeZoom + '諛곕줈 ?쒗븳?덉뒿?덈떎.', true);
+          setStatus('이미지가 커서 확대 배율을 ' + safeZoom + '배로 제한했습니다.', true);
         }
 
         if(resetRegions){
@@ -487,15 +487,15 @@
         try{
           await loadImageBlob(blob, true);
           render();
-          setStatus('?대?吏瑜?遺숈뿬?ｌ뿀?듬땲??', false);
+          setStatus('이미지를 붙여넣었습니다.', false);
           try{
             await idbSet('pastedImage', blob);
             await saveMeta();
           }catch(err){
-            setStatus('?대?吏瑜???ν븯吏 紐삵뻽?듬땲??(?⑸웾 ?쒗븳?????덉쓬). ?덈줈怨좎묠 ???щ씪吏????덉뒿?덈떎.', true);
+            setStatus('이미지를 저장하지 못했습니다 (용량 제한일 수 있음). 새로고침 시 사라질 수 있습니다.', true);
           }
         }catch(err){
-          setStatus('?대?吏瑜?遺덈윭?ㅻ뒗 ???ㅽ뙣?덉뒿?덈떎.', true);
+          setStatus('이미지를 불러오는 데 실패했습니다.', true);
         }
         break;
       }
@@ -508,7 +508,7 @@
     const safe = clampZoomForSize(z);
     if(safe !== z){
       zoomSelect.value = safe;
-      setStatus('?대?吏媛 而ㅼ꽌 ?뺣? 諛곗쑉??' + safe + '諛곕줈 ?쒗븳?덉뒿?덈떎.', true);
+      setStatus('이미지가 커서 확대 배율을 ' + safe + '배로 제한했습니다.', true);
     }
     state.zoom = safe;
     render();
@@ -540,11 +540,11 @@
     state.selectedRegionIndex = null;
     render();
     saveMeta();
-    setStatus('紐⑤뱺 ?몃? ?곸뿭???댁젣?덉뒿?덈떎.', false);
+    setStatus('모든 노란 영역을 해제했습니다.', false);
   });
 
   resetAllBtn.addEventListener('click', async ()=>{
-    if(!confirm('??λ맂 ?대?吏? 紐⑤뱺 ?몃? ?곸뿭 ?곗씠?곕? ??젣?좉퉴??')) return;
+    if(!confirm('저장된 이미지와 모든 노란 영역 데이터를 삭제할까요?')) return;
     state.img = null;
     state.width = 0; state.height = 0;
     state.yellowRegions = [];
@@ -556,7 +556,7 @@
     updateInfo();
     try{ await idbDelete('pastedImage'); }catch(e){}
     try{ await idbDelete('meta'); }catch(e){}
-    setStatus('珥덇린?붾릺?덉뒿?덈떎.', false);
+    setStatus('초기화되었습니다.', false);
   });
 
   // ---------- click on tarCanvas ----------
@@ -576,14 +576,14 @@
 
     if(idx >= 0){
       state.selectedRegionIndex = idx;
-      setStatus('?몃? ?곸뿭???좏깮?덉뒿?덈떎. Delete ?ㅻ줈 ?댁젣?????덉뒿?덈떎.', false);
+      setStatus('노란 영역을 선택했습니다. Delete 키로 해제할 수 있습니다.', false);
     }else{
       state.selectedRegionIndex = null;
       const size = state.squareSize;
       const x = Math.min(Math.max(px, 0), Math.max(0, state.width - size));
       const y = Math.min(Math.max(py, 0), Math.max(0, state.height - size));
       state.selection = { x, y, size };
-      setStatus('?좏깮 ?곸뿭???대룞?덉뒿?덈떎.', false);
+      setStatus('선택 영역을 이동했습니다.', false);
     }
     render();
   });
@@ -616,10 +616,10 @@
     }
     if(allWhite){
       state.yellowRegions.push({ x:s.x, y:s.y, size:s.size });
-      setStatus('?곗깋 ?곸뿭???뺤씤?섏뿬 ?몃??됱쑝濡?移좏뻽?듬땲?? (?⑤윭?곗뒪 ' + T + ')', false);
+      setStatus('흰색 영역을 확인하여 노란색으로 칠했습니다. (톨러런스 ' + T + ')', false);
       saveMeta();
     }else{
-      setStatus('?좏깮 ?곸뿭???곗깋???꾨떃?덈떎. (?⑤윭?곗뒪 ' + T + ')', true);
+      setStatus('선택 영역이 흰색이 아닙니다. (톨러런스 ' + T + ')', true);
     }
     render();
   }
@@ -630,7 +630,7 @@
     state.selectedRegionIndex = null;
     render();
     saveMeta();
-    setStatus('?몃? ?곸뿭???댁젣?덉뒿?덈떎.', false);
+    setStatus('노란 영역을 해제했습니다.', false);
   }
 
   window.addEventListener('keydown', (e)=>{
