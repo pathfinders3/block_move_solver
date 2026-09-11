@@ -13,6 +13,7 @@
   const infoSel = document.getElementById('infoSel');
   const infoCount = document.getElementById('infoCount');
   const statusLine = document.getElementById('statusLine');
+  const channelStatsLine = document.getElementById('channelStatsLine');
   const clearRegionsBtn = document.getElementById('clearRegionsBtn');
   const resetAllBtn = document.getElementById('resetAllBtn');
 
@@ -596,6 +597,61 @@
     statusLine.className =
       'status' +
       (isWarn ? ' warn' : '');
+  }
+
+
+  function updateChannelStatsDisplay(text){
+    channelStatsLine.textContent = text || '';
+  }
+
+
+  function getActiveStatsRegion(){
+    if(state.selection){
+      return {
+        x: state.selection.x,
+        y: state.selection.y,
+        size: state.selection.size
+      };
+    }
+
+    if(
+      state.selectedRegionIndex !== null &&
+      state.yellowRegions[state.selectedRegionIndex]
+    ){
+      return state.yellowRegions[state.selectedRegionIndex];
+    }
+
+    return null;
+  }
+
+
+  function getRegionChannelStats(region){
+    if(!region) return null;
+
+    const data =
+      baseCtx.getImageData(
+        region.x,
+        region.y,
+        region.size,
+        region.size
+      ).data;
+
+    let minChannel = 255;
+    let maxChannel = 0;
+
+    for(let i = 0; i < data.length; i += 4){
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      const pixelMin = Math.min(r, g, b);
+      const pixelMax = Math.max(r, g, b);
+
+      if(pixelMin < minChannel) minChannel = pixelMin;
+      if(pixelMax > maxChannel) maxChannel = pixelMax;
+    }
+
+    return { minChannel, maxChannel };
   }
 
 
@@ -1276,90 +1332,160 @@
     const { prefix, stride } =
       buildNonWhitePrefix(state.tolerance);
 
-    // 방향 탐색은 기준 사각형 크기부터 시작해, 없으면 1씩 줄여 검사한다.
-    for(let size = baseRegion.size; size >= 1; size--){
+    const firstSize = baseRegion.size;
+    const firstXMin = Math.max(0, baseRegion.x - firstSize);
+    const firstXMax = Math.min(w - firstSize, baseRegion.x + firstSize);
+    const firstYMin = Math.max(0, baseRegion.y - firstSize);
+    const firstYMax = Math.min(h - firstSize, baseRegion.y + firstSize);
 
-      let bestScore = -Infinity;
-      bestCandidates.length = 0;
-
-      // top-left 탐색 범위: (base.x-size, base.y-size) ~ (base.x+size, base.y+size)
-      // 예) base=(44,43), size=7 -> x:37~51, y:36~50
-      const xMin = Math.max(0, baseRegion.x - size);
-      const xMax = Math.min(w - size, baseRegion.x + size);
-      const yMin = Math.max(0, baseRegion.y - size);
-      const yMax = Math.min(h - size, baseRegion.y + size);
-
-      if(xMin > xMax || yMin > yMax){
-        continue;
-      }
-
+    if(firstXMin <= firstXMax && firstYMin <= firstYMax){
       console.log('[findDirectionalCandidates] range', {
         directionKey,
-        size,
+        size: firstSize,
         base: { x: baseRegion.x, y: baseRegion.y, size: baseRegion.size },
-        start: { x: xMin, y: yMin },
-        end: { x: xMax, y: yMax },
-        totalChecks: (xMax - xMin + 1) * (yMax - yMin + 1)
+        start: { x: firstXMin, y: firstYMin },
+        end: { x: firstXMax, y: firstYMax },
+        totalChecks: (firstXMax - firstXMin + 1) * (firstYMax - firstYMin + 1)
       });
+    }
 
-      for(let y = yMin; y <= yMax; y++){
-        for(let x = xMin; x <= xMax; x++){
+    const size = baseRegion.size;
+    let bestScore = -Infinity;
+    bestCandidates.length = 0;
 
-          const candidate = { x, y, size };
-          const whiteCount =
-            nonWhiteCount(
-              prefix,
-              stride,
-              x,
-              y,
-              size
-            );
+    // top-left 탐색 범위: (base.x-size, base.y-size) ~ (base.x+size, base.y+size)
+    // 예) base=(44,43), size=7 -> x:37~51, y:36~50
+    const xMin = Math.max(0, baseRegion.x - size);
+    const xMax = Math.min(w - size, baseRegion.x + size);
+    const yMin = Math.max(0, baseRegion.y - size);
+    const yMax = Math.min(h - size, baseRegion.y + size);
 
-          const dirMatch =
-            directionMatchesCandidate(baseRegion, candidate, directionKey);
+    if(xMin > xMax || yMin > yMax){
+      console.log('[findDirectionalCandidates] no candidate found', {
+        directionKey,
+        baseRegion,
+        width: w,
+        height: h,
+        tolerance: state.tolerance,
+        reason: 'search range invalid'
+      });
+      return [];
+    }
 
-          const score =
-            directionAlignmentScore(baseRegion, candidate, directionKey);
+    for(let y = yMin; y <= yMax; y++){
+      for(let x = xMin; x <= xMax; x++){
 
-          if(size === 7 && whiteCount === 49){
-            console.log('[debug size7 candidate]', {
-              directionKey,
-              x,
-              y,
-              size,
-              whiteCount,
-              dirMatch,
-              score,
-              xMin,
-              xMax,
-              yMin,
-              yMax
+        const candidate = { x, y, size };
+        const isTargetCandidate = x === 46 && y === 50 && size === 7;
+        const whiteCount =
+          nonWhiteCount(
+            prefix,
+            stride,
+            x,
+            y,
+            size
+          );
+
+        const dirMatch =
+          directionMatchesCandidate(baseRegion, candidate, directionKey);
+
+        const score =
+          directionAlignmentScore(baseRegion, candidate, directionKey);
+
+        if(isTargetCandidate){
+          const pixels = baseCtx.getImageData(candidate.x, candidate.y, candidate.size, candidate.size).data;
+          let minChannel = Infinity;
+          let minChannelPixel = null;
+
+          for(let i = 0; i < pixels.length; i += 4){
+            const r = pixels[i];
+            const g = pixels[i + 1];
+            const b = pixels[i + 2];
+            const channelMin = Math.min(r, g, b);
+
+            if(channelMin < minChannel){
+              minChannel = channelMin;
+              minChannelPixel = { r, g, b, x: (i / 4) % candidate.size, y: Math.floor((i / 4) / candidate.size) };
+            }
+          }
+
+          const maxToleranceThatPasses = Number.isFinite(minChannel) ? minChannel : 255;
+          const passesAtCurrentTolerance = state.tolerance <= maxToleranceThatPasses;
+
+          console.log('[findDirectionalCandidates] DEBUG target tolerance threshold', {
+            candidate,
+            currentTolerance: state.tolerance,
+            minChannel,
+            maxToleranceThatPasses,
+            passesAtCurrentTolerance,
+            minChannelPixel,
+            whiteCount
+          });
+
+          console.log('[findDirectionalCandidates] DEBUG direct values', {
+            minChannel,
+            maxToleranceThatPasses,
+            currentTolerance: state.tolerance,
+            passesAtCurrentTolerance,
+            passRule: 'tolerance must be <= maxToleranceThatPasses to pass'
+          });
+        }
+
+        if(whiteCount !== 0){
+          if(isTargetCandidate){
+            console.log('[findDirectionalCandidates] DEBUG target NONO: whiteCount != 0', {
+              candidate,
+              whiteCount
             });
           }
-
-          if(whiteCount !== 0) continue;
-          if(squaresOverlap(baseRegion, candidate)) continue;
-          if(!dirMatch) continue;
-
-          if(score > bestScore + 1e-12){
-            bestScore = score;
-            bestCandidates.length = 0;
-            bestCandidates.push(candidate);
-          }else if(Math.abs(score - bestScore) <= 1e-12){
-            bestCandidates.push(candidate);
+          continue;
+        }
+        if(squaresOverlap(baseRegion, candidate)){
+          if(isTargetCandidate){
+            console.log('[findDirectionalCandidates] DEBUG target NONO: overlap', {
+              candidate,
+              baseRegion
+            });
           }
+          continue;
+        }
+        if(!dirMatch){
+          if(isTargetCandidate){
+            console.log('[findDirectionalCandidates] DEBUG target NONO: direction mismatch', {
+              candidate,
+              directionKey,
+              dirMatch
+            });
+          }
+          continue;
+        }
+
+        if(isTargetCandidate){
+          console.log('[findDirectionalCandidates] DEBUG target OKOK', {
+            candidate,
+            score,
+            bestScore
+          });
+        }
+
+        if(score > bestScore + 1e-12){
+          bestScore = score;
+          bestCandidates.length = 0;
+          bestCandidates.push(candidate);
+        }else if(Math.abs(score - bestScore) <= 1e-12){
+          bestCandidates.push(candidate);
         }
       }
+    }
 
-      if(bestCandidates.length > 0){
-        console.log('[findDirectionalCandidates] matched size', {
-          directionKey,
-          size,
-          count: bestCandidates.length,
-          candidates: bestCandidates.slice(0, 5)
-        });
-        return bestCandidates;
-      }
+    if(bestCandidates.length > 0){
+      console.log('[findDirectionalCandidates] matched size', {
+        directionKey,
+        size,
+        count: bestCandidates.length,
+        candidates: bestCandidates.slice(0, 5)
+      });
+      return bestCandidates;
     }
 
     console.log('[findDirectionalCandidates] no candidate found', {
@@ -1450,46 +1576,25 @@
     const baseInfo = getExpansionBaseRegion();
 
     if(!baseInfo){
-      clearCandidateSquares();
-
-      setStatus(
-        '방향 후보는 노란 기준 사각형 위에서 실행하세요.',
-        true
-      );
-
-      render();
+      console.log('[startDirectionalCandidates] no base region', {
+        directionKey,
+        reason: '기준 노란 사각형이 없음'
+      });
       return;
     }
 
     const candidates =
       findDirectionalCandidates(baseInfo.region, directionKey);
 
-    if(candidates.length === 0){
-      clearCandidateSquares();
+    console.log('[startDirectionalCandidates]', {
+      directionKey,
+      base: { x: baseInfo.region.x, y: baseInfo.region.y, size: baseInfo.region.size },
+      count: candidates.length,
+      firstCandidate: candidates[0] || null,
+      sample: candidates.slice(0, 10)
+    });
 
-      setStatus(
-        dir.label + ' 방향에 맞는 붙은 후보를 찾지 못했습니다.',
-        true
-      );
-
-      render();
-      return;
-    }
-
-    state.candidateSquares = candidates;
-    state.selectedCandidateIndex = 0;
-    state.candidateMode = 'directional';
-    state.candidateDirectionKey = directionKey;
-    state.expansionBaseRegionIndex = baseInfo.index;
-
-    const c = candidates[0];
-
-    setStatus(
-      formatCandidateStatus(dir.label, 0, candidates.length, c.size),
-      false
-    );
-
-    render();
+    // UI와 후보 표시 로직은 제거하고, 콘솔 카운트만 남겨서 새 구현을 붙일 수 있게 한다.
   }
 
 
@@ -1721,6 +1826,41 @@
 
 
     switch(e.key){
+
+      case 'F1':
+        {
+          const region = getActiveStatsRegion();
+
+          if(!region){
+            setStatus('F1: 현재 선택된 사각형이 없습니다.', true);
+            updateChannelStatsDisplay('');
+            e.preventDefault();
+            break;
+          }
+
+          const stats = getRegionChannelStats(region);
+
+          if(!stats){
+            setStatus('F1: 영역 색 정보를 읽을 수 없습니다.', true);
+            updateChannelStatsDisplay('');
+            e.preventDefault();
+            break;
+          }
+
+          const regionText =
+            '(' + region.x + ', ' + region.y + ') ' +
+            region.size + 'x' + region.size;
+
+          const msg =
+            'F1: 선택 영역 ' + regionText +
+            ' | 원본 캔버스 기준 minChannel=' + stats.minChannel +
+            ', maxChannel=' + stats.maxChannel;
+
+          setStatus(msg, false);
+          updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel);
+          e.preventDefault();
+          break;
+        }
 
       case 'i':
       case 'I':

@@ -162,6 +162,16 @@ canvas{
   color: var(--accent);
 }
 .status.warn{ color: var(--warn); }
+.channel-status{
+  font-size: 0.78rem;
+  min-height: 16px;
+  color: #dfe7ff;
+  background: rgba(94, 230, 200, 0.06);
+  border: 1px solid rgba(94, 230, 200, 0.25);
+  border-radius: 6px;
+  padding: 6px 8px;
+  line-height: 1.5;
+}
 .region-count{
   color: var(--yellow);
   font-weight: 600;
