@@ -647,6 +647,21 @@
   }
 
 
+  function squaresOverlap(base, candidate){
+    const baseX2 = base.x + base.size;
+    const baseY2 = base.y + base.size;
+    const candidateX2 = candidate.x + candidate.size;
+    const candidateY2 = candidate.y + candidate.size;
+
+    return (
+      candidate.x < baseX2 &&
+      candidateX2 > base.x &&
+      candidate.y < baseY2 &&
+      candidateY2 > base.y
+    );
+  }
+
+
   function directionMatchesCandidate(base, candidate, directionKey){
     const baseCenter = getRegionCenter(base);
     const candidateCenter = getRegionCenter(candidate);
@@ -1261,19 +1276,31 @@
     const { prefix, stride } =
       buildNonWhitePrefix(state.tolerance);
 
-    for(let size = Math.min(w, h); size >= 1; size--){
+    // 방향 탐색은 기준 사각형 크기부터 시작해, 없으면 1씩 줄여 검사한다.
+    for(let size = baseRegion.size; size >= 1; size--){
 
       let bestScore = -Infinity;
       bestCandidates.length = 0;
 
+      // top-left 탐색 범위: (base.x-size, base.y-size) ~ (base.x+size, base.y+size)
+      // 예) base=(44,43), size=7 -> x:37~51, y:36~50
       const xMin = Math.max(0, baseRegion.x - size);
-      const xMax = Math.min(w - size, baseRegion.x + baseRegion.size + size);
+      const xMax = Math.min(w - size, baseRegion.x + size);
       const yMin = Math.max(0, baseRegion.y - size);
-      const yMax = Math.min(h - size, baseRegion.y + baseRegion.size + size);
+      const yMax = Math.min(h - size, baseRegion.y + size);
 
       if(xMin > xMax || yMin > yMax){
         continue;
       }
+
+      console.log('[findDirectionalCandidates] range', {
+        directionKey,
+        size,
+        base: { x: baseRegion.x, y: baseRegion.y, size: baseRegion.size },
+        start: { x: xMin, y: yMin },
+        end: { x: xMax, y: yMax },
+        totalChecks: (xMax - xMin + 1) * (yMax - yMin + 1)
+      });
 
       for(let y = yMin; y <= yMax; y++){
         for(let x = xMin; x <= xMax; x++){
@@ -1288,9 +1315,6 @@
               size
             );
 
-          const touch =
-            squaresTouchOrCorner(baseRegion, candidate);
-
           const dirMatch =
             directionMatchesCandidate(baseRegion, candidate, directionKey);
 
@@ -1304,7 +1328,6 @@
               y,
               size,
               whiteCount,
-              touch,
               dirMatch,
               score,
               xMin,
@@ -1315,7 +1338,7 @@
           }
 
           if(whiteCount !== 0) continue;
-          if(!touch) continue;
+          if(squaresOverlap(baseRegion, candidate)) continue;
           if(!dirMatch) continue;
 
           if(score > bestScore + 1e-12){
@@ -1327,14 +1350,6 @@
           }
         }
       }
-
-      console.log('[findDirectionalCandidates] size', {
-        directionKey,
-        size,
-        candidateCount: bestCandidates.length,
-        bestScore,
-        firstCandidate: bestCandidates[0] || null
-      });
 
       if(bestCandidates.length > 0){
         console.log('[findDirectionalCandidates] matched size', {
