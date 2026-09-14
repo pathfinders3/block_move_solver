@@ -769,6 +769,41 @@
   }
 
 
+  function getRelationToRecentYellowRegion(region){
+    const recent =
+      state.yellowRegions.length > 0
+        ? state.yellowRegions[state.yellowRegions.length - 1]
+        : null;
+
+    if(!recent) return { label: 'unknown', distance: null };
+
+    const aLeft = region.x;
+    const aRight = region.x + region.size;
+    const aTop = region.y;
+    const aBottom = region.y + region.size;
+
+    const bLeft = recent.x;
+    const bRight = recent.x + recent.size;
+    const bTop = recent.y;
+    const bBottom = recent.y + recent.size;
+
+    const overlapsOrTouches =
+      aLeft <= bRight &&
+      bLeft <= aRight &&
+      aTop <= bBottom &&
+      bTop <= aBottom;
+
+    const distance = Math.hypot(
+      (aLeft + aRight) / 2 - (bLeft + bRight) / 2,
+      (aTop + aBottom) / 2 - (bTop + bBottom) / 2
+    );
+
+    const label = overlapsOrTouches ? 'near' : 'far';
+
+    return { label, distance };
+  }
+
+
   function getRegionChannelStats(region){
     if(!region) return null;
 
@@ -2037,15 +2072,22 @@
               ? stats.underTolerancePixels.length + '개'
               : '0개';
 
+          const relation = getRelationToRecentYellowRegion(region);
+          const relationText =
+            relation.distance === null
+              ? 'relation=unknown'
+              : 'relation=' + relation.label + ' dist=' + Math.round(relation.distance);
+
           const msg =
             'F1: 선택 영역 ' + regionText +
             ' | 원본 캔버스 기준 minChannel=' + stats.minChannel +
             ', maxChannel=' + stats.maxChannel +
             ', min pixels=' + minPixelText +
-            ', tolerance 미만 픽셀=' + lowToleranceText;
+            ', tolerance 미만 픽셀=' + lowToleranceText +
+            ' | ' + relationText;
 
           setStatus(msg, false);
-          updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel + ' | minPixels=' + minPixelText + ' | tolerance 미만 픽셀=' + lowToleranceText);
+          updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel + ' | minPixels=' + minPixelText + ' | tolerance 미만 픽셀=' + lowToleranceText + ' | ' + relationText);
           render();
           break;
         }
