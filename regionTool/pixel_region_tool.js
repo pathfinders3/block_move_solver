@@ -2064,7 +2064,11 @@
 
           const minPixelText =
             stats.minPixels && stats.minPixels.length
-              ? stats.minPixels.map((p)=>'(' + p.x + ', ' + p.y + ')').join(', ')
+              ? (() => {
+                  const preview = stats.minPixels.slice(0, 2).map((p)=>'(' + p.x + ', ' + p.y + ')');
+                  const extra = Math.max(0, stats.minPixels.length - preview.length);
+                  return preview.join(', ') + (extra > 0 ? ', ... ' + String(stats.minPixels.length).padStart(2, '0') + '개' : '');
+                })()
               : '(없음)';
 
           const lowToleranceText =
