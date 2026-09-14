@@ -1904,12 +1904,13 @@
 
       case 'F1':
         {
+		  e.preventDefault();		// 추가
           const region = getActiveStatsRegion();
 
           if(!region){
             setStatus('F1: 현재 선택된 사각형이 없습니다.', true);
             updateChannelStatsDisplay('');
-            e.preventDefault();
+            //e.preventDefault(); // 삭제
             break;
           }
 
@@ -1918,7 +1919,7 @@
           if(!stats){
             setStatus('F1: 영역 색 정보를 읽을 수 없습니다.', true);
             updateChannelStatsDisplay('');
-            e.preventDefault();
+            //e.preventDefault(); // 삭제
             break;
           }
 
@@ -1943,7 +1944,6 @@
           setStatus(msg, false);
           updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel + ' | minPixel=(' + stats.minPixel.x + ', ' + stats.minPixel.y + ')');
           render();
-          e.preventDefault();
           break;
         }
 
