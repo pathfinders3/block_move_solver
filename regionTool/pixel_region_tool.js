@@ -13,7 +13,6 @@
   const infoSel = document.getElementById('infoSel');
   const infoCount = document.getElementById('infoCount');
   const statusLine = document.getElementById('statusLine');
-  const channelStatsLine = document.getElementById('channelStatsLine');
   const clearRegionsBtn = document.getElementById('clearRegionsBtn');
   const resetAllBtn = document.getElementById('resetAllBtn');
 
@@ -745,7 +744,7 @@
 
 
   function updateChannelStatsDisplay(text){
-    channelStatsLine.textContent = text || '';
+    // 하단 보조 메시지 영역 제거로 더 이상 사용하지 않음.
   }
 
 
@@ -2091,7 +2090,7 @@
             ' | ' + relationText;
 
           setStatus(msg, false);
-          updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel + ' | minPixels=' + minPixelText + ' | tolerance 미만 픽셀=' + lowToleranceText + ' | ' + relationText);
+          updateChannelStatsDisplay('');
           render();
           break;
         }
