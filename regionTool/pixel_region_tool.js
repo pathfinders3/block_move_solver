@@ -62,8 +62,10 @@
     candidateMode: null,      // 'expansion' | 'directional'
     candidateDirectionKey: null,
     expansionBaseRegionIndex: null,
-    minChannelHighlight: null, // {x, y, expiresAt}
-    minChannelHighlightTimer: null
+    minChannelHighlight: null, // {points: [{x,y}], expiresAt}
+    minChannelHighlightTimer: null,
+    lowToleranceHighlight: null, // {points: [{x,y}], expiresAt}
+    lowToleranceHighlightTimer: null
   };
 
 
@@ -455,12 +457,80 @@
       );
 
       ctx.strokeStyle = '#5ee6c8';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1;
       ctx.strokeRect(
-        displayX + 1,
-        displayY + 1,
-        scale - 2,
-        scale - 2
+        displayX + 0.5,
+        displayY + 0.5,
+        Math.max(scale - 1, 1),
+        Math.max(scale - 1, 1)
+      );
+    }
+  }
+
+
+  function clearLowToleranceHighlight(){
+    state.lowToleranceHighlight = null;
+
+    if(state.lowToleranceHighlightTimer){
+      clearTimeout(state.lowToleranceHighlightTimer);
+      state.lowToleranceHighlightTimer = null;
+    }
+  }
+
+
+  function scheduleLowToleranceHighlight(points, durationMs){
+    const highlightPoints = Array.isArray(points)
+      ? points
+      : [{ x: points.x, y: points.y }];
+
+    if(state.lowToleranceHighlightTimer){
+      clearTimeout(state.lowToleranceHighlightTimer);
+    }
+
+    state.lowToleranceHighlight = {
+      points: highlightPoints,
+      expiresAt: Date.now() + durationMs
+    };
+
+    state.lowToleranceHighlightTimer = setTimeout(()=>{
+      state.lowToleranceHighlight = null;
+      state.lowToleranceHighlightTimer = null;
+      render();
+    }, durationMs);
+  }
+
+
+  function drawLowToleranceHighlightOn(ctx, scale){
+    if(!state.lowToleranceHighlight) return;
+
+    const now = Date.now();
+
+    if(now > state.lowToleranceHighlight.expiresAt){
+      state.lowToleranceHighlight = null;
+      return;
+    }
+
+    for(const pixel of state.lowToleranceHighlight.points || []){
+      const px = pixel.x;
+      const py = pixel.y;
+      const displayX = px * scale;
+      const displayY = py * scale;
+
+      ctx.fillStyle = 'rgba(99, 67, 44, 0.36)';
+      ctx.fillRect(
+        displayX,
+        displayY,
+        scale,
+        scale
+      );
+
+      ctx.strokeStyle = '#5a3527';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        displayX + 0.5,
+        displayY + 0.5,
+        Math.max(scale - 1, 1),
+        Math.max(scale - 1, 1)
       );
     }
   }
@@ -565,6 +635,7 @@
     drawRegionsOn(sctx, 1);
     drawSelectionOn(sctx, 1);
     drawMinChannelHighlightOn(sctx, 1);
+    drawLowToleranceHighlightOn(sctx, 1);
     drawCandidateSquaresOn(sctx, 1);
 
 
@@ -629,6 +700,7 @@
     // 선택 영역 역시 zoom 배율로 표시
     drawSelectionOn(tctx, z);
     drawMinChannelHighlightOn(tctx, z);
+    drawLowToleranceHighlightOn(tctx, z);
     drawCandidateSquaresOn(tctx, z);
 
 
@@ -711,6 +783,7 @@
     let minChannel = 255;
     let maxChannel = 0;
     let minPixels = [];
+    let underTolerancePixels = [];
 
     for(let y = 0; y < region.size; y++){
       for(let x = 0; x < region.size; x++){
@@ -729,13 +802,17 @@
           minPixels.push({ x: region.x + x, y: region.y + y, value: pixelMin, r, g, b });
         }
 
+        if(r < state.tolerance || g < state.tolerance || b < state.tolerance){
+          underTolerancePixels.push({ x: region.x + x, y: region.y + y, r, g, b, value: Math.min(r, g, b) });
+        }
+
         if(pixelMax > maxChannel) maxChannel = pixelMax;
       }
     }
 
     const minPixel = minPixels[0] || null;
 
-    return { minChannel, maxChannel, minPixel, minPixels };
+    return { minChannel, maxChannel, minPixel, minPixels, underTolerancePixels };
   }
 
 
@@ -1939,6 +2016,13 @@
             );
           }
 
+          if(stats.underTolerancePixels && stats.underTolerancePixels.length){
+            scheduleLowToleranceHighlight(
+              stats.underTolerancePixels,
+              2000
+            );
+          }
+
           const regionText =
             '(' + region.x + ', ' + region.y + ') ' +
             region.size + 'x' + region.size;
@@ -1948,14 +2032,20 @@
               ? stats.minPixels.map((p)=>'(' + p.x + ', ' + p.y + ')').join(', ')
               : '(없음)';
 
+          const lowToleranceText =
+            stats.underTolerancePixels && stats.underTolerancePixels.length
+              ? stats.underTolerancePixels.length + '개'
+              : '0개';
+
           const msg =
             'F1: 선택 영역 ' + regionText +
             ' | 원본 캔버스 기준 minChannel=' + stats.minChannel +
             ', maxChannel=' + stats.maxChannel +
-            ', min pixels=' + minPixelText;
+            ', min pixels=' + minPixelText +
+            ', tolerance 미만 픽셀=' + lowToleranceText;
 
           setStatus(msg, false);
-          updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel + ' | minPixels=' + minPixelText);
+          updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel + ' | minPixels=' + minPixelText + ' | tolerance 미만 픽셀=' + lowToleranceText);
           render();
           break;
         }
