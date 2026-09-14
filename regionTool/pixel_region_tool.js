@@ -61,7 +61,9 @@
     selectedCandidateIndex: 0,
     candidateMode: null,      // 'expansion' | 'directional'
     candidateDirectionKey: null,
-    expansionBaseRegionIndex: null
+    expansionBaseRegionIndex: null,
+    minChannelHighlight: null, // {x, y, expiresAt}
+    minChannelHighlightTimer: null
   };
 
 
@@ -396,6 +398,69 @@
   }
 
 
+  function clearMinChannelHighlight(){
+    state.minChannelHighlight = null;
+
+    if(state.minChannelHighlightTimer){
+      clearTimeout(state.minChannelHighlightTimer);
+      state.minChannelHighlightTimer = null;
+    }
+  }
+
+
+  function scheduleMinChannelHighlight(x, y, durationMs){
+    if(state.minChannelHighlightTimer){
+      clearTimeout(state.minChannelHighlightTimer);
+    }
+
+    state.minChannelHighlight = {
+      x,
+      y,
+      expiresAt: Date.now() + durationMs
+    };
+
+    state.minChannelHighlightTimer = setTimeout(()=>{
+      state.minChannelHighlight = null;
+      state.minChannelHighlightTimer = null;
+      render();
+    }, durationMs);
+  }
+
+
+  function drawMinChannelHighlightOn(ctx, scale){
+    if(!state.minChannelHighlight) return;
+
+    const now = Date.now();
+
+    if(now > state.minChannelHighlight.expiresAt){
+      state.minChannelHighlight = null;
+      return;
+    }
+
+    const px = state.minChannelHighlight.x;
+    const py = state.minChannelHighlight.y;
+    const displayX = px * scale;
+    const displayY = py * scale;
+
+    ctx.fillStyle = 'rgba(94, 230, 200, 0.32)';
+    ctx.fillRect(
+      displayX,
+      displayY,
+      scale,
+      scale
+    );
+
+    ctx.strokeStyle = '#5ee6c8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(
+      displayX + 1,
+      displayY + 1,
+      scale - 2,
+      scale - 2
+    );
+  }
+
+
   function drawCandidateSquaresOn(ctx, scale){
 
     if(state.candidateSquares.length === 0) return;
@@ -494,6 +559,7 @@
 
     drawRegionsOn(sctx, 1);
     drawSelectionOn(sctx, 1);
+    drawMinChannelHighlightOn(sctx, 1);
     drawCandidateSquaresOn(sctx, 1);
 
 
@@ -557,6 +623,7 @@
 
     // 선택 영역 역시 zoom 배율로 표시
     drawSelectionOn(tctx, z);
+    drawMinChannelHighlightOn(tctx, z);
     drawCandidateSquaresOn(tctx, z);
 
 
@@ -638,20 +705,28 @@
 
     let minChannel = 255;
     let maxChannel = 0;
+    let minPixel = null;
 
-    for(let i = 0; i < data.length; i += 4){
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
+    for(let y = 0; y < region.size; y++){
+      for(let x = 0; x < region.size; x++){
+        const idx = ((y * region.size + x) * 4);
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
 
-      const pixelMin = Math.min(r, g, b);
-      const pixelMax = Math.max(r, g, b);
+        const pixelMin = Math.min(r, g, b);
+        const pixelMax = Math.max(r, g, b);
 
-      if(pixelMin < minChannel) minChannel = pixelMin;
-      if(pixelMax > maxChannel) maxChannel = pixelMax;
+        if(pixelMin < minChannel){
+          minChannel = pixelMin;
+          minPixel = { x: region.x + x, y: region.y + y, value: pixelMin, r, g, b };
+        }
+
+        if(pixelMax > maxChannel) maxChannel = pixelMax;
+      }
     }
 
-    return { minChannel, maxChannel };
+    return { minChannel, maxChannel, minPixel };
   }
 
 
@@ -1847,6 +1922,14 @@
             break;
           }
 
+          if(stats.minPixel){
+            scheduleMinChannelHighlight(
+              stats.minPixel.x,
+              stats.minPixel.y,
+              2000
+            );
+          }
+
           const regionText =
             '(' + region.x + ', ' + region.y + ') ' +
             region.size + 'x' + region.size;
@@ -1854,10 +1937,12 @@
           const msg =
             'F1: 선택 영역 ' + regionText +
             ' | 원본 캔버스 기준 minChannel=' + stats.minChannel +
-            ', maxChannel=' + stats.maxChannel;
+            ', maxChannel=' + stats.maxChannel +
+            ', min pixel=(' + stats.minPixel.x + ', ' + stats.minPixel.y + ')';
 
           setStatus(msg, false);
-          updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel);
+          updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel + ' | minPixel=(' + stats.minPixel.x + ', ' + stats.minPixel.y + ')');
+          render();
           e.preventDefault();
           break;
         }
