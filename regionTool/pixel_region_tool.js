@@ -408,14 +408,17 @@
   }
 
 
-  function scheduleMinChannelHighlight(x, y, durationMs){
+  function scheduleMinChannelHighlight(points, durationMs){
+    const highlightPoints = Array.isArray(points)
+      ? points
+      : [{ x: points.x, y: points.y }];
+
     if(state.minChannelHighlightTimer){
       clearTimeout(state.minChannelHighlightTimer);
     }
 
     state.minChannelHighlight = {
-      x,
-      y,
+      points: highlightPoints,
       expiresAt: Date.now() + durationMs
     };
 
@@ -437,27 +440,29 @@
       return;
     }
 
-    const px = state.minChannelHighlight.x;
-    const py = state.minChannelHighlight.y;
-    const displayX = px * scale;
-    const displayY = py * scale;
+    for(const pixel of state.minChannelHighlight.points || []){
+      const px = pixel.x;
+      const py = pixel.y;
+      const displayX = px * scale;
+      const displayY = py * scale;
 
-    ctx.fillStyle = 'rgba(94, 230, 200, 0.32)';
-    ctx.fillRect(
-      displayX,
-      displayY,
-      scale,
-      scale
-    );
+      ctx.fillStyle = 'rgba(94, 230, 200, 0.32)';
+      ctx.fillRect(
+        displayX,
+        displayY,
+        scale,
+        scale
+      );
 
-    ctx.strokeStyle = '#5ee6c8';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(
-      displayX + 1,
-      displayY + 1,
-      scale - 2,
-      scale - 2
-    );
+      ctx.strokeStyle = '#5ee6c8';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(
+        displayX + 1,
+        displayY + 1,
+        scale - 2,
+        scale - 2
+      );
+    }
   }
 
 
@@ -705,7 +710,7 @@
 
     let minChannel = 255;
     let maxChannel = 0;
-    let minPixel = null;
+    let minPixels = [];
 
     for(let y = 0; y < region.size; y++){
       for(let x = 0; x < region.size; x++){
@@ -719,14 +724,18 @@
 
         if(pixelMin < minChannel){
           minChannel = pixelMin;
-          minPixel = { x: region.x + x, y: region.y + y, value: pixelMin, r, g, b };
+          minPixels = [{ x: region.x + x, y: region.y + y, value: pixelMin, r, g, b }];
+        }else if(pixelMin === minChannel){
+          minPixels.push({ x: region.x + x, y: region.y + y, value: pixelMin, r, g, b });
         }
 
         if(pixelMax > maxChannel) maxChannel = pixelMax;
       }
     }
 
-    return { minChannel, maxChannel, minPixel };
+    const minPixel = minPixels[0] || null;
+
+    return { minChannel, maxChannel, minPixel, minPixels };
   }
 
 
@@ -1923,10 +1932,9 @@
             break;
           }
 
-          if(stats.minPixel){
+          if(stats.minPixels && stats.minPixels.length){
             scheduleMinChannelHighlight(
-              stats.minPixel.x,
-              stats.minPixel.y,
+              stats.minPixels,
               2000
             );
           }
@@ -1935,14 +1943,19 @@
             '(' + region.x + ', ' + region.y + ') ' +
             region.size + 'x' + region.size;
 
+          const minPixelText =
+            stats.minPixels && stats.minPixels.length
+              ? stats.minPixels.map((p)=>'(' + p.x + ', ' + p.y + ')').join(', ')
+              : '(없음)';
+
           const msg =
             'F1: 선택 영역 ' + regionText +
             ' | 원본 캔버스 기준 minChannel=' + stats.minChannel +
             ', maxChannel=' + stats.maxChannel +
-            ', min pixel=(' + stats.minPixel.x + ', ' + stats.minPixel.y + ')';
+            ', min pixels=' + minPixelText;
 
           setStatus(msg, false);
-          updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel + ' | minPixel=(' + stats.minPixel.x + ', ' + stats.minPixel.y + ')');
+          updateChannelStatsDisplay('원본 캔버스 기준 — minChannel=' + stats.minChannel + ' / maxChannel=' + stats.maxChannel + ' | minPixels=' + minPixelText);
           render();
           break;
         }
