@@ -63,6 +63,8 @@
     expansionBaseRegionIndex: null,
     minChannelHighlight: null, // {points: [{x,y}], expiresAt}
     minChannelHighlightTimer: null,
+    tolerancePassedHighlight: null, // {points: [{x,y}], expiresAt}
+    tolerancePassedHighlightTimer: null,
     lowToleranceHighlight: null, // {points: [{x,y}], expiresAt}
     lowToleranceHighlightTimer: null,
     f2Marker: null, // {x, y, expiresAt}
@@ -472,6 +474,74 @@
   }
 
 
+  function clearTolerancePassedHighlight(){
+    state.tolerancePassedHighlight = null;
+
+    if(state.tolerancePassedHighlightTimer){
+      clearTimeout(state.tolerancePassedHighlightTimer);
+      state.tolerancePassedHighlightTimer = null;
+    }
+  }
+
+
+  function scheduleTolerancePassedHighlight(points, durationMs){
+    const highlightPoints = Array.isArray(points)
+      ? points
+      : [{ x: points.x, y: points.y }];
+
+    if(state.tolerancePassedHighlightTimer){
+      clearTimeout(state.tolerancePassedHighlightTimer);
+    }
+
+    state.tolerancePassedHighlight = {
+      points: highlightPoints,
+      expiresAt: Date.now() + durationMs
+    };
+
+    state.tolerancePassedHighlightTimer = setTimeout(()=>{
+      state.tolerancePassedHighlight = null;
+      state.tolerancePassedHighlightTimer = null;
+      render();
+    }, durationMs);
+  }
+
+
+  function drawTolerancePassedHighlightOn(ctx, scale){
+    if(!state.tolerancePassedHighlight) return;
+
+    const now = Date.now();
+
+    if(now > state.tolerancePassedHighlight.expiresAt){
+      state.tolerancePassedHighlight = null;
+      return;
+    }
+
+    for(const pixel of state.tolerancePassedHighlight.points || []){
+      const px = pixel.x;
+      const py = pixel.y;
+      const displayX = px * scale;
+      const displayY = py * scale;
+
+      ctx.fillStyle = 'rgba(255, 123, 182, 0.28)';
+      ctx.fillRect(
+        displayX,
+        displayY,
+        scale,
+        scale
+      );
+
+      ctx.strokeStyle = '#ff7bb6';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        displayX + 0.5,
+        displayY + 0.5,
+        Math.max(scale - 1, 1),
+        Math.max(scale - 1, 1)
+      );
+    }
+  }
+
+
   function clearLowToleranceHighlight(){
     state.lowToleranceHighlight = null;
 
@@ -686,6 +756,7 @@
     drawRegionsOn(sctx, 1);
     drawSelectionOn(sctx, 1);
     drawMinChannelHighlightOn(sctx, 1);
+    drawTolerancePassedHighlightOn(sctx, 1);
     drawLowToleranceHighlightOn(sctx, 1);
     drawF2MarkerOn(sctx, 1);
     drawCandidateSquaresOn(sctx, 1);
@@ -752,6 +823,7 @@
     // 선택 영역 역시 zoom 배율로 표시
     drawSelectionOn(tctx, z);
     drawMinChannelHighlightOn(tctx, z);
+    drawTolerancePassedHighlightOn(tctx, z);
     drawLowToleranceHighlightOn(tctx, z);
     drawF2MarkerOn(tctx, z);
     drawCandidateSquaresOn(tctx, z);
@@ -957,6 +1029,7 @@
     let minChannel = 255;
     let maxChannel = 0;
     let minPixels = [];
+    let passedTolerancePixels = [];
     let underTolerancePixels = [];
 
     for(let y = 0; y < region.size; y++){
@@ -976,6 +1049,10 @@
           minPixels.push({ x: region.x + x, y: region.y + y, value: pixelMin, r, g, b });
         }
 
+        if(r >= state.tolerance && g >= state.tolerance && b >= state.tolerance){
+          passedTolerancePixels.push({ x: region.x + x, y: region.y + y, r, g, b, value: Math.min(r, g, b) });
+        }
+
         if(r < state.tolerance || g < state.tolerance || b < state.tolerance){
           underTolerancePixels.push({ x: region.x + x, y: region.y + y, r, g, b, value: Math.min(r, g, b) });
         }
@@ -986,7 +1063,7 @@
 
     const minPixel = minPixels[0] || null;
 
-    return { minChannel, maxChannel, minPixel, minPixels, underTolerancePixels };
+    return { minChannel, maxChannel, minPixel, minPixels, passedTolerancePixels, underTolerancePixels };
   }
 
 
@@ -2240,6 +2317,13 @@
             setStatus('F1: 영역 색 정보를 읽을 수 없습니다.', true);
             updateChannelStatsDisplay('');
             break;
+          }
+
+          if(stats.passedTolerancePixels && stats.passedTolerancePixels.length){
+            scheduleTolerancePassedHighlight(
+              stats.passedTolerancePixels,
+              2000
+            );
           }
 
           if(stats.minPixels && stats.minPixels.length){
