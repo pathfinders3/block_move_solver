@@ -1376,9 +1376,6 @@
   tarCanvas.addEventListener('mousemove', (e)=>{
     const point = getOriginalPixelFromCanvasEvent(e);
     hoverOriginalPixel = point;
-    if(point){
-      lastValidOriginalPixel = point;
-    }
   });
 
   tarCanvas.addEventListener('mouseleave', ()=>{
@@ -1532,9 +1529,15 @@
     lastValidOriginalPixel = { x: nextX, y: nextY };
     hoverOriginalPixel = { x: nextX, y: nextY };
 
+    const pixel = baseCtx.getImageData(nextX, nextY, 1, 1).data;
+    const r = pixel[0];
+    const g = pixel[1];
+    const b = pixel[2];
+    const minValue = Math.min(r, g, b);
+
     scheduleF2Marker(nextX, nextY, 25000);
     setStatus(
-      'F2 마커 이동: 원본 좌표=(' + nextX + ', ' + nextY + ')',
+      'F2 마커 이동: 원본 좌표=(' + nextX + ', ' + nextY + ') | RGB=(' + r + ', ' + g + ', ' + b + ') | min=' + minValue,
       false
     );
     render();
@@ -2321,6 +2324,9 @@
           }
 
           const { x, y } = targetPixel;
+          lastValidOriginalPixel = { x, y };
+          hoverOriginalPixel = { x, y };
+
           const pixel = baseCtx.getImageData(x, y, 1, 1).data;
           const r = pixel[0];
           const g = pixel[1];
