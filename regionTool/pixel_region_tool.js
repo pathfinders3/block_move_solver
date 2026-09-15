@@ -1193,31 +1193,31 @@
   }
 
 
-  function getAttachPositions(x, y, n, direction){
+  function getAttachPositionsForSize(x, y, baseSize, candidateSize, direction){
     const positions = [];
 
     switch(direction){
       case 'down':
-        for(let newX = x - n; newX <= x + n; newX++){
-          positions.push({ x: newX, y: y + n });
+        for(let newX = x - baseSize; newX <= x + baseSize; newX++){
+          positions.push({ x: newX, y: y + baseSize });
         }
         break;
 
       case 'up':
-        for(let newX = x - n; newX <= x + n; newX++){
-          positions.push({ x: newX, y: y - n });
+        for(let newX = x - baseSize; newX <= x + baseSize; newX++){
+          positions.push({ x: newX, y: y - baseSize });
         }
         break;
 
       case 'right':
-        for(let newY = y - n; newY <= y + n; newY++){
-          positions.push({ x: x + n, y: newY });
+        for(let newY = y - baseSize; newY <= y + baseSize; newY++){
+          positions.push({ x: x + baseSize, y: newY });
         }
         break;
 
       case 'left':
-        for(let newY = y - n; newY <= y + n; newY++){
-          positions.push({ x: x - n, y: newY });
+        for(let newY = y - baseSize; newY <= y + baseSize; newY++){
+          positions.push({ x: x - baseSize, y: newY });
         }
         break;
 
@@ -1225,7 +1225,17 @@
         throw new Error('알 수 없는 방향: ' + direction);
     }
 
-    return positions;
+    return positions.filter((pos)=>
+      pos.x >= 0 &&
+      pos.y >= 0 &&
+      pos.x + candidateSize <= state.width &&
+      pos.y + candidateSize <= state.height
+    );
+  }
+
+
+  function getAttachPositions(x, y, n, direction){
+    return getAttachPositionsForSize(x, y, n, n, direction);
   }
 
 
@@ -1273,14 +1283,26 @@
       return [];
     }
 
-    return getAttachPositions(
-      baseRegion.x,
-      baseRegion.y,
-      baseRegion.size,
-      direction
-    ).filter((pos)=>
-      isSquareWithinTolerance(pos.x, pos.y, baseRegion.size)
-    );
+    const minSize = 2;
+    const maxSize = Math.max(minSize, baseRegion.size);
+
+    for(let size = maxSize; size >= minSize; size--){
+      const positions = getAttachPositionsForSize(
+        baseRegion.x,
+        baseRegion.y,
+        baseRegion.size,
+        size,
+        direction
+      ).filter((pos)=>
+        isSquareWithinTolerance(pos.x, pos.y, size)
+      );
+
+      if(positions.length > 0){
+        return positions.map((pos)=>({ ...pos, size }));
+      }
+    }
+
+    return [];
   }
 
 
@@ -2206,13 +2228,17 @@
       const validPositions = getValidAttachPositionsForDirection(baseInfo.region, directionKey);
 
       if(validPositions.length === 0){
-        setStatus('해당 방향으로 붙일 수 있는 유효한 후보가 없습니다.', true);
+        const attemptedSizes = [];
+        for(let size = Math.max(2, baseInfo.region.size); size >= 2; size--){
+          attemptedSizes.push(size + 'x' + size);
+        }
+        setStatus('해당 방향으로 붙일 수 있는 유효한 후보가 없습니다. 시도 크기: ' + attemptedSizes.join(', '), true);
         return;
       }
 
       const label = getDirectionVector(directionKey)?.label || '방향';
       const summary = validPositions
-        .map((pos)=>'(' + pos.x + ', ' + pos.y + ')')
+        .map((pos)=>'(' + pos.x + ', ' + pos.y + ') / ' + pos.size + 'x' + pos.size)
         .join(', ');
 
       setStatus(label + ' 후보: ' + summary, false);
