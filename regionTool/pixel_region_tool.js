@@ -64,7 +64,9 @@
     minChannelHighlight: null, // {points: [{x,y}], expiresAt}
     minChannelHighlightTimer: null,
     lowToleranceHighlight: null, // {points: [{x,y}], expiresAt}
-    lowToleranceHighlightTimer: null
+    lowToleranceHighlightTimer: null,
+    f2Marker: null, // {x, y, expiresAt}
+    f2MarkerTimer: null
   };
 
   let hoverOriginalPixel = null;
@@ -537,6 +539,53 @@
   }
 
 
+  function scheduleF2Marker(x, y, durationMs){
+    if(state.f2MarkerTimer){
+      clearTimeout(state.f2MarkerTimer);
+    }
+
+    state.f2Marker = {
+      x,
+      y,
+      expiresAt: Date.now() + durationMs
+    };
+
+    state.f2MarkerTimer = setTimeout(()=>{
+      state.f2Marker = null;
+      state.f2MarkerTimer = null;
+      render();
+    }, durationMs);
+  }
+
+
+  function drawF2MarkerOn(ctx, scale){
+    if(!state.f2Marker) return;
+
+    const now = Date.now();
+
+    if(now > state.f2Marker.expiresAt){
+      state.f2Marker = null;
+      return;
+    }
+
+    const x = state.f2Marker.x;
+    const y = state.f2Marker.y;
+    const displayX = x * scale;
+    const displayY = y * scale;
+
+    const markerSize = Math.max(5, scale);
+
+    ctx.strokeStyle = '#ff6100';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      displayX + 0.5,
+      displayY + 0.5,
+      markerSize - 1,
+      markerSize - 1
+    );
+  }
+
+
   function drawCandidateSquaresOn(ctx, scale){
 
     if(state.candidateSquares.length === 0) return;
@@ -637,6 +686,7 @@
     drawSelectionOn(sctx, 1);
     drawMinChannelHighlightOn(sctx, 1);
     drawLowToleranceHighlightOn(sctx, 1);
+    drawF2MarkerOn(sctx, 1);
     drawCandidateSquaresOn(sctx, 1);
 
 
@@ -702,6 +752,7 @@
     drawSelectionOn(tctx, z);
     drawMinChannelHighlightOn(tctx, z);
     drawLowToleranceHighlightOn(tctx, z);
+    drawF2MarkerOn(tctx, z);
     drawCandidateSquaresOn(tctx, z);
 
 
@@ -2244,10 +2295,13 @@
           const b = pixel[2];
           const minValue = Math.min(r, g, b);
 
+          scheduleF2Marker(x, y, 5000);
+
           setStatus(
             'F2: 원본 좌표=(' + x + ', ' + y + ') | RGB=(' + r + ', ' + g + ', ' + b + ') | min=' + minValue,
             false
           );
+          render();
           break;
         }
 
