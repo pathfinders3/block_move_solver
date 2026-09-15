@@ -1805,6 +1805,15 @@
       for(let y = yMin; y <= yMax; y++){
         for(let x = xMin; x <= xMax; x++){
 
+          const sameAsBase =
+            x === bx &&
+            y === by &&
+            size === bs;
+
+          if(sameAsBase){
+            continue;
+          }
+
           if(
             nonWhiteCount(
               prefix,
@@ -2064,7 +2073,7 @@
       clearCandidateSquares();
 
       setStatus(
-        '기준 사각형을 포함하는 유효한 확장 후보를 찾지 못했습니다.',
+        '확장 후보 없음.',
         true
       );
 
