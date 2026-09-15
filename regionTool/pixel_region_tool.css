@@ -161,6 +161,10 @@ canvas{
   min-height: 16px;
   color: var(--accent);
   cursor: pointer;
+  border: 1px solid rgba(94, 230, 200, 0.45);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: rgba(94, 230, 200, 0.04);
 }
 .status:focus{
   outline: 1px solid var(--accent);

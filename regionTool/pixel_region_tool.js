@@ -862,10 +862,10 @@
   }
 
 
-  function setStatus(msg, isWarn){
+  function setStatus(msg, isWarn, detailText){
 
     statusLine.textContent = msg;
-    statusLine.dataset.fullText = msg || '';
+    statusLine.dataset.fullText = (detailText !== undefined ? detailText : msg) || '';
 
     statusLine.className =
       'status' +
@@ -878,7 +878,7 @@
 
     if(!msg.trim()) return;
 
-    statusOverlayContent.textContent = msg;
+    statusOverlayContent.textContent = msg.replace(/\s*\|\s*/g, '\n');
     statusOverlay.classList.add('open');
     statusOverlay.setAttribute('aria-hidden', 'false');
   }
@@ -2425,15 +2425,21 @@
 
           const msg =
             'F1: 선택 영역 ' + regionText +
-            ' | minChannel=' + stats.minChannel +
-            ', maxChannel=' + stats.maxChannel +
-            ', min pixels=' + minPixelText +
-            ', tolerance 미만 픽셀=' + lowToleranceText +
-            ' | ' + relationText +
-            ' | 1칸 확장(8x8)=' + expansionText +
-            ' | 불가 원인=' + expansionFailureText;
+            '\nminChannel=' + stats.minChannel + ', maxChannel=' + stats.maxChannel +
+            '\ntolerance 미만 픽셀=' + lowToleranceText +
+            '\nrelation=' + relation.label +
+            '\n1칸 확장(8x8)=' + expansionText;
 
-          setStatus(msg, false);
+          const detailMsg =
+            'F1: 선택 영역 ' + regionText +
+            '\nminChannel=' + stats.minChannel + ', maxChannel=' + stats.maxChannel +
+            '\nmin pixels=' + minPixelText +
+            '\ntolerance 미만 픽셀=' + lowToleranceText +
+            '\n' + relationText +
+            '\n1칸 확장(8x8)=' + expansionText +
+            '\n불가 원인=' + expansionFailureText;
+
+          setStatus(msg, false, detailMsg);
           updateChannelStatsDisplay('');
           render();
           break;
