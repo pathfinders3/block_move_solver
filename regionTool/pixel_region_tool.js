@@ -67,6 +67,8 @@
     lowToleranceHighlightTimer: null
   };
 
+  let hoverOriginalPixel = null;
+
 
   // ---------- IndexedDB persistence ----------
 
@@ -1278,17 +1280,12 @@
   });
 
 
-  // ---------- click on tarCanvas ----------
-
-  tarCanvas.addEventListener('click', (e)=>{
-
-    if(!state.img) return;
+  function getOriginalPixelFromCanvasEvent(e){
+    if(!state.img) return null;
 
     const rect =
       tarCanvas.getBoundingClientRect();
 
-    // CSS 크기와 Canvas 내부 크기가 다를 경우에도
-    // 정확하게 내부 좌표로 환산한다.
     const scaleX =
       tarCanvas.width / rect.width;
 
@@ -1312,6 +1309,39 @@
       Math.floor(
         cy / state.zoom
       );
+
+    if(
+      px < 0 || py < 0 ||
+      px >= state.width || py >= state.height
+    ){
+      return null;
+    }
+
+    return { x: px, y: py };
+  }
+
+
+  tarCanvas.addEventListener('mousemove', (e)=>{
+    hoverOriginalPixel = getOriginalPixelFromCanvasEvent(e);
+  });
+
+  tarCanvas.addEventListener('mouseleave', ()=>{
+    hoverOriginalPixel = null;
+  });
+
+
+  // ---------- click on tarCanvas ----------
+
+  tarCanvas.addEventListener('click', (e)=>{
+
+    if(!state.img) return;
+
+    const pointer = getOriginalPixelFromCanvasEvent(e);
+
+    if(!pointer) return;
+
+    const px = pointer.x;
+    const py = pointer.y;
 
 
     const idx =
@@ -2110,13 +2140,13 @@
 
       case 'F1':
         {
-		  e.preventDefault();		// 추가
+          e.preventDefault();
+
           const region = getActiveStatsRegion();
 
           if(!region){
             setStatus('F1: 현재 선택된 사각형이 없습니다.', true);
             updateChannelStatsDisplay('');
-            //e.preventDefault(); // 삭제
             break;
           }
 
@@ -2125,7 +2155,6 @@
           if(!stats){
             setStatus('F1: 영역 색 정보를 읽을 수 없습니다.', true);
             updateChannelStatsDisplay('');
-            //e.preventDefault(); // 삭제
             break;
           }
 
@@ -2196,6 +2225,29 @@
           setStatus(msg, false);
           updateChannelStatsDisplay('');
           render();
+          break;
+        }
+
+      case 'F2':
+        {
+          e.preventDefault();
+
+          if(!hoverOriginalPixel){
+            setStatus('F2: 확대 캔버스 위에 마우스를 올려 두세요.', true);
+            break;
+          }
+
+          const { x, y } = hoverOriginalPixel;
+          const pixel = baseCtx.getImageData(x, y, 1, 1).data;
+          const r = pixel[0];
+          const g = pixel[1];
+          const b = pixel[2];
+          const minValue = Math.min(r, g, b);
+
+          setStatus(
+            'F2: 원본 좌표=(' + x + ', ' + y + ') | RGB=(' + r + ', ' + g + ', ' + b + ') | min=' + minValue,
+            false
+          );
           break;
         }
 
