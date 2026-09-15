@@ -1193,6 +1193,97 @@
   }
 
 
+  function getAttachPositions(x, y, n, direction){
+    const positions = [];
+
+    switch(direction){
+      case 'down':
+        for(let newX = x - n; newX <= x + n; newX++){
+          positions.push({ x: newX, y: y + n });
+        }
+        break;
+
+      case 'up':
+        for(let newX = x - n; newX <= x + n; newX++){
+          positions.push({ x: newX, y: y - n });
+        }
+        break;
+
+      case 'right':
+        for(let newY = y - n; newY <= y + n; newY++){
+          positions.push({ x: x + n, y: newY });
+        }
+        break;
+
+      case 'left':
+        for(let newY = y - n; newY <= y + n; newY++){
+          positions.push({ x: x - n, y: newY });
+        }
+        break;
+
+      default:
+        throw new Error('알 수 없는 방향: ' + direction);
+    }
+
+    return positions;
+  }
+
+
+  function isSquareWithinTolerance(x, y, size){
+    if(
+      x < 0 ||
+      y < 0 ||
+      x + size > state.width ||
+      y + size > state.height
+    ){
+      return false;
+    }
+
+    const image = baseCtx.getImageData(x, y, size, size).data;
+
+    for(let i = 0; i < image.length; i += 4){
+      const r = image[i];
+      const g = image[i + 1];
+      const b = image[i + 2];
+
+      if(
+        r < state.tolerance ||
+        g < state.tolerance ||
+        b < state.tolerance
+      ){
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+
+  function getValidAttachPositionsForDirection(baseRegion, directionKey){
+    const directionMap = {
+      W: 'up',
+      X: 'down',
+      A: 'left',
+      D: 'right'
+    };
+
+    const direction = directionMap[directionKey];
+
+    if(!direction){
+      return [];
+    }
+
+    return getAttachPositions(
+      baseRegion.x,
+      baseRegion.y,
+      baseRegion.size,
+      direction
+    ).filter((pos)=>
+      isSquareWithinTolerance(pos.x, pos.y, baseRegion.size)
+    );
+  }
+
+
   // ---------- paste handling ----------
 
   window.addEventListener('paste', async (e)=>{
@@ -2107,10 +2198,25 @@
     const baseInfo = getExpansionBaseRegion();
 
     if(!baseInfo){
-      console.log('[startDirectionalCandidates] no base region', {
-        directionKey,
-        reason: '기준 노란 사각형이 없음'
-      });
+      setStatus('WXAD는 노란 기준 사각형 위에서 실행하세요.', true);
+      return;
+    }
+
+    if(directionKey === 'W' || directionKey === 'X' || directionKey === 'A' || directionKey === 'D'){
+      const validPositions = getValidAttachPositionsForDirection(baseInfo.region, directionKey);
+
+      if(validPositions.length === 0){
+        setStatus('해당 방향으로 붙일 수 있는 유효한 후보가 없습니다.', true);
+        return;
+      }
+
+      const label = getDirectionVector(directionKey)?.label || '방향';
+      const summary = validPositions
+        .map((pos)=>'(' + pos.x + ', ' + pos.y + ')')
+        .join(', ');
+
+      setStatus(label + ' 후보: ' + summary, false);
+      render();
       return;
     }
 
