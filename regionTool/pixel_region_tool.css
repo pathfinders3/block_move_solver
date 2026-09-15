@@ -160,8 +160,71 @@ canvas{
   margin-top: 8px;
   min-height: 16px;
   color: var(--accent);
+  cursor: pointer;
+}
+.status:focus{
+  outline: 1px solid var(--accent);
+  border-radius: 4px;
 }
 .status.warn{ color: var(--warn); }
+.status-overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.status-overlay.open{
+  display: flex;
+}
+.status-dialog{
+  width: min(720px, 90vw);
+  max-height: 80vh;
+  overflow: auto;
+  background: #101317;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+.status-dialog-header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--panel-border);
+}
+.status-dialog-header h3{
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.status-close{
+  appearance: none;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--text);
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.status-close:hover{
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.status-dialog-body{
+  padding: 16px;
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .channel-status{
   font-size: 0.78rem;
   min-height: 16px;

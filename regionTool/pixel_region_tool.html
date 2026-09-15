@@ -53,7 +53,17 @@
       <div><b>Delete</b> 선택된 노란 영역 해제</div>
     </div>
 
-    <div class="status" id="statusLine"></div>
+    <div class="status" id="statusLine" tabindex="0"></div>
+  </div>
+
+  <div class="status-overlay" id="statusOverlay" aria-hidden="true">
+    <div class="status-dialog" id="statusDialog" role="dialog" aria-modal="true" aria-labelledby="statusOverlayTitle">
+      <div class="status-dialog-header">
+        <h3 id="statusOverlayTitle">상세 메시지</h3>
+        <button type="button" class="status-close" id="statusCloseBtn" aria-label="닫기">×</button>
+      </div>
+      <div class="status-dialog-body" id="statusOverlayContent"></div>
+    </div>
   </div>
 
   <div class="canvases">

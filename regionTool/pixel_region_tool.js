@@ -15,6 +15,9 @@
   const statusLine = document.getElementById('statusLine');
   const clearRegionsBtn = document.getElementById('clearRegionsBtn');
   const resetAllBtn = document.getElementById('resetAllBtn');
+  const statusOverlay = document.getElementById('statusOverlay');
+  const statusOverlayContent = document.getElementById('statusOverlayContent');
+  const statusCloseBtn = document.getElementById('statusCloseBtn');
 
 
   // ---------- controls population ----------
@@ -862,10 +865,28 @@
   function setStatus(msg, isWarn){
 
     statusLine.textContent = msg;
+    statusLine.dataset.fullText = msg || '';
 
     statusLine.className =
       'status' +
       (isWarn ? ' warn' : '');
+  }
+
+
+  function openStatusOverlay(){
+    const msg = statusLine.dataset.fullText || statusLine.textContent || '';
+
+    if(!msg.trim()) return;
+
+    statusOverlayContent.textContent = msg;
+    statusOverlay.classList.add('open');
+    statusOverlay.setAttribute('aria-hidden', 'false');
+  }
+
+
+  function closeStatusOverlay(){
+    statusOverlay.classList.remove('open');
+    statusOverlay.setAttribute('aria-hidden', 'true');
   }
 
 
@@ -1449,6 +1470,28 @@
     return { x: px, y: py };
   }
 
+
+  statusLine.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    openStatusOverlay();
+  });
+
+  statusCloseBtn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    closeStatusOverlay();
+  });
+
+  statusOverlay.addEventListener('click', (e)=>{
+    if(e.target === statusOverlay){
+      closeStatusOverlay();
+    }
+  });
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape' && statusOverlay.classList.contains('open')){
+      closeStatusOverlay();
+    }
+  });
 
   tarCanvas.addEventListener('mousemove', (e)=>{
     const point = getOriginalPixelFromCanvasEvent(e);
