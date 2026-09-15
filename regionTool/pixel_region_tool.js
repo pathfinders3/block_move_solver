@@ -1528,7 +1528,14 @@
 
     if(idx >= 0){
 
+      const targetRegion = state.yellowRegions[idx];
+
       state.selectedRegionIndex = idx;
+      state.selection = {
+        x: targetRegion.x,
+        y: targetRegion.y,
+        size: targetRegion.size
+      };
       clearCandidateSquares();
 
       setStatus(
