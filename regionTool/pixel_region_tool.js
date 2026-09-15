@@ -70,6 +70,7 @@
   };
 
   let hoverOriginalPixel = null;
+  let lastValidOriginalPixel = null;
 
 
   // ---------- IndexedDB persistence ----------
@@ -1373,7 +1374,11 @@
 
 
   tarCanvas.addEventListener('mousemove', (e)=>{
-    hoverOriginalPixel = getOriginalPixelFromCanvasEvent(e);
+    const point = getOriginalPixelFromCanvasEvent(e);
+    hoverOriginalPixel = point;
+    if(point){
+      lastValidOriginalPixel = point;
+    }
   });
 
   tarCanvas.addEventListener('mouseleave', ()=>{
@@ -1507,6 +1512,31 @@
 
     clearCandidateSquares();
 
+    render();
+  }
+
+
+  function moveF2Marker(dx, dy){
+    if(!lastValidOriginalPixel || !state.img) return;
+
+    const nextX = Math.min(
+      Math.max(lastValidOriginalPixel.x + dx, 0),
+      Math.max(0, state.width - 1)
+    );
+
+    const nextY = Math.min(
+      Math.max(lastValidOriginalPixel.y + dy, 0),
+      Math.max(0, state.height - 1)
+    );
+
+    lastValidOriginalPixel = { x: nextX, y: nextY };
+    hoverOriginalPixel = { x: nextX, y: nextY };
+
+    scheduleF2Marker(nextX, nextY, 25000);
+    setStatus(
+      'F2 마커 이동: 원본 좌표=(' + nextX + ', ' + nextY + ')',
+      false
+    );
     render();
   }
 
@@ -2283,19 +2313,21 @@
         {
           e.preventDefault();
 
-          if(!hoverOriginalPixel){
+          const targetPixel = hoverOriginalPixel || lastValidOriginalPixel;
+
+          if(!targetPixel){
             setStatus('F2: 확대 캔버스 위에 마우스를 올려 두세요.', true);
             break;
           }
 
-          const { x, y } = hoverOriginalPixel;
+          const { x, y } = targetPixel;
           const pixel = baseCtx.getImageData(x, y, 1, 1).data;
           const r = pixel[0];
           const g = pixel[1];
           const b = pixel[2];
           const minValue = Math.min(r, g, b);
 
-          scheduleF2Marker(x, y, 5000);
+          scheduleF2Marker(x, y, 25000);
 
           setStatus(
             'F2: 원본 좌표=(' + x + ', ' + y + ') | RGB=(' + r + ', ' + g + ', ' + b + ') | min=' + minValue,
@@ -2307,25 +2339,41 @@
 
       case 'i':
       case 'I':
-        moveSelection(0, -1);
+        if(e.shiftKey){
+          moveF2Marker(0, -1);
+        }else{
+          moveSelection(0, -1);
+        }
         e.preventDefault();
         break;
 
       case 'k':
       case 'K':
-        moveSelection(0, 1);
+        if(e.shiftKey){
+          moveF2Marker(0, 1);
+        }else{
+          moveSelection(0, 1);
+        }
         e.preventDefault();
         break;
 
       case 'j':
       case 'J':
-        moveSelection(-1, 0);
+        if(e.shiftKey){
+          moveF2Marker(-1, 0);
+        }else{
+          moveSelection(-1, 0);
+        }
         e.preventDefault();
         break;
 
       case 'l':
       case 'L':
-        moveSelection(1, 0);
+        if(e.shiftKey){
+          moveF2Marker(1, 0);
+        }else{
+          moveSelection(1, 0);
+        }
         e.preventDefault();
         break;
 
