@@ -803,6 +803,92 @@
   }
 
 
+  function getExpandedSquares(x, y, n){
+    return [
+      { x: x - 1, y: y - 1 },
+      { x: x - 1, y: y },
+      { x: x, y: y - 1 },
+      { x: x, y: y }
+    ];
+  }
+
+
+  function getOriginalPixelInfo(x, y){
+    const pixel = baseCtx.getImageData(x, y, 1, 1).data;
+    const r = pixel[0];
+    const g = pixel[1];
+    const b = pixel[2];
+
+    return {
+      x,
+      y,
+      r,
+      g,
+      b,
+      value: Math.min(r, g, b)
+    };
+  }
+
+
+  function getExpansionStatusForRegion(region, step = 1){
+    const nextSize = region.size + step;
+    const baseSquares = getExpandedSquares(region.x, region.y, region.size);
+    const results = [];
+
+    const directionLabels = [
+      '좌상단',
+      '좌하단',
+      '우상단',
+      '우하단'
+    ];
+
+    for(let i = 0; i < baseSquares.length; i++){
+      const anchor = baseSquares[i];
+      const x = anchor.x;
+      const y = anchor.y;
+      const withinBounds =
+        x >= 0 &&
+        y >= 0 &&
+        x + nextSize <= state.width &&
+        y + nextSize <= state.height;
+
+      let canExpand = false;
+      let reason = '범위 밖';
+      let failingPixels = [];
+
+      if(withinBounds){
+        canExpand = true;
+
+        for(let yy = 0; yy < nextSize; yy++){
+          for(let xx = 0; xx < nextSize; xx++){
+            const px = x + xx;
+            const py = y + yy;
+            const info = getOriginalPixelInfo(px, py);
+
+            if(!(info.r >= state.tolerance && info.g >= state.tolerance && info.b >= state.tolerance)){
+              canExpand = false;
+              reason = '색상 불일치';
+              failingPixels.push(info);
+            }
+          }
+        }
+      }
+
+      results.push({
+        label: directionLabels[i],
+        x,
+        y,
+        size: nextSize,
+        canExpand,
+        reason,
+        failingPixels
+      });
+    }
+
+    return results;
+  }
+
+
   function getRegionChannelStats(region){
     if(!region) return null;
 
@@ -2081,13 +2167,31 @@
               ? 'relation=unknown'
               : 'relation=' + relation.label + ' dist=' + Math.round(relation.distance);
 
+          const expansionResults = getExpansionStatusForRegion(region, 1);
+          const lowerRight = expansionResults.find((item)=>item.label === '우하단') || expansionResults[0];
+
+          const expansionFailureText =
+            lowerRight && !lowerRight.canExpand && lowerRight.failingPixels.length > 0
+              ? lowerRight.failingPixels
+                  .slice(0, 15)
+                  .map((p)=>'(' + p.x + ',' + p.y + ') : ' + (p.value >= state.tolerance ? '가능' : '불가') + '(' + p.r + ',' + p.g + ',' + p.b + ' / min=' + p.value + ')')
+                  .join(' / ')
+              : '없음';
+
+          const expansionText =
+            lowerRight
+              ? '우하단:' + (lowerRight.canExpand ? '가능' : '불가')
+              : '우하단:검사없음';
+
           const msg =
             'F1: 선택 영역 ' + regionText +
             ' | 원본 캔버스 기준 minChannel=' + stats.minChannel +
             ', maxChannel=' + stats.maxChannel +
             ', min pixels=' + minPixelText +
             ', tolerance 미만 픽셀=' + lowToleranceText +
-            ' | ' + relationText;
+            ' | ' + relationText +
+            ' | 1칸 확장(8x8)=' + expansionText +
+            ' | 불가 원인=' + expansionFailureText;
 
           setStatus(msg, false);
           updateChannelStatsDisplay('');
