@@ -2342,7 +2342,7 @@
 
           const regionText =
             '(' + region.x + ', ' + region.y + ') ' +
-            region.size + 'x' + region.size;
+            region.size + 'x';
 
           const minPixelText =
             stats.minPixels && stats.minPixels.length
@@ -2382,7 +2382,7 @@
 
           const msg =
             'F1: 선택 영역 ' + regionText +
-            ' | 원본 캔버스 기준 minChannel=' + stats.minChannel +
+            ' | minChannel=' + stats.minChannel +
             ', maxChannel=' + stats.maxChannel +
             ', min pixels=' + minPixelText +
             ', tolerance 미만 픽셀=' + lowToleranceText +
