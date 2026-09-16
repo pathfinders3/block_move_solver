@@ -675,8 +675,8 @@
 
       ctx.fillStyle =
         isSelected
-          ? 'rgba(255, 107, 107, 0.12)'
-          : 'rgba(138, 180, 255, 0.06)';
+          ? 'rgba(255, 107, 107, 0.86)'
+          : 'rgba(138, 180, 255, 0.16)';
 
       ctx.fillRect(
         displayX,
@@ -2146,7 +2146,12 @@
   }
 
 
-  function formatCandidateStatus(prefixText, index, total, size){
+  function formatCandidateStatus(prefixText, index, total, size, x, y){
+    const coordText =
+      typeof x === 'number' && typeof y === 'number'
+        ? ' | 좌표 (' + x + ', ' + y + ')'
+        : '';
+
     return (
       prefixText +
       ' 후보 ' +
@@ -2157,6 +2162,7 @@
       size +
       'x' +
       size +
+      coordText +
       ' | PgUp/PgDn으로 순환, Enter로 확정'
     );
   }
@@ -2274,7 +2280,7 @@
 
       const c = candidateSquares[0];
       setStatus(
-        formatCandidateStatus(label, 0, candidateSquares.length, c.size),
+        formatCandidateStatus(label, 0, candidateSquares.length, c.size, c.x, c.y),
         false,
         label + ' 후보:\n' + fullSummary
       );
@@ -2321,7 +2327,7 @@
         : '확장';
 
     setStatus(
-      formatCandidateStatus(prefixText, idx, total, c.size),
+      formatCandidateStatus(prefixText, idx, total, c.size, c.x, c.y),
       false
     );
 
