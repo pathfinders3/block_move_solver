@@ -78,6 +78,7 @@
 
   let hoverOriginalPixel = null;
   let lastValidOriginalPixel = null;
+  let toastTimer = null;
 
 
   // ---------- IndexedDB persistence ----------
@@ -872,6 +873,34 @@
     statusLine.className =
       'status' +
       (isWarn ? ' warn' : '');
+  }
+
+
+  function showToast(msg, isWarn){
+    const container = document.getElementById('toastContainer');
+
+    if(!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'toast' + (isWarn ? ' warn' : '');
+    toast.textContent = msg;
+
+    container.appendChild(toast);
+
+    requestAnimationFrame(()=>{
+      toast.classList.add('visible');
+    });
+
+    if(toastTimer){
+      clearTimeout(toastTimer);
+    }
+
+    toastTimer = setTimeout(()=>{
+      toast.classList.remove('visible');
+      setTimeout(()=>{
+        toast.remove();
+      }, 220);
+    }, 1800);
   }
 
 
@@ -2811,14 +2840,18 @@
       case 'NumpadSubtract':
         if(
           state.candidateMode === 'directional' &&
-          state.candidateSizeGroups.length > 1 &&
-          state.candidateGroupIndex < state.candidateSizeGroups.length - 1
+          state.candidateSizeGroups.length > 1
         ){
-          state.candidateGroupIndex = Math.min(
-            state.candidateGroupIndex + 1,
-            state.candidateSizeGroups.length - 1
-          );
-          refreshDirectionalCandidateDisplay();
+          if(state.candidateGroupIndex < state.candidateSizeGroups.length - 1){
+            state.candidateGroupIndex = Math.min(
+              state.candidateGroupIndex + 1,
+              state.candidateSizeGroups.length - 1
+            );
+            refreshDirectionalCandidateDisplay();
+          }else{
+            const size = state.candidateSizeGroups[state.candidateGroupIndex]?.size || 0;
+            showToast('이 크기(' + size + 'x' + size + ')에는 추천할 사각형이 없습니다.', true);
+          }
         }
         e.preventDefault();
         break;
@@ -2828,14 +2861,18 @@
       case 'NumpadAdd':
         if(
           state.candidateMode === 'directional' &&
-          state.candidateSizeGroups.length > 1 &&
-          state.candidateGroupIndex > 0
+          state.candidateSizeGroups.length > 1
         ){
-          state.candidateGroupIndex = Math.max(
-            state.candidateGroupIndex - 1,
-            0
-          );
-          refreshDirectionalCandidateDisplay();
+          if(state.candidateGroupIndex > 0){
+            state.candidateGroupIndex = Math.max(
+              state.candidateGroupIndex - 1,
+              0
+            );
+            refreshDirectionalCandidateDisplay();
+          }else{
+            const size = state.candidateSizeGroups[state.candidateGroupIndex]?.size || 0;
+            showToast('이 크기(' + size + 'x' + size + ')에는 더 이상 크게 할 수 없습니다. 이것이 max 크기입니다.', true);
+          }
         }
         e.preventDefault();
         break;
