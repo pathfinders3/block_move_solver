@@ -2412,9 +2412,26 @@
 
     if(state.candidateMode === 'expansion'){
 
+      let targetIndex = baseIdx;
+
       if(
-        baseIdx === null ||
-        !state.yellowRegions[baseIdx]
+        targetIndex === null ||
+        !state.yellowRegions[targetIndex]
+      ){
+        if(state.selection){
+          targetIndex = state.yellowRegions.findIndex((r)=>
+            state.selection.x >= r.x &&
+            state.selection.x < r.x + r.size &&
+            state.selection.y >= r.y &&
+            state.selection.y < r.y + r.size
+          );
+        }
+      }
+
+      if(
+        targetIndex === null ||
+        targetIndex < 0 ||
+        !state.yellowRegions[targetIndex]
       ){
         clearCandidateSquares();
 
@@ -2427,13 +2444,13 @@
         return;
       }
 
-      state.yellowRegions[baseIdx] = {
+      state.yellowRegions[targetIndex] = {
         x: c.x,
         y: c.y,
         size: c.size
       };
 
-      state.selectedRegionIndex = baseIdx;
+      state.selectedRegionIndex = targetIndex;
 
       state.selection = {
         x: c.x,
