@@ -2230,7 +2230,23 @@
       const attempts = getValidAttachPositionsForDirection(baseInfo.region, directionKey);
 
       const label = getDirectionVector(directionKey)?.label || '방향';
-      const summary = attempts
+      const fullSummary = attempts
+        .map((entry)=>{
+          const sizeText = entry.size + 'x' + entry.size;
+          const positionsText = entry.positions.length > 0
+            ? entry.positions.map((pos)=>'(' + pos.x + ', ' + pos.y + ')').join(', ')
+            : '없음';
+          return sizeText + ' : ' + positionsText;
+        })
+        .join(',\n');
+
+      const compactSizes = [
+        baseInfo.region.size,
+        Math.max(2, baseInfo.region.size - 1)
+      ].filter((value, index, arr)=>arr.indexOf(value) === index);
+
+      const compactSummary = attempts
+        .filter((entry)=>compactSizes.includes(entry.size))
         .map((entry)=>{
           const sizeText = entry.size + 'x' + entry.size;
           const positionsText = entry.positions.length > 0
@@ -2241,12 +2257,12 @@
         .join(',\n');
 
       if(!attempts.some((entry)=>entry.positions.length > 0)){
-        setStatus(label + ' 후보:\n' + summary, true);
+        setStatus(label + ' 후보:\n' + compactSummary, true, label + ' 후보:\n' + fullSummary);
         render();
         return;
       }
 
-      setStatus(label + ' 후보:\n' + summary, false);
+      setStatus(label + ' 후보:\n' + compactSummary, false, label + ' 후보:\n' + fullSummary);
       render();
       return;
     }
