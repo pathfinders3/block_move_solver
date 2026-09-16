@@ -165,6 +165,7 @@ canvas{
   border-radius: 6px;
   padding: 6px 8px;
   background: rgba(94, 230, 200, 0.04);
+  white-space: pre-line;
 }
 .status:focus{
   outline: 1px solid var(--accent);

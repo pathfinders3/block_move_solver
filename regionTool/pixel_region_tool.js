@@ -2236,17 +2236,17 @@
           const positionsText = entry.positions.length > 0
             ? entry.positions.map((pos)=>'(' + pos.x + ', ' + pos.y + ')').join(', ')
             : '없음';
-          return sizeText + ' | ' + positionsText;
+          return sizeText + ' : ' + positionsText;
         })
-        .join(', ');
+        .join(',\n');
 
       if(!attempts.some((entry)=>entry.positions.length > 0)){
-        setStatus(label + ' 후보: ' + summary, true);
+        setStatus(label + ' 후보:\n' + summary, true);
         render();
         return;
       }
 
-      setStatus(label + ' 후보: ' + summary, false);
+      setStatus(label + ' 후보:\n' + summary, false);
       render();
       return;
     }
