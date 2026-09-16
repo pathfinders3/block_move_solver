@@ -1285,6 +1285,7 @@
 
     const minSize = 2;
     const maxSize = Math.max(minSize, baseRegion.size);
+    const attempts = [];
 
     for(let size = maxSize; size >= minSize; size--){
       const positions = getAttachPositionsForSize(
@@ -1297,12 +1298,13 @@
         isSquareWithinTolerance(pos.x, pos.y, size)
       );
 
-      if(positions.length > 0){
-        return positions.map((pos)=>({ ...pos, size }));
-      }
+      attempts.push({
+        size,
+        positions: positions.map((pos)=>({ ...pos, size }))
+      });
     }
 
-    return [];
+    return attempts;
   }
 
 
@@ -2225,21 +2227,24 @@
     }
 
     if(directionKey === 'W' || directionKey === 'X' || directionKey === 'A' || directionKey === 'D'){
-      const validPositions = getValidAttachPositionsForDirection(baseInfo.region, directionKey);
-
-      if(validPositions.length === 0){
-        const attemptedSizes = [];
-        for(let size = Math.max(2, baseInfo.region.size); size >= 2; size--){
-          attemptedSizes.push(size + 'x' + size);
-        }
-        setStatus('해당 방향으로 붙일 수 있는 유효한 후보가 없습니다. 시도 크기: ' + attemptedSizes.join(', '), true);
-        return;
-      }
+      const attempts = getValidAttachPositionsForDirection(baseInfo.region, directionKey);
 
       const label = getDirectionVector(directionKey)?.label || '방향';
-      const summary = validPositions
-        .map((pos)=>'(' + pos.x + ', ' + pos.y + ') / ' + pos.size + 'x' + pos.size)
+      const summary = attempts
+        .map((entry)=>{
+          const sizeText = entry.size + 'x' + entry.size;
+          const positionsText = entry.positions.length > 0
+            ? entry.positions.map((pos)=>'(' + pos.x + ', ' + pos.y + ')').join(', ')
+            : '없음';
+          return sizeText + ' | ' + positionsText;
+        })
         .join(', ');
+
+      if(!attempts.some((entry)=>entry.positions.length > 0)){
+        setStatus(label + ' 후보: ' + summary, true);
+        render();
+        return;
+      }
 
       setStatus(label + ' 후보: ' + summary, false);
       render();
