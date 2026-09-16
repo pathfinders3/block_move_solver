@@ -2228,6 +2228,7 @@
 
     if(directionKey === 'W' || directionKey === 'X' || directionKey === 'A' || directionKey === 'D'){
       const attempts = getValidAttachPositionsForDirection(baseInfo.region, directionKey);
+      const validEntries = attempts.filter((entry)=>entry.positions.length > 0);
 
       const label = getDirectionVector(directionKey)?.label || '방향';
       const fullSummary = attempts
@@ -2240,29 +2241,43 @@
         })
         .join(',\n');
 
-      const compactSizes = [
-        baseInfo.region.size,
-        Math.max(2, baseInfo.region.size - 1)
-      ].filter((value, index, arr)=>arr.indexOf(value) === index);
+      const compactEntries = validEntries.slice(0, 2);
+      const compactSummary = compactEntries.length > 0
+        ? compactEntries
+            .map((entry)=>{
+              const sizeText = entry.size + 'x' + entry.size;
+              const positionsText = entry.positions.map((pos)=>'(' + pos.x + ', ' + pos.y + ')').join(', ');
+              return sizeText + ' : ' + positionsText;
+            })
+            .join(',\n')
+        : '없음';
 
-      const compactSummary = attempts
-        .filter((entry)=>compactSizes.includes(entry.size))
-        .map((entry)=>{
-          const sizeText = entry.size + 'x' + entry.size;
-          const positionsText = entry.positions.length > 0
-            ? entry.positions.map((pos)=>'(' + pos.x + ', ' + pos.y + ')').join(', ')
-            : '없음';
-          return sizeText + ' : ' + positionsText;
-        })
-        .join(',\n');
-
-      if(!attempts.some((entry)=>entry.positions.length > 0)){
+      if(validEntries.length === 0){
         setStatus(label + ' 후보:\n' + compactSummary, true, label + ' 후보:\n' + fullSummary);
         render();
         return;
       }
 
-      setStatus(label + ' 후보:\n' + compactSummary, false, label + ' 후보:\n' + fullSummary);
+      const candidateSquares = compactEntries.flatMap((entry)=>
+        entry.positions.map((pos)=>({
+          x: pos.x,
+          y: pos.y,
+          size: entry.size
+        }))
+      );
+
+      state.candidateSquares = candidateSquares;
+      state.selectedCandidateIndex = 0;
+      state.candidateMode = 'directional';
+      state.candidateDirectionKey = directionKey;
+      state.expansionBaseRegionIndex = baseInfo.index;
+
+      const c = candidateSquares[0];
+      setStatus(
+        formatCandidateStatus(label, 0, candidateSquares.length, c.size),
+        false,
+        label + ' 후보:\n' + fullSummary
+      );
       render();
       return;
     }
