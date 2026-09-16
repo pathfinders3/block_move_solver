@@ -63,6 +63,8 @@
     selectedCandidateIndex: 0,
     candidateMode: null,      // 'expansion' | 'directional'
     candidateDirectionKey: null,
+    candidateSizeGroups: [],  // 방향 후보를 size별로 나눈 목록 [{size, positions:[{x,y,size}]}]
+    candidateGroupIndex: 0,
     expansionBaseRegionIndex: null,
     minChannelHighlight: null, // {points: [{x,y}], expiresAt}
     minChannelHighlightTimer: null,
@@ -1093,6 +1095,8 @@
     state.selectedCandidateIndex = 0;
     state.candidateMode = null;
     state.candidateDirectionKey = null;
+    state.candidateSizeGroups = [];
+    state.candidateGroupIndex = 0;
     state.expansionBaseRegionIndex = null;
   }
 
@@ -2247,40 +2251,35 @@
         })
         .join(',\n');
 
-      const compactEntries = validEntries.slice(0, 2);
-      const compactSummary = compactEntries.length > 0
-        ? compactEntries
-            .map((entry)=>{
-              const sizeText = entry.size + 'x' + entry.size;
-              const positionsText = entry.positions.map((pos)=>'(' + pos.x + ', ' + pos.y + ')').join(', ');
-              return sizeText + ' : ' + positionsText;
-            })
-            .join(',\n')
-        : '없음';
-
       if(validEntries.length === 0){
-        setStatus(label + ' 후보:\n' + compactSummary, true, label + ' 후보:\n' + fullSummary);
+        setStatus(label + ' 후보:\n없음', true, label + ' 후보:\n' + fullSummary);
         render();
         return;
       }
 
-      const candidateSquares = compactEntries.flatMap((entry)=>
-        entry.positions.map((pos)=>({
+      state.candidateSizeGroups = validEntries.map((entry)=>({
+        size: entry.size,
+        positions: entry.positions.map((pos)=>({
           x: pos.x,
           y: pos.y,
           size: entry.size
         }))
-      );
+      }));
 
-      state.candidateSquares = candidateSquares;
+      state.candidateGroupIndex = 0;
+      state.candidateSquares = state.candidateSizeGroups[0].positions;
       state.selectedCandidateIndex = 0;
       state.candidateMode = 'directional';
       state.candidateDirectionKey = directionKey;
       state.expansionBaseRegionIndex = baseInfo.index;
 
-      const c = candidateSquares[0];
+      const currentGroup = state.candidateSizeGroups[0];
+      const c = currentGroup.positions[0];
+      const compactSummary = currentGroup.size + 'x' + currentGroup.size + ' : ' +
+        currentGroup.positions.map((pos)=>'(' + pos.x + ', ' + pos.y + ')').join(', ');
+
       setStatus(
-        formatCandidateStatus(label, 0, candidateSquares.length, c.size, c.x, c.y),
+        formatCandidateStatus(label, 0, currentGroup.positions.length, c.size, c.x, c.y),
         false,
         label + ' 후보:\n' + fullSummary
       );
@@ -2300,6 +2299,40 @@
     });
 
     // UI와 후보 표시 로직은 제거하고, 콘솔 카운트만 남겨서 새 구현을 붙일 수 있게 한다.
+  }
+
+
+  function refreshDirectionalCandidateDisplay(){
+    if(
+      state.candidateMode !== 'directional' ||
+      state.candidateDirectionKey === null ||
+      state.candidateSizeGroups.length === 0
+    ){
+      return;
+    }
+
+    const group = state.candidateSizeGroups[state.candidateGroupIndex];
+    state.candidateSquares = group.positions;
+    state.selectedCandidateIndex = 0;
+
+    const label = getDirectionVector(state.candidateDirectionKey)?.label || '방향';
+    const c = group.positions[0];
+
+    setStatus(
+      formatCandidateStatus(label, 0, group.positions.length, c.size, c.x, c.y),
+      false,
+      label + ' 후보:\n' + state.candidateSizeGroups
+        .map((entry)=>{
+          const sizeText = entry.size + 'x' + entry.size;
+          const positionsText = entry.positions.length > 0
+            ? entry.positions.map((pos)=>'(' + pos.x + ', ' + pos.y + ')').join(', ')
+            : '없음';
+          return sizeText + ' : ' + positionsText;
+        })
+        .join(',\n')
+    );
+
+    render();
   }
 
 
@@ -2770,6 +2803,22 @@
 
       case 'PageUp':
         cycleCandidate(-1);
+        e.preventDefault();
+        break;
+
+      case '-':
+      case 'Subtract':
+        if(
+          state.candidateMode === 'directional' &&
+          state.candidateSizeGroups.length > 1 &&
+          state.candidateGroupIndex < state.candidateSizeGroups.length - 1
+        ){
+          state.candidateGroupIndex = Math.min(
+            state.candidateGroupIndex + 1,
+            state.candidateSizeGroups.length - 1
+          );
+          refreshDirectionalCandidateDisplay();
+        }
         e.preventDefault();
         break;
 
