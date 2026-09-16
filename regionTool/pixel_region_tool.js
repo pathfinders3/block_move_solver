@@ -2808,6 +2808,7 @@
 
       case '-':
       case 'Subtract':
+      case 'NumpadSubtract':
         if(
           state.candidateMode === 'directional' &&
           state.candidateSizeGroups.length > 1 &&
@@ -2816,6 +2817,23 @@
           state.candidateGroupIndex = Math.min(
             state.candidateGroupIndex + 1,
             state.candidateSizeGroups.length - 1
+          );
+          refreshDirectionalCandidateDisplay();
+        }
+        e.preventDefault();
+        break;
+
+      case '+':
+      case 'Add':
+      case 'NumpadAdd':
+        if(
+          state.candidateMode === 'directional' &&
+          state.candidateSizeGroups.length > 1 &&
+          state.candidateGroupIndex > 0
+        ){
+          state.candidateGroupIndex = Math.max(
+            state.candidateGroupIndex - 1,
+            0
           );
           refreshDirectionalCandidateDisplay();
         }
