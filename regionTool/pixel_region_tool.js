@@ -1445,7 +1445,8 @@
 
           if(
             nonWhiteCount(prefix, stride, x, y, size) !== 0 ||
-            squaresOverlap(baseRegion, candidate)
+            squaresOverlap(baseRegion, candidate) ||
+            !squaresTouchOrCorner(baseRegion, candidate)
           ){
             continue;
           }
