@@ -2342,8 +2342,10 @@
       const dy = -(candidateCenter.y - refCenter.y);
       const distance = Math.sqrt(dx * dx + dy * dy);
       const angleDeg = ((Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 360;
+      const oppositeAngleDeg = (angleDeg + 180) % 360;
 
       let arrow = '→';
+      let oppositeArrow = '←';
 
       if(angleDeg >= 337.5 || angleDeg < 22.5){
         arrow = '→';
@@ -2363,8 +2365,26 @@
         arrow = '↘';
       }
 
+      if(oppositeAngleDeg >= 337.5 || oppositeAngleDeg < 22.5){
+        oppositeArrow = '→';
+      }else if(oppositeAngleDeg >= 22.5 && oppositeAngleDeg < 67.5){
+        oppositeArrow = '↗';
+      }else if(oppositeAngleDeg >= 67.5 && oppositeAngleDeg < 112.5){
+        oppositeArrow = '↑';
+      }else if(oppositeAngleDeg >= 112.5 && oppositeAngleDeg < 157.5){
+        oppositeArrow = '↖';
+      }else if(oppositeAngleDeg >= 157.5 && oppositeAngleDeg < 202.5){
+        oppositeArrow = '←';
+      }else if(oppositeAngleDeg >= 202.5 && oppositeAngleDeg < 247.5){
+        oppositeArrow = '↙';
+      }else if(oppositeAngleDeg >= 247.5 && oppositeAngleDeg < 292.5){
+        oppositeArrow = '↓';
+      }else if(oppositeAngleDeg >= 292.5 && oppositeAngleDeg < 337.5){
+        oppositeArrow = '↘';
+      }
+
       relativeText =
-        ' | 기준 마지막 노란 영역 거리=' + distance.toFixed(1) + 'px, 각도=' + angleDeg.toFixed(1) + '° ' + arrow;
+        ' | 기준 마지막 노란 영역 거리=' + distance.toFixed(1) + 'px, 각도=' + angleDeg.toFixed(1) + '° ' + arrow + ' (반대방향 ' + oppositeAngleDeg.toFixed(1) + '° ' + oppositeArrow + ')';
     }
 
     return (
