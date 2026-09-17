@@ -1238,7 +1238,7 @@
 
       case 'up':
         for(let newX = x - baseSize; newX <= x + baseSize; newX++){
-          positions.push({ x: newX, y: y - baseSize });
+          positions.push({ x: newX, y: y - candidateSize });
         }
         break;
 
