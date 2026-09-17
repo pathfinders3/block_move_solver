@@ -1138,6 +1138,40 @@
   }
 
 
+  function formatCartesianAngleSummary(fromRegion, toRegion){
+    if(!fromRegion || !toRegion) return '';
+
+    const fromCenter = getRegionCenter(fromRegion);
+    const toCenter = getRegionCenter(toRegion);
+    const dx = toCenter.x - fromCenter.x;
+    const dy = -(toCenter.y - fromCenter.y);
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const angleDeg = ((Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 360;
+
+    let arrow = '→';
+
+    if(angleDeg >= 337.5 || angleDeg < 22.5){
+      arrow = '→';
+    }else if(angleDeg >= 22.5 && angleDeg < 67.5){
+      arrow = '↗';
+    }else if(angleDeg >= 67.5 && angleDeg < 112.5){
+      arrow = '↑';
+    }else if(angleDeg >= 112.5 && angleDeg < 157.5){
+      arrow = '↖';
+    }else if(angleDeg >= 157.5 && angleDeg < 202.5){
+      arrow = '←';
+    }else if(angleDeg >= 202.5 && angleDeg < 247.5){
+      arrow = '↙';
+    }else if(angleDeg >= 247.5 && angleDeg < 292.5){
+      arrow = '↓';
+    }else if(angleDeg >= 292.5 && angleDeg < 337.5){
+      arrow = '↘';
+    }
+
+    return ' | 기준 각도: ' + angleDeg.toFixed(1) + '° ' + arrow + ' | 거리=' + distance.toFixed(1) + 'px';
+  }
+
+
   function getDirectionVector(directionKey){
     switch(directionKey){
       case 'Q': return { x: -1, y: -1, label: '위왼쪽' };
@@ -1677,6 +1711,11 @@
     if(idx >= 0){
 
       const targetRegion = state.yellowRegions[idx];
+      const prevRegion = idx > 0 ? state.yellowRegions[idx - 1] : null;
+      const selfAngleText = ' | 자기 자신 기준: 0°';
+      const prevAngleText = prevRegion
+        ? formatCartesianAngleSummary(targetRegion, prevRegion)
+        : ' | 이전 노란 영역 없음';
 
       state.selectedRegionIndex = idx;
       state.selection = {
@@ -1690,6 +1729,8 @@
         '노란 영역 선택: [' + idx + ']' +
         ' | (' + targetRegion.x + ', ' + targetRegion.y + ') ' +
         targetRegion.size + 'x' + targetRegion.size +
+        selfAngleText +
+        prevAngleText +
         ' | Delete 키로 삭제가능.',
         false
       );
