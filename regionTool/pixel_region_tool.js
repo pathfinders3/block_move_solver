@@ -1422,9 +1422,10 @@
     const sizeStart = Math.max(baseRegion.size * 2, 2);
     const minSize = 2;
     const threshold = broadened ? Math.cos((45 * Math.PI) / 180) : 0.1;
-    const candidates = [];
+    const sizeGroups = [];
 
     for(let size = Math.min(w, h, sizeStart); size >= minSize; size--){
+      const groupCandidates = [];
       const xMin = Math.max(0, baseRegion.x - size);
       const xMax = Math.min(w - size, baseRegion.x + size);
       const yMin = Math.max(0, baseRegion.y - size);
@@ -1467,12 +1468,22 @@
             continue;
           }
 
-          candidates.push(candidate);
+          groupCandidates.push(candidate);
         }
+      }
+
+      if(groupCandidates.length > 0){
+        sizeGroups.push({ size, candidates: groupCandidates });
+      }
+
+      if(sizeGroups.length >= 2){
+        break;
       }
     }
 
-    return candidates.sort((a, b)=>b.size - a.size || a.x - b.x || a.y - b.y);
+    return sizeGroups
+      .flatMap((group)=>group.candidates)
+      .sort((a, b)=>b.size - a.size || a.x - b.x || a.y - b.y);
   }
 
 
