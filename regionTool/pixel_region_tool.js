@@ -2472,6 +2472,31 @@
       return;
     }
 
+    const overlapRegion = state.yellowRegions.find((r)=>
+      squaresOverlap(r, {
+        x: c.x,
+        y: c.y,
+        size: c.size
+      })
+    );
+
+    if(overlapRegion){
+      const overlapText =
+        '(' + c.x + ', ' + c.y + ') ' + c.size + 'x' + c.size +
+        ' | 기존 영역과 겹쳐서 추가 못함';
+
+      showToast(overlapText, true);
+      clearCandidateSquares();
+
+      setStatus(
+        '기존 영역과 겹쳐서 추가할 수 없습니다.',
+        true
+      );
+
+      render();
+      return;
+    }
+
     state.yellowRegions.push({
       x: c.x,
       y: c.y,
