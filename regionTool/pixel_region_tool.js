@@ -31,8 +31,8 @@
     zoomSelect.appendChild(opt);
   }
 
-  // populate square size select 1..8 (side length)
-  for(let s=1; s<=8; s++){
+  // populate square size select 1..10 (side length)
+  for(let s=1; s<=10; s++){
     const opt = document.createElement('option');
     opt.value = s;
     opt.textContent = s + ' x ' + s;
