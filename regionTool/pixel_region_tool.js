@@ -1687,8 +1687,9 @@
       clearCandidateSquares();
 
       setStatus(
-        '노란 영역을 선택했습니다. ' +
-        'Delete 키로 해제할 수 있습니다.',
+        '노란 영역 선택: (' + targetRegion.x + ', ' + targetRegion.y + ') ' +
+        targetRegion.size + 'x' + targetRegion.size +
+        ' | Delete 키로 삭제가능.',
         false
       );
 
