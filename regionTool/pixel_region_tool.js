@@ -1687,7 +1687,8 @@
       clearCandidateSquares();
 
       setStatus(
-        '노란 영역 선택: (' + targetRegion.x + ', ' + targetRegion.y + ') ' +
+        '노란 영역 선택: [' + idx + ']' +
+        ' | (' + targetRegion.x + ', ' + targetRegion.y + ') ' +
         targetRegion.size + 'x' + targetRegion.size +
         ' | Delete 키로 삭제가능.',
         false
