@@ -1182,7 +1182,7 @@
     const prevCenter = getRegionCenter(prevRegion);
     const lastCenter = getRegionCenter(lastRegion);
     const vx = lastCenter.x - prevCenter.x;
-    const vy = lastCenter.y - prevCenter.y;
+    const vy = -(lastCenter.y - prevCenter.y);
     const magnitude = Math.hypot(vx, vy);
 
     if(magnitude === 0){
@@ -1413,17 +1413,18 @@
   }
 
 
-  function findAverageDirectionCandidates(baseRegion, directionVector){
+  function findAverageDirectionCandidates(baseRegion, directionVector, options = {}){
     const w = state.width;
     const h = state.height;
-    const bestCandidates = [];
     const { prefix, stride } = buildNonWhitePrefix(state.tolerance);
     const baseCenter = getRegionCenter(baseRegion);
-    const maxSize = Math.min(w, h, Math.max(baseRegion.size * 2, baseRegion.size));
-    const minSize = Math.max(2, baseRegion.size);
-    let bestScore = -Infinity;
+    const broadened = !!options.broadened;
+    const sizeStart = Math.max(baseRegion.size * 2, 2);
+    const minSize = 2;
+    const threshold = broadened ? Math.cos((45 * Math.PI) / 180) : 0.1;
+    const candidates = [];
 
-    for(let size = maxSize; size >= minSize; size--){
+    for(let size = Math.min(w, h, sizeStart); size >= minSize; size--){
       const xMin = Math.max(0, baseRegion.x - size);
       const xMax = Math.min(w - size, baseRegion.x + size);
       const yMin = Math.max(0, baseRegion.y - size);
@@ -1453,7 +1454,7 @@
             y: y + size / 2
           };
           const vx = candidateCenter.x - baseCenter.x;
-          const vy = candidateCenter.y - baseCenter.y;
+          const vy = -(candidateCenter.y - baseCenter.y);
           const magnitude = Math.hypot(vx, vy);
 
           if(magnitude === 0){
@@ -1462,22 +1463,16 @@
 
           const score = ((vx * directionVector.x) + (vy * directionVector.y)) / magnitude;
 
-          if(score <= 0.1){
+          if(score < threshold){
             continue;
           }
 
-          if(score > bestScore + 1e-12){
-            bestScore = score;
-            bestCandidates.length = 0;
-            bestCandidates.push(candidate);
-          }else if(Math.abs(score - bestScore) <= 1e-12){
-            bestCandidates.push(candidate);
-          }
+          candidates.push(candidate);
         }
       }
     }
 
-    return bestCandidates;
+    return candidates.sort((a, b)=>b.size - a.size || a.x - b.x || a.y - b.y);
   }
 
 
@@ -2440,7 +2435,7 @@
   }
 
 
-  function startDirectionalCandidates(directionKey){
+  function startDirectionalCandidates(directionKey, options = {}){
 
     const dir = getDirectionVector(directionKey);
 
@@ -2461,11 +2456,12 @@
         return;
       }
 
-      const candidates = findAverageDirectionCandidates(baseInfo.region, avgDir);
+      const candidates = findAverageDirectionCandidates(baseInfo.region, avgDir, options);
 
       if(candidates.length === 0){
         clearCandidateSquares();
-        setStatus('평균 방향으로 후보 사각형을 찾지 못했습니다.', true);
+        const modeText = options.broadened ? '±30° 범위' : '평균 방향';
+        setStatus(modeText + '으로 후보 사각형을 찾지 못했습니다.', true);
         render();
         return;
       }
@@ -2477,7 +2473,7 @@
       state.expansionBaseRegionIndex = baseInfo.index;
 
       const c = candidates[0];
-      const label = getDirectionVector(directionKey)?.label || '평균방향';
+      const label = options.broadened ? '평균방향(±30°)' : '평균방향';
 
       setStatus(
         formatCandidateStatus(label, 0, candidates.length, c.size, c.x, c.y, state.yellowRegions[state.yellowRegions.length - 1] || null),
@@ -3077,7 +3073,11 @@
 
       case 's':
       case 'S':
-        startDirectionalCandidates('S');
+        if(e.shiftKey){
+          startDirectionalCandidates('S', { broadened: true });
+        }else{
+          startDirectionalCandidates('S');
+        }
         e.preventDefault();
         break;
 
