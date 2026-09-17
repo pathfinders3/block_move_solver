@@ -1712,7 +1712,6 @@
 
       const targetRegion = state.yellowRegions[idx];
       const prevRegion = idx > 0 ? state.yellowRegions[idx - 1] : null;
-      const selfAngleText = ' | 자기 자신 기준: 0°';
       const prevAngleText = prevRegion
         ? formatCartesianAngleSummary(targetRegion, prevRegion)
         : ' | 이전 노란 영역 없음';
@@ -1729,7 +1728,6 @@
         '노란 영역 선택: [' + idx + ']' +
         ' | (' + targetRegion.x + ', ' + targetRegion.y + ') ' +
         targetRegion.size + 'x' + targetRegion.size +
-        selfAngleText +
         prevAngleText +
         ' | Delete 키로 삭제가능.',
         false
