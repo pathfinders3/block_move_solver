@@ -31,8 +31,8 @@
     zoomSelect.appendChild(opt);
   }
 
-  // populate square size select 1..10 (side length)
-  for(let s=1; s<=10; s++){
+  // populate square size select 1..18 (side length)
+  for(let s=1; s<=18; s++){
     const opt = document.createElement('option');
     opt.value = s;
     opt.textContent = s + ' x ' + s;
@@ -1317,7 +1317,7 @@
     }
 
     const minSize = 2;
-    const maxSize = Math.max(minSize, baseRegion.size + 2);
+    const maxSize = Math.max(minSize, baseRegion.size * 2);
     const attempts = [];
 
     for(let size = maxSize; size >= minSize; size--){
