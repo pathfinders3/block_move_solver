@@ -2199,12 +2199,32 @@
         y: y + size / 2
       };
       const dx = candidateCenter.x - refCenter.x;
-      const dy = candidateCenter.y - refCenter.y;
+      const dy = -(candidateCenter.y - refCenter.y);
       const distance = Math.sqrt(dx * dx + dy * dy);
       const angleDeg = ((Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 360;
 
+      let arrow = '→';
+
+      if(angleDeg >= 337.5 || angleDeg < 22.5){
+        arrow = '→';
+      }else if(angleDeg >= 22.5 && angleDeg < 67.5){
+        arrow = '↗';
+      }else if(angleDeg >= 67.5 && angleDeg < 112.5){
+        arrow = '↑';
+      }else if(angleDeg >= 112.5 && angleDeg < 157.5){
+        arrow = '↖';
+      }else if(angleDeg >= 157.5 && angleDeg < 202.5){
+        arrow = '←';
+      }else if(angleDeg >= 202.5 && angleDeg < 247.5){
+        arrow = '↙';
+      }else if(angleDeg >= 247.5 && angleDeg < 292.5){
+        arrow = '↓';
+      }else if(angleDeg >= 292.5 && angleDeg < 337.5){
+        arrow = '↘';
+      }
+
       relativeText =
-        ' | 기준 마지막 노란 영역 거리=' + distance.toFixed(1) + 'px, 각도=' + angleDeg.toFixed(1) + '°';
+        ' | 기준 마지막 노란 영역 거리=' + distance.toFixed(1) + 'px, 각도=' + angleDeg.toFixed(1) + '° ' + arrow;
     }
 
     return (
