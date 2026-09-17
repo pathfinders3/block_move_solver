@@ -1317,7 +1317,7 @@
     }
 
     const minSize = 2;
-    const maxSize = Math.max(minSize, baseRegion.size);
+    const maxSize = Math.max(minSize, baseRegion.size + 1);
     const attempts = [];
 
     for(let size = maxSize; size >= minSize; size--){
@@ -2867,7 +2867,11 @@
             refreshDirectionalCandidateDisplay();
           }else{
             const size = state.candidateSizeGroups[state.candidateGroupIndex]?.size || 0;
-            showToast('이 크기(' + size + 'x' + size + ')에는 추천할 사각형이 없습니다.', true);
+            const count = state.candidateSizeGroups[state.candidateGroupIndex]?.positions.length || 0;
+            showToast(
+              '시도한 크기: ' + size + 'x' + size + ' | 후보 수: ' + count + '개\n이 크기(' + size + 'x' + size + ')에는 추천할 사각형이 없습니다.',
+              true
+            );
           }
         }
         e.preventDefault();
@@ -2888,7 +2892,11 @@
             refreshDirectionalCandidateDisplay();
           }else{
             const size = state.candidateSizeGroups[state.candidateGroupIndex]?.size || 0;
-            showToast('이 크기(' + size + 'x' + size + ')에는 더 이상 크게 할 수 없습니다. 이것이 max 크기입니다.', true);
+            const count = state.candidateSizeGroups[state.candidateGroupIndex]?.positions.length || 0;
+            showToast(
+              '시도한 크기: ' + size + 'x' + size + ' | 후보 수: ' + count + '개\n이 크기(' + size + 'x' + size + ')에는 더 이상 크게 할 수 없습니다. 이것이 max 크기입니다.',
+              true
+            );
           }
         }
         e.preventDefault();
