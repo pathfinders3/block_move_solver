@@ -1172,6 +1172,31 @@
   }
 
 
+  function getAverageDirectionVectorFromYellowRegions(){
+    if(state.yellowRegions.length < 2){
+      return null;
+    }
+
+    const prevRegion = state.yellowRegions[state.yellowRegions.length - 2];
+    const lastRegion = state.yellowRegions[state.yellowRegions.length - 1];
+    const prevCenter = getRegionCenter(prevRegion);
+    const lastCenter = getRegionCenter(lastRegion);
+    const vx = lastCenter.x - prevCenter.x;
+    const vy = lastCenter.y - prevCenter.y;
+    const magnitude = Math.hypot(vx, vy);
+
+    if(magnitude === 0){
+      return null;
+    }
+
+    return {
+      x: vx / magnitude,
+      y: vy / magnitude,
+      label: '평균방향'
+    };
+  }
+
+
   function getDirectionVector(directionKey){
     switch(directionKey){
       case 'Q': return { x: -1, y: -1, label: '위왼쪽' };
@@ -1182,6 +1207,12 @@
       case 'Z': return { x: -1, y: 1, label: '아래왼쪽' };
       case 'X': return { x: 0, y: 1, label: '아래' };
       case 'C': return { x: 1, y: 1, label: '아래오른쪽' };
+      case 'S': {
+        const avgDir = getAverageDirectionVectorFromYellowRegions();
+        return avgDir
+          ? { x: avgDir.x, y: avgDir.y, label: '평균방향' }
+          : { x: 0, y: 0, label: '평균방향' };
+      }
       default: return null;
     }
   }
@@ -1233,6 +1264,13 @@
       case 'Z': return dx < 0 && dy > 0;
       case 'X': return dy > 0;
       case 'C': return dx > 0 && dy > 0;
+      case 'S': {
+        const avgDir = getAverageDirectionVectorFromYellowRegions();
+        if(!avgDir) return false;
+        const magnitude = Math.hypot(dx, dy);
+        if(magnitude === 0) return false;
+        return ((dx * avgDir.x) + (dy * avgDir.y)) / magnitude >= 0.1;
+      }
       default: return false;
     }
   }
@@ -1372,6 +1410,74 @@
     }
 
     return attempts;
+  }
+
+
+  function findAverageDirectionCandidates(baseRegion, directionVector){
+    const w = state.width;
+    const h = state.height;
+    const bestCandidates = [];
+    const { prefix, stride } = buildNonWhitePrefix(state.tolerance);
+    const baseCenter = getRegionCenter(baseRegion);
+    const maxSize = Math.min(w, h, Math.max(baseRegion.size * 2, baseRegion.size));
+    const minSize = Math.max(2, baseRegion.size);
+    let bestScore = -Infinity;
+
+    for(let size = maxSize; size >= minSize; size--){
+      const xMin = Math.max(0, baseRegion.x - size);
+      const xMax = Math.min(w - size, baseRegion.x + size);
+      const yMin = Math.max(0, baseRegion.y - size);
+      const yMax = Math.min(h - size, baseRegion.y + size);
+
+      for(let y = yMin; y <= yMax; y++){
+        for(let x = xMin; x <= xMax; x++){
+          const candidate = { x, y, size };
+
+          if(
+            x === baseRegion.x &&
+            y === baseRegion.y &&
+            size === baseRegion.size
+          ){
+            continue;
+          }
+
+          if(
+            nonWhiteCount(prefix, stride, x, y, size) !== 0 ||
+            squaresOverlap(baseRegion, candidate)
+          ){
+            continue;
+          }
+
+          const candidateCenter = {
+            x: x + size / 2,
+            y: y + size / 2
+          };
+          const vx = candidateCenter.x - baseCenter.x;
+          const vy = candidateCenter.y - baseCenter.y;
+          const magnitude = Math.hypot(vx, vy);
+
+          if(magnitude === 0){
+            continue;
+          }
+
+          const score = ((vx * directionVector.x) + (vy * directionVector.y)) / magnitude;
+
+          if(score <= 0.1){
+            continue;
+          }
+
+          if(score > bestScore + 1e-12){
+            bestScore = score;
+            bestCandidates.length = 0;
+            bestCandidates.push(candidate);
+          }else if(Math.abs(score - bestScore) <= 1e-12){
+            bestCandidates.push(candidate);
+          }
+        }
+      }
+    }
+
+    return bestCandidates;
   }
 
 
@@ -2343,7 +2449,42 @@
     const baseInfo = getExpansionBaseRegion();
 
     if(!baseInfo){
-      setStatus('WXAD는 노란 기준 사각형 위에서 실행하세요.', true);
+      setStatus('WXADS는 노란 기준 사각형 위에서 실행하세요.', true);
+      return;
+    }
+
+    if(directionKey === 'S'){
+      const avgDir = getAverageDirectionVectorFromYellowRegions();
+
+      if(!avgDir){
+        setStatus('평균 방향을 만들려면 최근 2개의 노란 영역이 필요합니다.', true);
+        return;
+      }
+
+      const candidates = findAverageDirectionCandidates(baseInfo.region, avgDir);
+
+      if(candidates.length === 0){
+        clearCandidateSquares();
+        setStatus('평균 방향으로 후보 사각형을 찾지 못했습니다.', true);
+        render();
+        return;
+      }
+
+      state.candidateSquares = candidates;
+      state.selectedCandidateIndex = 0;
+      state.candidateMode = 'directional';
+      state.candidateDirectionKey = directionKey;
+      state.expansionBaseRegionIndex = baseInfo.index;
+
+      const c = candidates[0];
+      const label = getDirectionVector(directionKey)?.label || '평균방향';
+
+      setStatus(
+        formatCandidateStatus(label, 0, candidates.length, c.size, c.x, c.y, state.yellowRegions[state.yellowRegions.length - 1] || null),
+        false,
+        label + ' 후보:\n' + candidates.map((pos)=>'(' + pos.x + ', ' + pos.y + ') ' + pos.size + 'x' + pos.size).join(',\n')
+      );
+      render();
       return;
     }
 
@@ -2931,6 +3072,12 @@
       case 'd':
       case 'D':
         startDirectionalCandidates('D');
+        e.preventDefault();
+        break;
+
+      case 's':
+      case 'S':
+        startDirectionalCandidates('S');
         e.preventDefault();
         break;
 
