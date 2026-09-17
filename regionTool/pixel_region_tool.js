@@ -2181,11 +2181,31 @@
   }
 
 
-  function formatCandidateStatus(prefixText, index, total, size, x, y){
+  function formatCandidateStatus(prefixText, index, total, size, x, y, referenceRegion = null){
     const coordText =
       typeof x === 'number' && typeof y === 'number'
         ? ' | 좌표 (' + x + ', ' + y + ')'
         : '';
+
+    let relativeText = '';
+
+    if(referenceRegion && typeof x === 'number' && typeof y === 'number'){
+      const refCenter = {
+        x: referenceRegion.x + referenceRegion.size / 2,
+        y: referenceRegion.y + referenceRegion.size / 2
+      };
+      const candidateCenter = {
+        x: x + size / 2,
+        y: y + size / 2
+      };
+      const dx = candidateCenter.x - refCenter.x;
+      const dy = candidateCenter.y - refCenter.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const angleDeg = ((Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 360;
+
+      relativeText =
+        ' | 기준 마지막 노란 영역 거리=' + distance.toFixed(1) + 'px, 각도=' + angleDeg.toFixed(1) + '°';
+    }
 
     return (
       prefixText +
@@ -2198,6 +2218,7 @@
       'x' +
       size +
       coordText +
+      relativeText +
       ' | PgUp/PgDn으로 순환, Enter로 확정'
     );
   }
@@ -2306,11 +2327,12 @@
 
       const currentGroup = state.candidateSizeGroups[0];
       const c = currentGroup.positions[0];
+      const refRegion = state.yellowRegions[state.yellowRegions.length - 1] || null;
       const compactSummary = currentGroup.size + 'x' + currentGroup.size + ' : ' +
         currentGroup.positions.map((pos)=>'(' + pos.x + ', ' + pos.y + ')').join(', ');
 
       setStatus(
-        formatCandidateStatus(label, 0, currentGroup.positions.length, c.size, c.x, c.y),
+        formatCandidateStatus(label, 0, currentGroup.positions.length, c.size, c.x, c.y, refRegion),
         false,
         label + ' 후보:\n' + fullSummary
       );
@@ -2348,9 +2370,10 @@
 
     const label = getDirectionVector(state.candidateDirectionKey)?.label || '방향';
     const c = group.positions[0];
+    const refRegion = state.yellowRegions[state.yellowRegions.length - 1] || null;
 
     setStatus(
-      formatCandidateStatus(label, 0, group.positions.length, c.size, c.x, c.y),
+      formatCandidateStatus(label, 0, group.positions.length, c.size, c.x, c.y, refRegion),
       false,
       label + ' 후보:\n' + state.candidateSizeGroups
         .map((entry)=>{
@@ -2385,13 +2408,14 @@
 
     const idx = state.selectedCandidateIndex;
     const c = state.candidateSquares[idx];
+    const refRegion = state.yellowRegions[state.yellowRegions.length - 1] || null;
     const prefixText =
       state.candidateMode === 'directional' && state.candidateDirectionKey
         ? (getDirectionVector(state.candidateDirectionKey)?.label || '방향')
         : '확장';
 
     setStatus(
-      formatCandidateStatus(prefixText, idx, total, c.size, c.x, c.y),
+      formatCandidateStatus(prefixText, idx, total, c.size, c.x, c.y, refRegion),
       false
     );
 
