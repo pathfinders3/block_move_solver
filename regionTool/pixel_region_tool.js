@@ -14,6 +14,7 @@
   const infoSize = document.getElementById('infoSize');
   const infoSel = document.getElementById('infoSel');
   const infoCount = document.getElementById('infoCount');
+  const groupSelect = document.getElementById('groupSelect');
   const statusLine = document.getElementById('statusLine');
   const clearRegionsBtn = document.getElementById('clearRegionsBtn');
   const resetAllBtn = document.getElementById('resetAllBtn');
@@ -62,6 +63,7 @@
     selection: null,          // {x,y,size}
     yellowRegions: [],        // [{x,y,size}]
     currentGroupId: 0,
+    restrictCandidatesToGroup: false,
     selectedRegionIndex: null,
     candidateSquares: [],     // Shift+F8 후보 목록 [{x,y,size}]
     selectedCandidateIndex: 0,
@@ -83,6 +85,58 @@
   let hoverOriginalPixel = null;
   let lastValidOriginalPixel = null;
   let toastTimer = null;
+
+  function getGroupIds(){
+    const ids = Array.from(new Set(state.yellowRegions.map((r)=>typeof r.groupId === 'number' ? r.groupId : 0)));
+    ids.sort((a,b)=>a-b);
+    return ids;
+  }
+
+  function populateGroupSelect(){
+    if(!groupSelect) return;
+    const ids = getGroupIds();
+    // compute next id
+    const maxId = ids.length ? Math.max(...ids) : -1;
+    const nextId = maxId + 1;
+
+    // clear
+    while(groupSelect.firstChild) groupSelect.removeChild(groupSelect.firstChild);
+
+    // add existing groups
+    ids.forEach((id)=>{
+      const opt = document.createElement('option');
+      opt.value = String(id);
+      opt.textContent = 'Group ' + id;
+      groupSelect.appendChild(opt);
+    });
+
+    // add create-new option
+    const newOpt = document.createElement('option');
+    newOpt.value = '__new__';
+    newOpt.textContent = 'Create group ' + nextId;
+    groupSelect.appendChild(newOpt);
+
+    // set selection
+    const current = String(state.currentGroupId);
+    const found = Array.from(groupSelect.options).some((o)=>o.value === current);
+    groupSelect.value = found ? current : '__new__';
+  }
+
+  if(groupSelect){
+    groupSelect.addEventListener('change', ()=>{
+      const v = groupSelect.value;
+      if(v === '__new__'){
+        const ids = getGroupIds();
+        const nextId = ids.length ? Math.max(...ids) + 1 : 0;
+        state.currentGroupId = nextId;
+        populateGroupSelect();
+      }else{
+        state.currentGroupId = parseInt(v, 10);
+      }
+      saveMeta();
+      render();
+    });
+  }
 
 
   // ---------- IndexedDB persistence ----------
@@ -169,6 +223,8 @@
         squareSize: state.squareSize,
         tolerance: state.tolerance,
         shiftSRangeDegrees: state.shiftSRangeDegrees,
+        currentGroupId: state.currentGroupId,
+        restrictCandidatesToGroup: state.restrictCandidatesToGroup,
         yellowRegions: state.yellowRegions,
         width: state.width,
         height: state.height
@@ -204,6 +260,16 @@
               ? state.shiftSRangeDegrees
               : meta.shiftSRangeDegrees;
 
+          state.currentGroupId =
+            (meta.currentGroupId === undefined)
+              ? state.currentGroupId
+              : meta.currentGroupId;
+
+          state.restrictCandidatesToGroup =
+            (meta.restrictCandidatesToGroup === undefined)
+              ? state.restrictCandidatesToGroup
+              : !!meta.restrictCandidatesToGroup;
+
           state.yellowRegions =
             Array.isArray(meta.yellowRegions)
               ? meta.yellowRegions.map((r)=>({
@@ -219,6 +285,8 @@
           toleranceInput.value = state.tolerance;
           shiftSRangeInput.value = state.shiftSRangeDegrees;
           shiftSRangeValue.textContent = state.shiftSRangeDegrees + '°';
+          // populate group selector based on restored regions
+          populateGroupSelect();
         }
 
         state.selection = {
@@ -691,7 +759,9 @@
       return -1;
     }
 
-    const avgDir = getAverageDirectionVectorFromYellowRegions();
+    const avgDir = getAverageDirectionVectorFromYellowRegions.groupAware(
+      state.restrictCandidatesToGroup ? state.currentGroupId : undefined
+    );
     const baseRegion =
       state.expansionBaseRegionIndex !== null &&
       state.yellowRegions[state.expansionBaseRegionIndex]
@@ -1248,28 +1318,41 @@
 
 
   function getAverageDirectionVectorFromYellowRegions(){
-    if(state.yellowRegions.length < 2){
-      return null;
+    return getAverageDirectionVectorFromYellowRegions.groupAware();
+  }
+
+
+  // group-aware overloaded implementation helper
+  getAverageDirectionVectorFromYellowRegions.groupAware = function(groupId){
+    // if groupId is undefined and restrictCandidatesToGroup is true, use currentGroupId
+    if(groupId === undefined && state.restrictCandidatesToGroup){
+      groupId = state.currentGroupId;
     }
 
-    const prevRegion = state.yellowRegions[state.yellowRegions.length - 2];
-    const lastRegion = state.yellowRegions[state.yellowRegions.length - 1];
+    let regions = state.yellowRegions;
+
+    if(groupId !== undefined && groupId !== null){
+      regions = regions.filter((r)=>r.groupId === groupId);
+    }
+
+    if(regions.length < 2) return null;
+
+    const prevRegion = regions[regions.length - 2];
+    const lastRegion = regions[regions.length - 1];
     const prevCenter = getRegionCenter(prevRegion);
     const lastCenter = getRegionCenter(lastRegion);
     const vx = lastCenter.x - prevCenter.x;
     const vy = -(lastCenter.y - prevCenter.y);
     const magnitude = Math.hypot(vx, vy);
 
-    if(magnitude === 0){
-      return null;
-    }
+    if(magnitude === 0) return null;
 
     return {
       x: vx / magnitude,
       y: vy / magnitude,
       label: '평균방향'
     };
-  }
+  };
 
 
   function getDirectionVector(directionKey){
@@ -1283,7 +1366,9 @@
       case 'X': return { x: 0, y: 1, label: '아래' };
       case 'C': return { x: 1, y: 1, label: '아래오른쪽' };
       case 'S': {
-        const avgDir = getAverageDirectionVectorFromYellowRegions();
+        const avgDir = getAverageDirectionVectorFromYellowRegions.groupAware(
+          state.restrictCandidatesToGroup ? state.currentGroupId : undefined
+        );
         return avgDir
           ? { x: avgDir.x, y: avgDir.y, label: '평균방향' }
           : { x: 0, y: 0, label: '평균방향' };
@@ -1340,7 +1425,9 @@
       case 'X': return dy > 0;
       case 'C': return dx > 0 && dy > 0;
       case 'S': {
-        const avgDir = getAverageDirectionVectorFromYellowRegions();
+        const avgDir = getAverageDirectionVectorFromYellowRegions.groupAware(
+          state.restrictCandidatesToGroup ? state.currentGroupId : undefined
+        );
         if(!avgDir) return false;
         const magnitude = Math.hypot(dx, dy);
         if(magnitude === 0) return false;
@@ -2859,6 +2946,8 @@
       size: c.size,
       groupId: state.currentGroupId
     });
+    // update group selector UI
+    populateGroupSelect();
 
     state.selectedRegionIndex = state.yellowRegions.length - 1;
 
@@ -2933,6 +3022,9 @@
         size: s.size,
         groupId: state.currentGroupId
       });
+
+      // update group selector UI
+      populateGroupSelect();
 
       clearCandidateSquares();
 
