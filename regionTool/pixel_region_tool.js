@@ -9,6 +9,8 @@
   const zoomSelect = document.getElementById('zoomSelect');
   const sizeSelect = document.getElementById('sizeSelect');
   const toleranceInput = document.getElementById('toleranceInput');
+  const shiftSRangeInput = document.getElementById('shiftSRangeInput');
+  const shiftSRangeValue = document.getElementById('shiftSRangeValue');
   const infoSize = document.getElementById('infoSize');
   const infoSel = document.getElementById('infoSel');
   const infoCount = document.getElementById('infoCount');
@@ -56,6 +58,7 @@
     zoom: parseInt(zoomSelect.value, 10),
     squareSize: parseInt(sizeSelect.value, 10),
     tolerance: parseInt(toleranceInput.value, 10),
+    shiftSRangeDegrees: parseInt(shiftSRangeInput.value, 10),
     selection: null,          // {x,y,size}
     yellowRegions: [],        // [{x,y,size}]
     selectedRegionIndex: null,
@@ -1421,7 +1424,12 @@
     const broadened = !!options.broadened;
     const sizeStart = Math.max(baseRegion.size * 2, 2);
     const minSize = 2;
-    const threshold = broadened ? Math.cos((45 * Math.PI) / 180) : 0.1;
+    const angleLimit = broadened
+      ? state.shiftSRangeDegrees
+      : 0;
+    const threshold = broadened
+      ? Math.cos((angleLimit * Math.PI) / 180)
+      : 0.1;
     const sizeGroups = [];
 
     for(let size = Math.min(w, h, sizeStart); size >= minSize; size--){
@@ -1658,6 +1666,25 @@
 
     saveMeta();
   });
+
+
+  function updateShiftSRangeDisplay(){
+    const v = Math.max(0, Math.min(90, parseInt(shiftSRangeInput.value, 10) || 45));
+    shiftSRangeInput.value = v;
+    shiftSRangeValue.textContent = v + '°';
+    state.shiftSRangeDegrees = v;
+  }
+
+  shiftSRangeInput.addEventListener('input', ()=>{
+    updateShiftSRangeDisplay();
+    setStatus(
+      'Shift+S 각도 범위: ' + state.shiftSRangeDegrees + '°',
+      false
+    );
+    render();
+  });
+
+  updateShiftSRangeDisplay();
 
 
   clearRegionsBtn.addEventListener('click', ()=>{
