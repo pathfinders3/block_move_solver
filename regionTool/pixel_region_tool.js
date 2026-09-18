@@ -3278,6 +3278,48 @@
           break;
         }
 
+      case 'F11':
+        {
+          e.preventDefault();
+
+          const groupId = state.currentGroupId;
+          const grouped = state.yellowRegions
+            .map((region, index)=>({ region, index }))
+            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === groupId)
+            .sort((a, b)=>a.index - b.index);
+
+          if(grouped.length === 0){
+            setStatus('F11: 현재 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
+            render();
+            break;
+          }
+
+          const { region, index } = grouped[grouped.length - 1];
+          const prevRegion = index > 0 ? state.yellowRegions[index - 1] : null;
+          const prevAngleText = prevRegion
+            ? formatCartesianAngleSummary(region, prevRegion)
+            : ' | 이전 노란 영역 없음';
+
+          state.selectedRegionIndex = index;
+          state.selection = {
+            x: region.x,
+            y: region.y,
+            size: region.size
+          };
+          clearCandidateSquares();
+
+          setStatus(
+            'F11: 현재 그룹에서 가장 큰 인덱스 선택: [' + index + '] (그룹 ' + groupId + ')' +
+            ' | (' + region.x + ', ' + region.y + ') ' +
+            region.size + 'x' + region.size +
+            prevAngleText +
+            ' | Delete 키로 삭제가능.',
+            false
+          );
+          render();
+          break;
+        }
+
       case 'i':
       case 'I':
         if(e.shiftKey){
