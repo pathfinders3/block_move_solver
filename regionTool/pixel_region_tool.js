@@ -2025,7 +2025,7 @@
       clearCandidateSquares();
 
       setStatus(
-        '노란 영역 선택: [' + idx + ']' +
+        '노란 영역 선택: [' + idx + '] (그룹 ' + (targetRegion.groupId === undefined ? 0 : targetRegion.groupId) + ')' +
         ' | (' + targetRegion.x + ', ' + targetRegion.y + ') ' +
         targetRegion.size + 'x' + targetRegion.size +
         prevAngleText +
