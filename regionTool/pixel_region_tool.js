@@ -2669,17 +2669,17 @@
   }
 
 
-  function startDirectionalCandidates(directionKey, options = {}){
+  function prepareDirectionalSuggestion(directionKey, options = {}){
 
     const dir = getDirectionVector(directionKey);
 
-    if(!dir) return;
+    if(!dir) return false;
 
     const baseInfo = getExpansionBaseRegion();
 
     if(!baseInfo){
       setStatus('WXADS는 노란 기준 사각형 위에서 실행하세요.', true);
-      return;
+      return false;
     }
 
     if(directionKey === 'S'){
@@ -2687,18 +2687,17 @@
 
       if(!avgDir){
         setStatus('평균 방향을 만들려면 최근 2개의 노란 영역이 필요합니다.', true);
-        return;
+        return false;
       }
 
       const candidates = findAverageDirectionCandidates(baseInfo.region, avgDir, options);
 
       if(candidates.length === 0){
         clearCandidateSquares();
-        const angleRange = options.broadened ? 360 : state.shiftSRangeDegrees;
         const modeText = options.broadened ? '전체 360° 범위' : '현재 각도 범위';
         setStatus(modeText + '에서 후보 사각형을 찾지 못했습니다.', true);
         render();
-        return;
+        return false;
       }
 
       state.candidateSquares = candidates;
@@ -2718,7 +2717,7 @@
         label + ' 후보:\n' + candidates.map((pos)=>'(' + pos.x + ', ' + pos.y + ') ' + pos.size + 'x' + pos.size).join(',\n')
       );
       render();
-      return;
+      return true;
     }
 
     if(directionKey === 'W' || directionKey === 'X' || directionKey === 'A' || directionKey === 'D'){
@@ -2739,7 +2738,7 @@
       if(validEntries.length === 0){
         setStatus(label + ' 후보:\n없음', true, label + ' 후보:\n' + fullSummary);
         render();
-        return;
+        return false;
       }
 
       state.candidateSizeGroups = validEntries.map((entry)=>({
@@ -2770,13 +2769,13 @@
         label + ' 후보:\n' + fullSummary
       );
       render();
-      return;
+      return true;
     }
 
     const candidates =
       findDirectionalCandidates(baseInfo.region, directionKey);
 
-    console.log('[startDirectionalCandidates]', {
+    console.log('[prepareDirectionalSuggestion]', {
       directionKey,
       base: { x: baseInfo.region.x, y: baseInfo.region.y, size: baseInfo.region.size },
       count: candidates.length,
@@ -2784,7 +2783,13 @@
       sample: candidates.slice(0, 10)
     });
 
-    // UI와 후보 표시 로직은 제거하고, 콘솔 카운트만 남겨서 새 구현을 붙일 수 있게 한다.
+    return false;
+  }
+
+
+  function startDirectionalCandidates(directionKey, options = {}){
+
+    prepareDirectionalSuggestion(directionKey, options);
   }
 
 
@@ -3233,6 +3238,18 @@
             false
           );
           render();
+          break;
+        }
+
+      case 'F9':
+        {
+          e.preventDefault();
+
+          if(!prepareDirectionalSuggestion('S', { broadened: e.shiftKey })){
+            break;
+          }
+
+          acceptSelectedCandidate();
           break;
         }
 
