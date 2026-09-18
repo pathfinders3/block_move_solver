@@ -61,6 +61,7 @@
     shiftSRangeDegrees: parseInt(shiftSRangeInput.value, 10),
     selection: null,          // {x,y,size}
     yellowRegions: [],        // [{x,y,size}]
+    currentGroupId: 0,
     selectedRegionIndex: null,
     candidateSquares: [],     // Shift+F8 후보 목록 [{x,y,size}]
     selectedCandidateIndex: 0,
@@ -205,7 +206,12 @@
 
           state.yellowRegions =
             Array.isArray(meta.yellowRegions)
-              ? meta.yellowRegions
+              ? meta.yellowRegions.map((r)=>({
+                x: r.x,
+                y: r.y,
+                size: r.size,
+                groupId: (r.groupId === undefined) ? 0 : r.groupId
+              }))
               : [];
 
           zoomSelect.value = state.zoom;
@@ -2850,7 +2856,8 @@
     state.yellowRegions.push({
       x: c.x,
       y: c.y,
-      size: c.size
+      size: c.size,
+      groupId: state.currentGroupId
     });
 
     state.selectedRegionIndex = state.yellowRegions.length - 1;
@@ -2923,7 +2930,8 @@
       state.yellowRegions.push({
         x: s.x,
         y: s.y,
-        size: s.size
+        size: s.size,
+        groupId: state.currentGroupId
       });
 
       clearCandidateSquares();
