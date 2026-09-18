@@ -1489,9 +1489,9 @@
     for(let size = Math.min(w, h, sizeStart); size >= minSize; size--){
       const groupCandidates = [];
       const xMin = Math.max(0, baseRegion.x - size);
-      const xMax = Math.min(w - size, baseRegion.x + size);
+      const xMax = Math.min(w - size, baseRegion.x + baseRegion.size);
       const yMin = Math.max(0, baseRegion.y - size);
-      const yMax = Math.min(h - size, baseRegion.y + size);
+      const yMax = Math.min(h - size, baseRegion.y + baseRegion.size);
 
       for(let y = yMin; y <= yMax; y++){
         for(let x = xMin; x <= xMax; x++){
