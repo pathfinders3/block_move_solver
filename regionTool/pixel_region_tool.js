@@ -167,6 +167,7 @@
         zoom: state.zoom,
         squareSize: state.squareSize,
         tolerance: state.tolerance,
+        shiftSRangeDegrees: state.shiftSRangeDegrees,
         yellowRegions: state.yellowRegions,
         width: state.width,
         height: state.height
@@ -197,6 +198,11 @@
               ? state.tolerance
               : meta.tolerance;
 
+          state.shiftSRangeDegrees =
+            (meta.shiftSRangeDegrees === undefined)
+              ? state.shiftSRangeDegrees
+              : meta.shiftSRangeDegrees;
+
           state.yellowRegions =
             Array.isArray(meta.yellowRegions)
               ? meta.yellowRegions
@@ -205,6 +211,8 @@
           zoomSelect.value = state.zoom;
           sizeSelect.value = state.squareSize;
           toleranceInput.value = state.tolerance;
+          shiftSRangeInput.value = state.shiftSRangeDegrees;
+          shiftSRangeValue.textContent = state.shiftSRangeDegrees + '°';
         }
 
         state.selection = {
@@ -670,10 +678,52 @@
 
     if(state.candidateSquares.length === 0) return;
 
+    let bestDirectionMatchIndex = -1;
+    let bestDirectionScore = -Infinity;
+
+    if(
+      state.candidateMode === 'directional' &&
+      state.candidateDirectionKey === 'S' &&
+      state.yellowRegions.length >= 2
+    ){
+      const avgDir = getAverageDirectionVectorFromYellowRegions();
+      const baseRegion =
+        state.expansionBaseRegionIndex !== null &&
+        state.yellowRegions[state.expansionBaseRegionIndex]
+          ? state.yellowRegions[state.expansionBaseRegionIndex]
+          : state.yellowRegions[state.yellowRegions.length - 1];
+
+      if(avgDir && baseRegion){
+        const baseCenter = getRegionCenter(baseRegion);
+
+        state.candidateSquares.forEach((c, idx)=>{
+          const candidateCenter = {
+            x: c.x + c.size / 2,
+            y: c.y + c.size / 2
+          };
+          const vx = candidateCenter.x - baseCenter.x;
+          const vy = -(candidateCenter.y - baseCenter.y);
+          const magnitude = Math.hypot(vx, vy);
+
+          if(magnitude === 0) return;
+
+          const score = ((vx * avgDir.x) + (vy * avgDir.y)) / magnitude;
+
+          if(score > bestDirectionScore){
+            bestDirectionScore = score;
+            bestDirectionMatchIndex = idx;
+          }
+        });
+      }
+    }
+
     state.candidateSquares.forEach((c, idx)=>{
 
       const isSelected =
         idx === state.selectedCandidateIndex;
+      const isClosestDirectionMatch =
+        !isSelected &&
+        bestDirectionMatchIndex === idx;
 
       const displayX = c.x * scale;
       const displayY = c.y * scale;
@@ -682,7 +732,9 @@
       ctx.fillStyle =
         isSelected
           ? 'rgba(255, 107, 107, 0.86)'
-          : 'rgba(138, 180, 255, 0.16)';
+          : isClosestDirectionMatch
+            ? 'rgba(38, 110, 72, 0.34)'
+            : 'rgba(138, 180, 255, 0.16)';
 
       ctx.fillRect(
         displayX,
@@ -695,7 +747,9 @@
       ctx.fillStyle =
         isSelected
           ? '#ff6b6b'
-          : '#8ab4ff';
+          : isClosestDirectionMatch
+            ? '#1d5a39'
+            : '#8ab4ff';
 
       ctx.fillRect(
         displayX - 1,
@@ -1425,11 +1479,11 @@
     const sizeStart = Math.max(baseRegion.size * 2, 2);
     const minSize = 2;
     const angleLimit = broadened
-      ? state.shiftSRangeDegrees
-      : 0;
+      ? 360
+      : state.shiftSRangeDegrees;
     const threshold = broadened
-      ? Math.cos((angleLimit * Math.PI) / 180)
-      : 0.1;
+      ? -1
+      : Math.cos((angleLimit * Math.PI) / 180);
     const sizeGroups = [];
 
     for(let size = Math.min(w, h, sizeStart); size >= minSize; size--){
@@ -1682,6 +1736,7 @@
       false
     );
     render();
+    saveMeta();
   });
 
   updateShiftSRangeDisplay();
@@ -2519,8 +2574,9 @@
 
       if(candidates.length === 0){
         clearCandidateSquares();
-        const modeText = options.broadened ? '±30° 범위' : '평균 방향';
-        setStatus(modeText + '으로 후보 사각형을 찾지 못했습니다.', true);
+        const angleRange = options.broadened ? 360 : state.shiftSRangeDegrees;
+        const modeText = options.broadened ? '전체 360° 범위' : '현재 각도 범위';
+        setStatus(modeText + '에서 후보 사각형을 찾지 못했습니다.', true);
         render();
         return;
       }
@@ -2532,7 +2588,7 @@
       state.expansionBaseRegionIndex = baseInfo.index;
 
       const c = candidates[0];
-      const label = options.broadened ? '평균방향(±30°)' : '평균방향';
+      const label = options.broadened ? '평균방향(전체 360°)' : '평균방향(±' + state.shiftSRangeDegrees + '°)';
 
       setStatus(
         formatCandidateStatus(label, 0, candidates.length, c.size, c.x, c.y, state.yellowRegions[state.yellowRegions.length - 1] || null),
