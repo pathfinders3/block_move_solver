@@ -3240,14 +3240,20 @@
         {
           e.preventDefault();
 
-          const groupId = state.currentGroupId;
+          const selectedRegion =
+            state.selectedRegionIndex !== null && state.yellowRegions[state.selectedRegionIndex]
+              ? state.yellowRegions[state.selectedRegionIndex]
+              : null;
+          const groupId = selectedRegion
+            ? ((typeof selectedRegion.groupId === 'number') ? selectedRegion.groupId : 0)
+            : state.currentGroupId;
           const grouped = state.yellowRegions
             .map((region, index)=>({ region, index }))
             .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === groupId)
             .sort((a, b)=>a.index - b.index);
 
           if(grouped.length === 0){
-            setStatus('F10: 현재 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
+            setStatus('F10: 현재 선택/활성 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
             render();
             break;
           }
@@ -3267,7 +3273,7 @@
           clearCandidateSquares();
 
           setStatus(
-            'F10: 현재 그룹에서 가장 작은 인덱스 선택: [' + index + '] (그룹 ' + groupId + ')' +
+            'F10: 선택된 그룹에서 가장 작은 인덱스 선택: [' + index + '] (그룹 ' + groupId + ')' +
             ' | (' + region.x + ', ' + region.y + ') ' +
             region.size + 'x' + region.size +
             prevAngleText +
@@ -3282,14 +3288,20 @@
         {
           e.preventDefault();
 
-          const groupId = state.currentGroupId;
+          const selectedRegion =
+            state.selectedRegionIndex !== null && state.yellowRegions[state.selectedRegionIndex]
+              ? state.yellowRegions[state.selectedRegionIndex]
+              : null;
+          const groupId = selectedRegion
+            ? ((typeof selectedRegion.groupId === 'number') ? selectedRegion.groupId : 0)
+            : state.currentGroupId;
           const grouped = state.yellowRegions
             .map((region, index)=>({ region, index }))
             .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === groupId)
             .sort((a, b)=>a.index - b.index);
 
           if(grouped.length === 0){
-            setStatus('F11: 현재 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
+            setStatus('F11: 현재 선택/활성 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
             render();
             break;
           }
@@ -3309,7 +3321,7 @@
           clearCandidateSquares();
 
           setStatus(
-            'F11: 현재 그룹에서 가장 큰 인덱스 선택: [' + index + '] (그룹 ' + groupId + ')' +
+            'F11: 선택된 그룹에서 가장 큰 인덱스 선택: [' + index + '] (그룹 ' + groupId + ')' +
             ' | (' + region.x + ', ' + region.y + ') ' +
             region.size + 'x' + region.size +
             prevAngleText +
