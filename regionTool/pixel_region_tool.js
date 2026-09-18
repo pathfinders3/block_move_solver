@@ -138,6 +138,19 @@
     });
   }
 
+  function getGroupColor(groupId){
+    const palette = [
+      { fill: '#f4d35e', stroke: '#ffb84d' }, // group 0 (yellow)
+      { fill: '#c6f7e2', stroke: '#1d5a39' }, // group 1 (mint/green)
+      { fill: '#ffd6e0', stroke: '#b64f5a' }, // group 2 (pink)
+      { fill: '#dfe6ff', stroke: '#3b6bff' }, // group 3 (light blue)
+      { fill: '#e9e2c8', stroke: '#7b5f2f' }  // group 4 (tan)
+    ];
+
+    const id = (typeof groupId === 'number') ? groupId : 0;
+    return palette[Math.abs(id) % palette.length];
+  }
+
 
   // ---------- IndexedDB persistence ----------
 
@@ -405,16 +418,13 @@
   // ---------- rendering ----------
 
   function drawRegionsOn(ctx, scale){
-
     state.yellowRegions.forEach((r, idx)=>{
 
-      const selected =
-        (idx === state.selectedRegionIndex);
+      const selected = (idx === state.selectedRegionIndex);
+      const gid = (typeof r.groupId === 'number') ? r.groupId : 0;
+      const colors = getGroupColor(gid);
 
-      ctx.fillStyle =
-        selected
-          ? '#ffb84d'
-          : '#f4d35e';
+      ctx.fillStyle = selected ? '#ffb84d' : colors.fill;
 
       ctx.fillRect(
         r.x * scale,
@@ -423,14 +433,19 @@
         r.size * scale
       );
 
-
       if(selected){
-
-        ctx.lineWidth =
-          Math.max(2, scale / 3);
-
+        ctx.lineWidth = Math.max(2, scale / 3);
         ctx.strokeStyle = '#ff6b6b';
-
+        ctx.strokeRect(
+          r.x * scale + ctx.lineWidth / 2,
+          r.y * scale + ctx.lineWidth / 2,
+          r.size * scale - ctx.lineWidth,
+          r.size * scale - ctx.lineWidth
+        );
+      }else{
+        // subtle outer border using group's stroke color
+        ctx.lineWidth = Math.max(1, scale > 1 ? Math.min(2, Math.floor(scale/4)) : 1);
+        ctx.strokeStyle = colors.stroke;
         ctx.strokeRect(
           r.x * scale + ctx.lineWidth / 2,
           r.y * scale + ctx.lineWidth / 2,
