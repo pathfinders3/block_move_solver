@@ -674,48 +674,60 @@
   }
 
 
+  function getBestDirectionMatchIndex(candidates){
+    if(
+      state.candidateMode !== 'directional' ||
+      state.candidateDirectionKey !== 'S' ||
+      state.yellowRegions.length < 2 ||
+      !Array.isArray(candidates) ||
+      candidates.length === 0
+    ){
+      return -1;
+    }
+
+    const avgDir = getAverageDirectionVectorFromYellowRegions();
+    const baseRegion =
+      state.expansionBaseRegionIndex !== null &&
+      state.yellowRegions[state.expansionBaseRegionIndex]
+        ? state.yellowRegions[state.expansionBaseRegionIndex]
+        : state.yellowRegions[state.yellowRegions.length - 1];
+
+    if(!avgDir || !baseRegion){
+      return -1;
+    }
+
+    const baseCenter = getRegionCenter(baseRegion);
+    let bestDirectionMatchIndex = -1;
+    let bestDirectionScore = -Infinity;
+
+    candidates.forEach((c, idx)=>{
+      const candidateCenter = {
+        x: c.x + c.size / 2,
+        y: c.y + c.size / 2
+      };
+      const vx = candidateCenter.x - baseCenter.x;
+      const vy = -(candidateCenter.y - baseCenter.y);
+      const magnitude = Math.hypot(vx, vy);
+
+      if(magnitude === 0) return;
+
+      const score = ((vx * avgDir.x) + (vy * avgDir.y)) / magnitude;
+
+      if(score > bestDirectionScore){
+        bestDirectionScore = score;
+        bestDirectionMatchIndex = idx;
+      }
+    });
+
+    return bestDirectionMatchIndex;
+  }
+
+
   function drawCandidateSquaresOn(ctx, scale){
 
     if(state.candidateSquares.length === 0) return;
 
-    let bestDirectionMatchIndex = -1;
-    let bestDirectionScore = -Infinity;
-
-    if(
-      state.candidateMode === 'directional' &&
-      state.candidateDirectionKey === 'S' &&
-      state.yellowRegions.length >= 2
-    ){
-      const avgDir = getAverageDirectionVectorFromYellowRegions();
-      const baseRegion =
-        state.expansionBaseRegionIndex !== null &&
-        state.yellowRegions[state.expansionBaseRegionIndex]
-          ? state.yellowRegions[state.expansionBaseRegionIndex]
-          : state.yellowRegions[state.yellowRegions.length - 1];
-
-      if(avgDir && baseRegion){
-        const baseCenter = getRegionCenter(baseRegion);
-
-        state.candidateSquares.forEach((c, idx)=>{
-          const candidateCenter = {
-            x: c.x + c.size / 2,
-            y: c.y + c.size / 2
-          };
-          const vx = candidateCenter.x - baseCenter.x;
-          const vy = -(candidateCenter.y - baseCenter.y);
-          const magnitude = Math.hypot(vx, vy);
-
-          if(magnitude === 0) return;
-
-          const score = ((vx * avgDir.x) + (vy * avgDir.y)) / magnitude;
-
-          if(score > bestDirectionScore){
-            bestDirectionScore = score;
-            bestDirectionMatchIndex = idx;
-          }
-        });
-      }
-    }
+    const bestDirectionMatchIndex = getBestDirectionMatchIndex(state.candidateSquares);
 
     state.candidateSquares.forEach((c, idx)=>{
 
@@ -2582,12 +2594,14 @@
       }
 
       state.candidateSquares = candidates;
-      state.selectedCandidateIndex = 0;
       state.candidateMode = 'directional';
       state.candidateDirectionKey = directionKey;
       state.expansionBaseRegionIndex = baseInfo.index;
 
-      const c = candidates[0];
+      const defaultMatchIndex = getBestDirectionMatchIndex(candidates);
+      state.selectedCandidateIndex = Math.max(0, defaultMatchIndex >= 0 ? defaultMatchIndex : 0);
+
+      const c = candidates[state.selectedCandidateIndex];
       const label = options.broadened ? '평균방향(전체 360°)' : '평균방향(±' + state.shiftSRangeDegrees + '°)';
 
       setStatus(
