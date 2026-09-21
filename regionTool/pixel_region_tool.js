@@ -14,6 +14,7 @@
   const infoSize = document.getElementById('infoSize');
   const infoSel = document.getElementById('infoSel');
   const infoCount = document.getElementById('infoCount');
+  const infoGroupHistory = document.getElementById('infoGroupHistory');
   const groupSelect = document.getElementById('groupSelect');
   const statusLine = document.getElementById('statusLine');
   const clearRegionsBtn = document.getElementById('clearRegionsBtn');
@@ -63,6 +64,7 @@
     selection: null,          // {x,y,size}
     yellowRegions: [],        // [{x,y,size}]
     currentGroupId: 0,
+    selectedGroupHistory: [],  // 최근 선택된 groupId 2개
     restrictCandidatesToGroup: false,
     selectedRegionIndex: null,
     candidateSquares: [],     // Shift+F8 후보 목록 [{x,y,size}]
@@ -237,6 +239,7 @@
         tolerance: state.tolerance,
         shiftSRangeDegrees: state.shiftSRangeDegrees,
         currentGroupId: state.currentGroupId,
+        selectedGroupHistory: state.selectedGroupHistory,
         restrictCandidatesToGroup: state.restrictCandidatesToGroup,
         yellowRegions: state.yellowRegions,
         width: state.width,
@@ -277,6 +280,13 @@
             (meta.currentGroupId === undefined)
               ? state.currentGroupId
               : meta.currentGroupId;
+
+          state.selectedGroupHistory =
+            Array.isArray(meta.selectedGroupHistory)
+              ? meta.selectedGroupHistory
+                  .map((g)=>Number.isInteger(g) ? g : 0)
+                  .slice(-2)
+              : [];
 
           state.restrictCandidatesToGroup =
             (meta.restrictCandidatesToGroup === undefined)
@@ -999,6 +1009,13 @@
   }
 
 
+  function pushSelectedGroupHistory(groupId){
+    const normalized = Number.isInteger(groupId) ? groupId : 0;
+    state.selectedGroupHistory = [...state.selectedGroupHistory, normalized].slice(-2);
+    saveMeta();
+  }
+
+
   function updateInfo(){
 
     infoSize.textContent =
@@ -1022,6 +1039,11 @@
 
     infoCount.textContent =
       state.yellowRegions.length;
+
+    infoGroupHistory.textContent =
+      state.selectedGroupHistory.length > 0
+        ? state.selectedGroupHistory.join(', ')
+        : '-';
   }
 
 
@@ -2037,6 +2059,7 @@
         y: targetRegion.y,
         size: targetRegion.size
       };
+      pushSelectedGroupHistory((typeof targetRegion.groupId === 'number') ? targetRegion.groupId : 0);
       clearCandidateSquares();
 
       setStatus(
