@@ -15,6 +15,7 @@
   const infoSel = document.getElementById('infoSel');
   const infoCount = document.getElementById('infoCount');
   const infoGroupHistory = document.getElementById('infoGroupHistory');
+  const keyHelpSummary = document.getElementById('keyHelpSummary');
   const groupSelect = document.getElementById('groupSelect');
   const statusLine = document.getElementById('statusLine');
   const clearRegionsBtn = document.getElementById('clearRegionsBtn');
@@ -1179,6 +1180,30 @@
   }
 
 
+  function openKeyHelpOverlay(){
+    const keyHelpText = [
+      'Ctrl+V : 이미지 붙여넣기',
+      '클릭 : 확대 캔버스에서 선택 영역 이동 / 노란 영역 선택',
+      'I J K L : 선택 영역 상 좌 하 우 이동',
+      'F8 : 흰색 검사 후 노란색 칠하기',
+      'Shift+F8 : 기준 노란 사각형을 최대 확장 후보로 탐색',
+      'Q W E A D Z X C : 방향 후보 탐색',
+      'S : 평균 방향 후보',
+      'Shift+S : 범위 확장 후보',
+      'PgUp / PgDn : 후보 순환',
+      'Enter : 확정',
+      'F9 : 평균 방향 추천 후 즉시 확정',            
+      'Delete : 선택된 노란 영역 해제',
+      'Alt+M : 최근 2개 그룹 통합',
+      'Ctrl+Z : 최근 그룹 통합 취소'
+    ].join('\n');
+
+    statusOverlayContent.textContent = keyHelpText;
+    statusOverlay.classList.add('open');
+    statusOverlay.setAttribute('aria-hidden', 'false');
+  }
+
+
   function updateChannelStatsDisplay(text){
     // 하단 보조 메시지 영역 제거로 더 이상 사용하지 않음.
   }
@@ -2069,6 +2094,18 @@
   statusLine.addEventListener('click', (e)=>{
     e.stopPropagation();
     openStatusOverlay();
+  });
+
+  keyHelpSummary.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    openKeyHelpOverlay();
+  });
+
+  keyHelpSummary.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      openKeyHelpOverlay();
+    }
   });
 
   statusCloseBtn.addEventListener('click', (e)=>{

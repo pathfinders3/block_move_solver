@@ -96,19 +96,18 @@ button:hover{
   justify-content: space-between;
 }
 .info-line span:last-child{ color: var(--text); }
-.keys{
+.keys-summary{
   font-size: 0.78rem;
-  color: var(--text-dim);
-  line-height: 1.7;
-}
-.keys b{
   color: var(--accent);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: #101317;
-  border: 1px solid var(--panel-border);
-  border-radius: 4px;
-  padding: 1px 6px;
-  margin-right: 4px;
+  cursor: pointer;
+  border: 1px solid rgba(94, 230, 200, 0.45);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(94, 230, 200, 0.04);
+  text-align: center;
+}
+.keys-summary:focus{
+  outline: 1px solid var(--accent);
 }
 .canvases{
   flex: 1 1 480px;
