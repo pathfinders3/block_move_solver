@@ -1052,8 +1052,8 @@
       secondEdge.y - firstEdge.y
     );
 
-    if(gap >= 8){
-      const msg = '그룹 ' + firstGroupId + ' 마지막점과 그룹 ' + secondGroupId + ' 첫점의 거리 ' + Number(gap.toFixed(1)) + 'px가 8px 이상입니다. 병합을 취소합니다.';
+    if(gap >= 24){
+      const msg = '그룹 ' + firstGroupId + ' 마지막점과 그룹 ' + secondGroupId + ' 첫점의 거리 ' + Number(gap.toFixed(1)) + 'px가 24px 이상입니다. 병합을 취소합니다.';
       showToast(msg, true);
       setStatus(msg, true);
       render();
