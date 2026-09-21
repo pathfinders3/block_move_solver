@@ -74,6 +74,7 @@
     candidateSizeGroups: [],  // 방향 후보를 size별로 나눈 목록 [{size, positions:[{x,y,size}]}]
     candidateGroupIndex: 0,
     expansionBaseRegionIndex: null,
+    groupMergeUndoStack: [],
     minChannelHighlight: null, // {points: [{x,y}], expiresAt}
     minChannelHighlightTimer: null,
     tolerancePassedHighlight: null, // {points: [{x,y}], expiresAt}
@@ -1013,6 +1014,81 @@
     const normalized = Number.isInteger(groupId) ? groupId : 0;
     state.selectedGroupHistory = [...state.selectedGroupHistory, normalized].slice(-2);
     saveMeta();
+  }
+
+
+  function mergeSelectedGroupsIntoFirst(){
+    const firstGroupId = state.selectedGroupHistory[0];
+    const secondGroupId = state.selectedGroupHistory[1];
+
+    if(
+      !Number.isInteger(firstGroupId) ||
+      !Number.isInteger(secondGroupId) ||
+      firstGroupId === secondGroupId
+    ){
+      saveMeta();
+      return;
+    }
+
+    const previousSnapshot = {
+      yellowRegions: state.yellowRegions.map((region)=>({ ...region })),
+      currentGroupId: state.currentGroupId,
+      selectedGroupHistory: state.selectedGroupHistory.slice(),
+      selectedRegionIndex: state.selectedRegionIndex,
+      selection: state.selection ? { ...state.selection } : null
+    };
+
+    const merged = [];
+    const kept = [];
+
+    for(const region of state.yellowRegions){
+      const groupId = (typeof region.groupId === 'number') ? region.groupId : 0;
+      if(groupId === secondGroupId){
+        merged.push({ ...region, groupId: firstGroupId });
+      }else if(groupId === firstGroupId){
+        kept.push({ ...region, groupId: firstGroupId });
+      }else{
+        kept.push({ ...region });
+      }
+    }
+
+    state.yellowRegions = [...kept, ...merged];
+    state.currentGroupId = firstGroupId;
+    state.selectedGroupHistory = [firstGroupId];
+    state.groupMergeUndoStack.push(previousSnapshot);
+
+    state.selectedRegionIndex = null;
+    state.selection = null;
+    populateGroupSelect();
+    saveMeta();
+    render();
+
+    setStatus(
+      '그룹 ' + firstGroupId + ' + 그룹 ' + secondGroupId + ' 를 통합했습니다. Ctrl+Z로 취소할 수 있습니다.',
+      false
+    );
+  }
+
+
+  function undoLastGroupMerge(){
+    if(state.groupMergeUndoStack.length === 0){
+      setStatus('취소할 그룹 통합 기록이 없습니다.', true);
+      render();
+      return;
+    }
+
+    const snapshot = state.groupMergeUndoStack.pop();
+    state.yellowRegions = snapshot.yellowRegions.map((region)=>({ ...region }));
+    state.currentGroupId = snapshot.currentGroupId;
+    state.selectedGroupHistory = snapshot.selectedGroupHistory.slice();
+    state.selectedRegionIndex = snapshot.selectedRegionIndex;
+    state.selection = snapshot.selection ? { ...snapshot.selection } : null;
+
+    populateGroupSelect();
+    saveMeta();
+    render();
+
+    setStatus('그룹 통합을 취소했습니다.', false);
   }
 
 
@@ -3463,7 +3539,11 @@
 
       case 'z':
       case 'Z':
-        startDirectionalCandidates('Z');
+        if(e.ctrlKey || e.metaKey){
+          undoLastGroupMerge();
+        }else{
+          startDirectionalCandidates('Z');
+        }
         e.preventDefault();
         break;
 
@@ -3537,6 +3617,14 @@
           }
         }
         e.preventDefault();
+        break;
+
+      case 'm':
+      case 'M':
+        if(e.altKey){
+          mergeSelectedGroupsIntoFirst();
+          e.preventDefault();
+        }
         break;
 
       case 'Enter':
