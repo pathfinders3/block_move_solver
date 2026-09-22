@@ -1141,7 +1141,7 @@
         x: Number(region.x),
         y: Number(region.y),
         size: Number(region.size),
-        canConnect: true,
+        canConnect: false,
         mergeState: false
       });
     }
@@ -1149,7 +1149,10 @@
     const groups = Array.from(groupsById.entries())
       .sort((a, b)=>a[0] - b[0])
       .map(([groupId, points], groupIndex)=>{
-        const sortedPoints = points.slice().sort((a, b)=>a.y - b.y || a.x - b.x || a.size - b.size);
+        // Preserve insertion/creation order of points so polyline topology
+        // (point sequence) is retained. Sorting by y/x breaks path order
+        // and prevents DP simplification from working correctly.
+        const sortedPoints = points.slice();
         const segmentId = 'seg-' + String(groupIndex + 1);
 
         const segment = {
@@ -1233,9 +1236,44 @@
       }
     }
 
+    // build blockGrider2-compatible rects + polylines
+    const rects = [];
+    const polylines = [];
+
+    groups.forEach(group => {
+      const segments = Array.isArray(group && group.segments) ? group.segments : [];
+      segments.forEach(segment => {
+        const points = Array.isArray(segment && segment.points) ? segment.points : [];
+        const pointIndices = [];
+
+        points.forEach(point => {
+          const x = Number(point && point.x);
+          const y = Number(point && point.y);
+          const size = Number(point && point.size);
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(size) || size <= 0) {
+            return;
+          }
+
+          rects.push({
+            x: Math.round(x),
+            y: Math.round(y),
+            size: Math.round(size),
+            canConnect: !!(point && point.canConnect)
+          });
+          pointIndices.push(rects.length - 1);
+        });
+
+        if (pointIndices.length > 0) {
+          polylines.push({ pointIndices });
+        }
+      });
+    });
+
     const payload = {
       version: 1,
       groups,
+      rects,
+      polylines,
       canvas1ClipboardScale: {
         scalePercent: 100,
         scale: 1,
