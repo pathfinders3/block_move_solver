@@ -1427,7 +1427,9 @@
       'F9 : 평균 방향 추천 후 즉시 확정',            
       'Delete : 선택된 노란 영역 해제',
       'Alt+M : 최근 2개 그룹 통합',
-      'Ctrl+Z : 최근 그룹 통합 취소'
+      'Ctrl+Z : 최근 그룹 통합 취소',
+      'F11 : 그룹 내 가장 큰 인덱스 선택',
+      'F10 : 그룹 내 가장 작은 인덱스 선택'
     ].join('\n');
 
     statusOverlayContent.textContent = keyHelpText;
@@ -3718,6 +3720,124 @@
             ' | Delete 키로 삭제가능.',
             false
           );
+          render();
+          break;
+        }
+
+      case 'ArrowLeft':
+        {
+          e.preventDefault();
+
+          if(state.selectedRegionIndex === null){
+            // nothing selected
+            setStatus('이동할 선택된 노란 영역이 없습니다.', true);
+            break;
+          }
+
+          const current = state.yellowRegions[state.selectedRegionIndex];
+          if(!current){
+            setStatus('선택된 노란 영역을 찾을 수 없습니다.', true);
+            break;
+          }
+
+          const groupId = (typeof current.groupId === 'number') ? current.groupId : 0;
+          const grouped = state.yellowRegions
+            .map((region, index)=>({ region, index }))
+            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === groupId)
+            .sort((a, b)=>a.index - b.index);
+
+          if(grouped.length === 0){
+            setStatus('현재 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
+            break;
+          }
+
+          const pos = grouped.findIndex((g)=>g.index === state.selectedRegionIndex);
+          if(pos <= 0){
+            showToast('그룹 내 이전 사각형이 없습니다.', true);
+            setStatus('그룹 내 이전 사각형이 없습니다.', true);
+            break;
+          }
+
+          const { region, index } = grouped[pos - 1];
+          const prevRegion = index > 0 ? state.yellowRegions[index - 1] : null;
+          const prevAngleText = prevRegion
+            ? formatCartesianAngleSummary(region, prevRegion)
+            : ' | 이전 노란 영역 없음';
+
+          state.selectedRegionIndex = index;
+          state.selection = { x: region.x, y: region.y, size: region.size };
+          clearCandidateSquares();
+
+          setStatus(
+            '선택 변경: [' + index + '] (그룹 ' + groupId + ')' +
+            ' | (' + region.x + ', ' + region.y + ') ' +
+            region.size + 'x' + region.size +
+            prevAngleText +
+            ' | Delete 키로 삭제가능.',
+            false
+          );
+
+          render();
+          break;
+        }
+
+      case 'ArrowRight':
+        {
+          e.preventDefault();
+
+          if(state.selectedRegionIndex === null){
+            setStatus('이동할 선택된 노란 영역이 없습니다.', true);
+            break;
+          }
+
+          const currentR = state.yellowRegions[state.selectedRegionIndex];
+          if(!currentR){
+            setStatus('선택된 노란 영역을 찾을 수 없습니다.', true);
+            break;
+          }
+
+          const gid = (typeof currentR.groupId === 'number') ? currentR.groupId : 0;
+          const groupList = state.yellowRegions
+            .map((region, index)=>({ region, index }))
+            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === gid)
+            .sort((a, b)=>a.index - b.index);
+
+          if(groupList.length === 0){
+            setStatus('현재 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
+            break;
+          }
+
+          const posR = groupList.findIndex((g)=>g.index === state.selectedRegionIndex);
+          if(posR < 0){
+            setStatus('현재 선택된 사각형의 위치를 찾을 수 없습니다.', true);
+            break;
+          }
+
+          if(posR >= groupList.length - 1){
+            showToast('그룹 내 다음 사각형이 없습니다.', true);
+            setStatus('그룹 내 다음 사각형이 없습니다.', true);
+            break;
+          }
+
+          const { region: nextRegion, index: nextIndex } = groupList[posR + 1];
+          const prevRegion2 = nextIndex > 0 ? state.yellowRegions[nextIndex - 1] : null;
+          const prevAngleText2 = prevRegion2
+            ? formatCartesianAngleSummary(nextRegion, prevRegion2)
+            : ' | 이전 노란 영역 없음';
+
+          state.selectedRegionIndex = nextIndex;
+          state.selection = { x: nextRegion.x, y: nextRegion.y, size: nextRegion.size };
+          clearCandidateSquares();
+
+          setStatus(
+            '선택 변경: [' + nextIndex + '] (그룹 ' + gid + ')' +
+            ' | (' + nextRegion.x + ', ' + nextRegion.y + ') ' +
+            nextRegion.size + 'x' + nextRegion.size +
+            prevAngleText2 +
+            ' | Delete 키로 삭제가능.',
+            false
+          );
+
           render();
           break;
         }
