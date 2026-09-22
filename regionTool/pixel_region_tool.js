@@ -3468,6 +3468,80 @@
     );
   }
 
+  // 연속 그룹 탐색: direction = 'forward' | 'backward'
+  function continuousGroupTraverse(direction, options){
+    const opts = options || {};
+    const maxGap = Number.isFinite(Number(opts.maxGap)) ? Number(opts.maxGap) : 50;
+
+    if(direction !== 'forward' && direction !== 'backward') return false;
+
+    if(state.selectedRegionIndex === null){
+      setStatus('이동할 선택된 노란 영역이 없습니다.', true);
+      return false;
+    }
+
+    const currentIndex = state.selectedRegionIndex;
+    const currentRegion = state.yellowRegions[currentIndex];
+    if(!currentRegion){
+      setStatus('선택된 노란 영역을 찾을 수 없습니다.', true);
+      return false;
+    }
+
+    const gid = (typeof currentRegion.groupId === 'number') ? currentRegion.groupId : 0;
+
+    const groupList = state.yellowRegions
+      .map((region, index)=>({ region, index }))
+      .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === gid)
+      .sort((a, b)=>a.index - b.index);
+
+    if(groupList.length === 0){
+      setStatus('현재 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
+      return false;
+    }
+
+    let pos = groupList.findIndex((g)=>g.index === currentIndex);
+    if(pos < 0){
+      setStatus('현재 선택된 사각형의 위치를 찾을 수 없습니다.', true);
+      return false;
+    }
+
+    let moved = 0;
+
+    while(true){
+      const nextPos = direction === 'forward' ? pos + 1 : pos - 1;
+      if(nextPos < 0 || nextPos >= groupList.length) break;
+
+      const curItem = groupList[pos];
+      const nextItem = groupList[nextPos];
+
+      const cCenter = getRegionCenter(curItem.region);
+      const nCenter = getRegionCenter(nextItem.region);
+      const dist = Math.hypot(nCenter.x - cCenter.x, nCenter.y - cCenter.y);
+
+      if(dist >= maxGap){
+        showToast((direction === 'forward' ? '다음' : '이전') + ' 사각형과의 거리가 ' + Number(dist.toFixed(1)) + 'px로 너무 멉니다. 이동을 중단합니다.', true);
+        setStatus('연속 이동 중단: 점 간 거리 ' + Number(dist.toFixed(1)) + 'px', true);
+        break;
+      }
+
+      state.selectedRegionIndex = nextItem.index;
+      state.selection = { x: nextItem.region.x, y: nextItem.region.y, size: nextItem.region.size };
+      clearCandidateSquares();
+      moved++;
+
+      pos = nextPos;
+    }
+
+    if(moved > 0){
+      render();
+      setStatus('연속 이동 완료: 선택된 인덱스 [' + state.selectedRegionIndex + '] (그룹 ' + gid + ')', false);
+      return true;
+    }
+
+    setStatus((direction === 'forward' ? '다음' : '이전') + ' 조건을 만족하는 가까운 사각형이 없습니다.', true);
+    return false;
+  }
+
 
   window.addEventListener('keydown', (e)=>{
 
@@ -3844,158 +3918,17 @@
 
       case ';':
         {
-          // Alt + ; 로 연속 앞으로 이동하되, 다음 사각형과의 중심 거리 >= 50px이면 중단
           if(!e.altKey) break;
           e.preventDefault();
-
-          if(state.selectedRegionIndex === null){
-            setStatus('이동할 선택된 노란 영역이 없습니다.', true);
-            break;
-          }
-
-          const maxGap = 21;
-
-          let currentIndex = state.selectedRegionIndex;
-          const currentRegion = state.yellowRegions[currentIndex];
-          if(!currentRegion){
-            setStatus('선택된 노란 영역을 찾을 수 없습니다.', true);
-            break;
-          }
-
-          const gid = (typeof currentRegion.groupId === 'number') ? currentRegion.groupId : 0;
-
-          // build ordered list of group members
-          const groupList = state.yellowRegions
-            .map((region, index)=>({ region, index }))
-            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === gid)
-            .sort((a, b)=>a.index - b.index);
-
-          if(groupList.length === 0){
-            setStatus('현재 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
-            break;
-          }
-
-          let pos = groupList.findIndex((g)=>g.index === currentIndex);
-          if(pos < 0){
-            setStatus('현재 선택된 사각형의 위치를 찾을 수 없습니다.', true);
-            break;
-          }
-
-          let moved = 0;
-
-          while(true){
-            const nextPos = pos + 1;
-            if(nextPos >= groupList.length) break; // no more
-
-            const nextItem = groupList[nextPos];
-            const curItem = groupList[pos];
-
-            const cCenter = getRegionCenter(curItem.region);
-            const nCenter = getRegionCenter(nextItem.region);
-            const dist = Math.hypot(nCenter.x - cCenter.x, nCenter.y - cCenter.y);
-
-            if(dist >= maxGap){
-              showToast('다음 사각형과의 거리가 ' + Number(dist.toFixed(1)) + 'px로 너무 멉니다. 이동을 중단합니다.', true);
-              setStatus('연속 이동 중단: 다음 점과의 거리 ' + Number(dist.toFixed(1)) + 'px', true);
-              break;
-            }
-
-            // perform move
-            state.selectedRegionIndex = nextItem.index;
-            state.selection = { x: nextItem.region.x, y: nextItem.region.y, size: nextItem.region.size };
-            clearCandidateSquares();
-            moved++;
-
-            // advance pos to newly selected
-            pos = nextPos;
-          }
-
-          if(moved > 0){
-            const final = state.yellowRegions[state.selectedRegionIndex];
-            setStatus('연속 이동 완료: 선택된 인덱스 [' + state.selectedRegionIndex + '] (그룹 ' + gid + ')', false);
-            render();
-          }else{
-            // no movement
-            setStatus('조건을 만족하는 다음 가까운 사각형이 없습니다.', true);
-          }
-
+          continuousGroupTraverse('forward', { maxGap: 50 });
           break;
         }
 
       case "'":
         {
-          // Alt + ' 로 연속 역방향 이동하되, 이전 사각형과의 중심 거리 >= 50px이면 중단
           if(!e.altKey) break;
           e.preventDefault();
-
-          if(state.selectedRegionIndex === null){
-            setStatus('이동할 선택된 노란 영역이 없습니다.', true);
-            break;
-          }
-
-          const maxGapBack = 21;
-
-          let currentIndexBack = state.selectedRegionIndex;
-          const currentRegionBack = state.yellowRegions[currentIndexBack];
-          if(!currentRegionBack){
-            setStatus('선택된 노란 영역을 찾을 수 없습니다.', true);
-            break;
-          }
-
-          const gidBack = (typeof currentRegionBack.groupId === 'number') ? currentRegionBack.groupId : 0;
-
-          const groupListBack = state.yellowRegions
-            .map((region, index)=>({ region, index }))
-            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === gidBack)
-            .sort((a, b)=>a.index - b.index);
-
-          if(groupListBack.length === 0){
-            setStatus('현재 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
-            break;
-          }
-
-          let posBack = groupListBack.findIndex((g)=>g.index === currentIndexBack);
-          if(posBack < 0){
-            setStatus('현재 선택된 사각형의 위치를 찾을 수 없습니다.', true);
-            break;
-          }
-
-          let movedBack = 0;
-
-          while(true){
-            const prevPos = posBack - 1;
-            if(prevPos < 0) break; // no more previous
-
-            const prevItem = groupListBack[prevPos];
-            const curItem = groupListBack[posBack];
-
-            const cCenter = getRegionCenter(curItem.region);
-            const pCenter = getRegionCenter(prevItem.region);
-            const dist = Math.hypot(pCenter.x - cCenter.x, pCenter.y - cCenter.y);
-
-            if(dist >= maxGapBack){
-              showToast('이전 사각형과의 거리가 ' + Number(dist.toFixed(1)) + 'px로 너무 멉니다. 이동을 중단합니다.', true);
-              setStatus('연속 역방향 이동 중단: 이전 점과의 거리 ' + Number(dist.toFixed(1)) + 'px', true);
-              break;
-            }
-
-            // perform move to previous
-            state.selectedRegionIndex = prevItem.index;
-            state.selection = { x: prevItem.region.x, y: prevItem.region.y, size: prevItem.region.size };
-            clearCandidateSquares();
-            movedBack++;
-
-            posBack = prevPos;
-          }
-
-          if(movedBack > 0){
-            const final = state.yellowRegions[state.selectedRegionIndex];
-            setStatus('연속 역방향 이동 완료: 선택된 인덱스 [' + state.selectedRegionIndex + '] (그룹 ' + gidBack + ')', false);
-            render();
-          }else{
-            setStatus('조건을 만족하는 이전 가까운 사각형이 없습니다.', true);
-          }
-
+          continuousGroupTraverse('backward', { maxGap: 50 });
           break;
         }
 
