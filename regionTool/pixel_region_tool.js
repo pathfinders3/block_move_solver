@@ -3933,7 +3933,7 @@
             break;
           }
 
-          const maxGapBack = 50;
+          const maxGapBack = 21;
 
           let currentIndexBack = state.selectedRegionIndex;
           const currentRegionBack = state.yellowRegions[currentIndexBack];
