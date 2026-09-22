@@ -3842,6 +3842,86 @@
           break;
         }
 
+      case ';':
+        {
+          // Alt + ; 로 연속 앞으로 이동하되, 다음 사각형과의 중심 거리 >= 50px이면 중단
+          if(!e.altKey) break;
+          e.preventDefault();
+
+          if(state.selectedRegionIndex === null){
+            setStatus('이동할 선택된 노란 영역이 없습니다.', true);
+            break;
+          }
+
+          const maxGap = 21;
+
+          let currentIndex = state.selectedRegionIndex;
+          const currentRegion = state.yellowRegions[currentIndex];
+          if(!currentRegion){
+            setStatus('선택된 노란 영역을 찾을 수 없습니다.', true);
+            break;
+          }
+
+          const gid = (typeof currentRegion.groupId === 'number') ? currentRegion.groupId : 0;
+
+          // build ordered list of group members
+          const groupList = state.yellowRegions
+            .map((region, index)=>({ region, index }))
+            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === gid)
+            .sort((a, b)=>a.index - b.index);
+
+          if(groupList.length === 0){
+            setStatus('현재 그룹에 선택 가능한 노란 사각형이 없습니다.', true);
+            break;
+          }
+
+          let pos = groupList.findIndex((g)=>g.index === currentIndex);
+          if(pos < 0){
+            setStatus('현재 선택된 사각형의 위치를 찾을 수 없습니다.', true);
+            break;
+          }
+
+          let moved = 0;
+
+          while(true){
+            const nextPos = pos + 1;
+            if(nextPos >= groupList.length) break; // no more
+
+            const nextItem = groupList[nextPos];
+            const curItem = groupList[pos];
+
+            const cCenter = getRegionCenter(curItem.region);
+            const nCenter = getRegionCenter(nextItem.region);
+            const dist = Math.hypot(nCenter.x - cCenter.x, nCenter.y - cCenter.y);
+
+            if(dist >= maxGap){
+              showToast('다음 사각형과의 거리가 ' + Number(dist.toFixed(1)) + 'px로 너무 멉니다. 이동을 중단합니다.', true);
+              setStatus('연속 이동 중단: 다음 점과의 거리 ' + Number(dist.toFixed(1)) + 'px', true);
+              break;
+            }
+
+            // perform move
+            state.selectedRegionIndex = nextItem.index;
+            state.selection = { x: nextItem.region.x, y: nextItem.region.y, size: nextItem.region.size };
+            clearCandidateSquares();
+            moved++;
+
+            // advance pos to newly selected
+            pos = nextPos;
+          }
+
+          if(moved > 0){
+            const final = state.yellowRegions[state.selectedRegionIndex];
+            setStatus('연속 이동 완료: 선택된 인덱스 [' + state.selectedRegionIndex + '] (그룹 ' + gid + ')', false);
+            render();
+          }else{
+            // no movement
+            setStatus('조건을 만족하는 다음 가까운 사각형이 없습니다.', true);
+          }
+
+          break;
+        }
+
       case 'i':
       case 'I':
         if(e.shiftKey){
