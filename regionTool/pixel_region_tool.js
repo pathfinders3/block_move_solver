@@ -1247,23 +1247,43 @@
       }
     };
 
-    const blob = new Blob([
-      JSON.stringify(payload, null, 2)
-    ], {
-      type: 'application/json'
-    });
+    const jsonText = JSON.stringify(payload, null, 2);
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'region-groups-export.json';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    // Try to copy to clipboard first
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(jsonText).then(()=>{
+        showToast('JSON이 클립보드에 복사되었습니다.', false);
+        setStatus('JSON이 클립보드에 복사되었습니다.', false);
+      }).catch((err)=>{
+        // fallback to download
+        const blob = new Blob([jsonText], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'region-groups-export.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
 
-    showToast('JSON EXPORT 완료: region-groups-export.json', false);
-    setStatus('JSON EXPORT 완료: region-groups-export.json', false);
+        showToast('클립보드 복사 실패 — 파일로 다운로드했습니다.', true);
+        setStatus('클립보드 복사 실패 — 파일로 다운로드했습니다.', true);
+      });
+    }else{
+      // older browsers: fallback to download
+      const blob = new Blob([jsonText], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'region-groups-export.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      showToast('JSON EXPORT 완료: region-groups-export.json', false);
+      setStatus('JSON EXPORT 완료: region-groups-export.json', false);
+    }
   }
 
 
