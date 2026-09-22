@@ -16,6 +16,7 @@
   const infoCount = document.getElementById('infoCount');
   const infoGroupHistory = document.getElementById('infoGroupHistory');
   const keyHelpSummary = document.getElementById('keyHelpSummary');
+  const exportJsonBtn = document.getElementById('exportJsonBtn');
   const groupSelect = document.getElementById('groupSelect');
   const statusLine = document.getElementById('statusLine');
   const clearRegionsBtn = document.getElementById('clearRegionsBtn');
@@ -1122,6 +1123,150 @@
   }
 
 
+  function exportCurrentGroupsAsJson(){
+    if(state.yellowRegions.length === 0){
+      showToast('내보낼 노란 사각형이 없습니다.', true);
+      setStatus('내보낼 노란 사각형이 없습니다.', true);
+      return;
+    }
+
+    const groupsById = new Map();
+
+    for(const region of state.yellowRegions){
+      const groupId = (typeof region.groupId === 'number') ? region.groupId : 0;
+      if(!groupsById.has(groupId)){
+        groupsById.set(groupId, []);
+      }
+      groupsById.get(groupId).push({
+        x: Number(region.x),
+        y: Number(region.y),
+        size: Number(region.size),
+        canConnect: true,
+        mergeState: false
+      });
+    }
+
+    const groups = Array.from(groupsById.entries())
+      .sort((a, b)=>a[0] - b[0])
+      .map(([groupId, points], groupIndex)=>{
+        const sortedPoints = points.slice().sort((a, b)=>a.y - b.y || a.x - b.x || a.size - b.size);
+        const segmentId = 'seg-' + String(groupIndex + 1);
+
+        const segment = {
+          id: segmentId,
+          points: sortedPoints.map((point, pointIndex)=>({
+            x: point.x,
+            y: point.y,
+            size: point.size,
+            canConnect: point.canConnect,
+            mergeState: point.mergeState
+          }))
+        };
+
+        // connections between points inside this single segment are not exported here.
+        // We'll compute cross-segment connections after building all groups.
+
+        return {
+          id: 'group-' + String(groupId),
+          segments: [segment],
+          connections: []
+        };
+      });
+
+    // build cross-segment connections: only between different group's segments
+    const allConnections = [];
+
+    for(let gi = 0; gi < groups.length; gi++){
+      for(let gj = gi + 1; gj < groups.length; gj++){
+        const gA = groups[gi];
+        const gB = groups[gj];
+        const segA = gA.segments[0];
+        const segB = gB.segments[0];
+
+        for(let ai = 0; ai < segA.points.length; ai++){
+          const a = segA.points[ai];
+          const ax1 = a.x;
+          const ay1 = a.y;
+          const ax2 = a.x + a.size;
+          const ay2 = a.y + a.size;
+
+          for(let bi = 0; bi < segB.points.length; bi++){
+            const b = segB.points[bi];
+            const bx1 = b.x;
+            const by1 = b.y;
+            const bx2 = b.x + b.size;
+            const by2 = b.y + b.size;
+
+            // rectangles intersect or touch -> record connection
+            const noOverlap = (ax2 < bx1) || (bx2 < ax1) || (ay2 < by1) || (by2 < ay1);
+            if(!noOverlap){
+              const distance = Math.hypot((b.x + b.size/2) - (a.x + a.size/2), (b.y + b.size/2) - (a.y + a.size/2));
+              allConnections.push({
+                id: 'conn-g' + String(gi+1) + '-g' + String(gj+1) + '-' + String(ai) + '-' + String(bi),
+                from: {
+                  segmentId: segA.id,
+                  pointIndex: ai
+                },
+                to: {
+                  segmentId: segB.id,
+                  pointIndex: bi
+                },
+                distance: Number(distance.toFixed(2))
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // attach cross-segment connections to their respective groups' connections arrays
+    for(const conn of allConnections){
+      // find group by segment id in 'groups'
+      const fromSegId = conn.from.segmentId;
+      const toSegId = conn.to.segmentId;
+      const gFrom = groups.find((g)=>g.segments.some((s)=>s.id === fromSegId));
+      const gTo = groups.find((g)=>g.segments.some((s)=>s.id === toSegId));
+      if(gFrom && gTo){
+        // store in both groups' connections for completeness
+        gFrom.connections.push(conn);
+        gTo.connections.push(conn);
+      }
+    }
+
+    const payload = {
+      version: 1,
+      groups,
+      canvas1ClipboardScale: {
+        scalePercent: 100,
+        scale: 1,
+        sourceWidth: state.width || 0,
+        sourceHeight: state.height || 0,
+        appliedWidth: state.width || 0,
+        appliedHeight: state.height || 0,
+        mode: 'fit'
+      }
+    };
+
+    const blob = new Blob([
+      JSON.stringify(payload, null, 2)
+    ], {
+      type: 'application/json'
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'region-groups-export.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    showToast('JSON EXPORT 완료: region-groups-export.json', false);
+    setStatus('JSON EXPORT 완료: region-groups-export.json', false);
+  }
+
+
   function updateInfo(){
 
     infoSize.textContent =
@@ -2012,6 +2157,11 @@
   });
 
   updateShiftSRangeDisplay();
+
+
+  exportJsonBtn.addEventListener('click', ()=>{
+    exportCurrentGroupsAsJson();
+  });
 
 
   clearRegionsBtn.addEventListener('click', ()=>{
