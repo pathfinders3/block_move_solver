@@ -2,6 +2,7 @@
   "use strict";
 
   const MAX_TAR_DIM = 8000; // 안전 상한: 확대 캔버스가 너무 커지는 것을 방지
+  const GROUP_TRAVERSE_MAX_GAP = 21; // 그룹 내 연속 탐색 시 최대 중심 간 거리 (px)
 
   const srcCanvas = document.getElementById('srcCanvas');
   const tarCanvas = document.getElementById('tarCanvas');
@@ -3920,7 +3921,7 @@
         {
           if(!e.altKey) break;
           e.preventDefault();
-          continuousGroupTraverse('forward', { maxGap: 50 });
+          continuousGroupTraverse('forward', { maxGap: GROUP_TRAVERSE_MAX_GAP });
           break;
         }
 
@@ -3928,7 +3929,7 @@
         {
           if(!e.altKey) break;
           e.preventDefault();
-          continuousGroupTraverse('backward', { maxGap: 50 });
+          continuousGroupTraverse('backward', { maxGap: GROUP_TRAVERSE_MAX_GAP });
           break;
         }
 
