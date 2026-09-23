@@ -3933,6 +3933,104 @@
           break;
         }
 
+      case '\\':
+        {
+          // Alt + \ : 현재 선택된 사각형을 중심으로 이전/다음 방향으로 연속된(가까운) 블록만 새 그룹으로 분리
+          if(!e.altKey) break;
+          e.preventDefault();
+
+          if(state.selectedRegionIndex === null){
+            setStatus('분리할 기준이 되는 선택된 노란 영역이 없습니다.', true);
+            break;
+          }
+
+          const currentIdx = state.selectedRegionIndex;
+          const current = state.yellowRegions[currentIdx];
+          if(!current){
+            setStatus('선택된 노란 영역을 찾을 수 없습니다.', true);
+            break;
+          }
+
+          const gid = (typeof current.groupId === 'number') ? current.groupId : 0;
+
+          const groupList = state.yellowRegions
+            .map((region, index)=>({ region, index }))
+            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === gid)
+            .sort((a, b)=>a.index - b.index);
+
+          if(groupList.length === 0){
+            setStatus('현재 그룹에 분리할 요소가 없습니다.', true);
+            break;
+          }
+
+          const posOriginal = groupList.findIndex((g)=>g.index === currentIdx);
+          if(posOriginal < 0){
+            setStatus('현재 선택된 사각형의 위치를 찾을 수 없습니다.', true);
+            break;
+          }
+
+          // find backward break (k where gap between k and k+1 >= maxGap)
+          let backBreak = null;
+          for(let k = posOriginal - 1; k >= 0; k--){
+            const a = groupList[k + 1].region;
+            const b = groupList[k].region;
+            const da = getRegionCenter(a);
+            const db = getRegionCenter(b);
+            const dist = Math.hypot(da.x - db.x, da.y - db.y);
+            if(dist >= GROUP_TRAVERSE_MAX_GAP){
+              backBreak = k;
+              break;
+            }
+          }
+
+          // find forward break (k where gap between k and k+1 >= maxGap)
+          let forwardBreak = null;
+          for(let k = posOriginal; k < groupList.length - 1; k++){
+            const a = groupList[k].region;
+            const b = groupList[k + 1].region;
+            const da = getRegionCenter(a);
+            const db = getRegionCenter(b);
+            const dist = Math.hypot(da.x - db.x, da.y - db.y);
+            if(dist >= GROUP_TRAVERSE_MAX_GAP){
+              forwardBreak = k;
+              break;
+            }
+          }
+
+          const startPos = (backBreak === null) ? 0 : (backBreak + 1);
+          const endPos = (forwardBreak === null) ? (groupList.length - 1) : forwardBreak;
+
+          // If the contiguous window equals the whole group, nothing to split
+          if(startPos === 0 && endPos === groupList.length - 1){
+            showToast('분리할 수 없습니다. 그룹 전체가 모두 연결되어 있습니다.', true);
+            setStatus('분리할 수 없습니다. 그룹 전체가 모두 연결되어 있습니다.', true);
+            break;
+          }
+
+          // compute new group id
+          const ids = getGroupIds();
+          const nextId = ids.length ? Math.max(...ids) + 1 : 0;
+
+          const movedIndices = [];
+          for(let p = startPos; p <= endPos; p++){
+            const origIndex = groupList[p].index;
+            state.yellowRegions[origIndex].groupId = nextId;
+            movedIndices.push(origIndex);
+          }
+
+          // select first moved region
+          const firstMovedOrigIndex = groupList[startPos].index;
+          state.selectedRegionIndex = firstMovedOrigIndex;
+          state.selection = { x: state.yellowRegions[firstMovedOrigIndex].x, y: state.yellowRegions[firstMovedOrigIndex].y, size: state.yellowRegions[firstMovedOrigIndex].size };
+
+          populateGroupSelect();
+          saveMeta();
+          render();
+
+          setStatus('분리 완료: 새 그룹 ' + nextId + ' 생성 (' + movedIndices.length + '개)', false);
+          break;
+        }
+
       case 'i':
       case 'I':
         if(e.shiftKey){
