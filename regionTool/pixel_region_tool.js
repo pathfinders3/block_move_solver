@@ -2435,7 +2435,12 @@
         y: targetRegion.y,
         size: targetRegion.size
       };
-      pushSelectedGroupHistory((typeof targetRegion.groupId === 'number') ? targetRegion.groupId : 0);
+      // set current group to the clicked region's group and update UI
+      const clickedGid = (typeof targetRegion.groupId === 'number') ? targetRegion.groupId : 0;
+      state.currentGroupId = clickedGid;
+      pushSelectedGroupHistory(clickedGid);
+      populateGroupSelect();
+      saveMeta();
       clearCandidateSquares();
 
       setStatus(
