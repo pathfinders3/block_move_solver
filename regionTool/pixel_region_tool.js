@@ -3828,7 +3828,7 @@
 
           const pos = grouped.findIndex((g)=>g.index === state.selectedRegionIndex);
           if(pos <= 0){
-            showToast('그룹 내 이전 사각형이 없습니다.', true);
+            showToast('그룹 내 이전 사각형이 없습니다.(First)', true);
             setStatus('그룹 내 이전 사각형이 없습니다.', true);
             break;
           }
@@ -3889,7 +3889,7 @@
           }
 
           if(posR >= groupList.length - 1){
-            showToast('그룹 내 다음 사각형이 없습니다.', true);
+            showToast('그룹 내 다음 사각형이 없습니다.(Last)', true);
             setStatus('그룹 내 다음 사각형이 없습니다.', true);
             break;
           }
