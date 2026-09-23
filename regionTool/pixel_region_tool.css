@@ -55,6 +55,21 @@ header{
   flex-direction: column;
   gap: 6px;
 }
+
+.group-select-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-swatch{
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.25);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset;
+}
 .field label{
   font-size: 0.78rem;
   color: var(--text-dim);

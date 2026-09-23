@@ -19,6 +19,7 @@
   const keyHelpSummary = document.getElementById('keyHelpSummary');
   const exportJsonBtn = document.getElementById('exportJsonBtn');
   const groupSelect = document.getElementById('groupSelect');
+  const groupSwatch = document.getElementById('groupSwatch');
   const statusLine = document.getElementById('statusLine');
   const clearRegionsBtn = document.getElementById('clearRegionsBtn');
   const resetAllBtn = document.getElementById('resetAllBtn');
@@ -126,6 +127,21 @@
     const current = String(state.currentGroupId);
     const found = Array.from(groupSelect.options).some((o)=>o.value === current);
     groupSelect.value = found ? current : '__new__';
+
+    // update swatch color for current selection
+    try{
+      const gid = found ? Number(groupSelect.value) : null;
+      if(groupSwatch){
+        if(gid === null){
+          groupSwatch.style.background = 'transparent';
+        }else{
+          const colors = getGroupColor(gid);
+          groupSwatch.style.background = colors.fill || 'transparent';
+        }
+      }
+    }catch(e){
+      /* ignore swatch errors */
+    }
   }
 
   if(groupSelect){
@@ -141,6 +157,13 @@
       }
       saveMeta();
       render();
+      // update swatch
+      try{
+        const gid = (v === '__new__') ? null : Number(v);
+        if(groupSwatch){
+          groupSwatch.style.background = gid === null ? 'transparent' : (getGroupColor(gid).fill || 'transparent');
+        }
+      }catch(e){/* ignore */}
     });
   }
 

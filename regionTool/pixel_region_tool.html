@@ -46,7 +46,10 @@
 
     <div class="field">
       <label for="groupSelect">현재 그룹 (Group)</label>
-      <select id="groupSelect"></select>
+      <div class="group-select-row">
+        <select id="groupSelect"></select>
+        <span id="groupSwatch" class="group-swatch" aria-hidden="true" title="그룹 색상"></span>
+      </div>
     </div>
 
     <button id="exportJsonBtn">JSON EXPORT</button>
