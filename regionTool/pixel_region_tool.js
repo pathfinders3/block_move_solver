@@ -94,9 +94,50 @@
   let toastTimer = null;
 
   function getGroupIds(){
-    const ids = Array.from(new Set(state.yellowRegions.map((r)=>typeof r.groupId === 'number' ? r.groupId : 0)));
+    const all = [];
+    state.yellowRegions.forEach((r)=>{
+      if(Array.isArray(r.groupIds)){
+        r.groupIds.forEach((g)=>{ all.push(Number.isInteger(g) ? g : 0); });
+      }else if(typeof r.groupId === 'number'){
+        all.push(r.groupId);
+      }else{
+        all.push(0);
+      }
+    });
+    const ids = Array.from(new Set(all));
     ids.sort((a,b)=>a-b);
     return ids;
+  }
+
+  // region group helpers to support multiple groups per region
+  function getRegionGroupIds(region){
+    if(!region) return [0];
+    if(Array.isArray(region.groupIds)) return region.groupIds.map((g)=>Number.isInteger(g) ? g : 0);
+    if(typeof region.groupId === 'number') return [region.groupId];
+    return [0];
+  }
+
+  function regionHasGroup(region, gid){
+    const ids = getRegionGroupIds(region);
+    return ids.indexOf(gid) >= 0;
+  }
+
+  function addRegionToGroup(region, gid){
+    const ids = new Set(getRegionGroupIds(region));
+    ids.add(gid);
+    region.groupIds = Array.from(ids);
+    if(region.groupId !== undefined) delete region.groupId;
+  }
+
+  function removeRegionFromGroup(region, gid){
+    const ids = getRegionGroupIds(region).filter((g)=>g !== gid);
+    region.groupIds = ids.length ? ids : [0];
+    if(region.groupId !== undefined) delete region.groupId;
+  }
+
+  function getRegionPrimaryGroup(region){
+    const ids = getRegionGroupIds(region);
+    return ids.length ? ids[0] : 0;
   }
 
   function populateGroupSelect(){
@@ -326,7 +367,8 @@
                 x: r.x,
                 y: r.y,
                 size: r.size,
-                groupId: (r.groupId === undefined) ? 0 : r.groupId
+                // preserve existing groupIds if present, else fall back to groupId or 0
+                groupIds: Array.isArray(r.groupIds) ? r.groupIds.map((g)=>Number.isInteger(g) ? g : 0) : (r.groupId !== undefined ? [Number.isInteger(r.groupId) ? r.groupId : 0] : [0])
               }))
               : [];
 
@@ -458,7 +500,7 @@
     state.yellowRegions.forEach((r, idx)=>{
 
       const selected = (idx === state.selectedRegionIndex);
-      const gid = (typeof r.groupId === 'number') ? r.groupId : 0;
+      const gid = getRegionPrimaryGroup(r);
       const colors = getGroupColor(gid);
 
       ctx.fillStyle = selected ? '#ffb84d' : colors.fill;
@@ -489,6 +531,35 @@
           r.size * scale - ctx.lineWidth,
           r.size * scale - ctx.lineWidth
         );
+      }
+
+      // multi-group badge: show small circle with count if region belongs to multiple groups
+      try{
+        const gids = getRegionGroupIds(r);
+        if(Array.isArray(gids) && gids.length > 1){
+          const displayX = r.x * scale;
+          const displayY = r.y * scale;
+          const displaySize = r.size * scale;
+          const badgeSize = Math.max(8, Math.min(16, Math.floor(scale * 3)));
+          const bx = Math.round(displayX + displaySize - badgeSize - 2);
+          const by = Math.round(displayY + 2);
+
+          // badge background
+          ctx.beginPath();
+          ctx.fillStyle = '#222';
+          ctx.arc(bx + badgeSize/2, by + badgeSize/2, badgeSize/2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // badge text (count)
+          ctx.fillStyle = '#fff';
+          const fontSize = Math.max(10, Math.floor(badgeSize * 0.8));
+          ctx.font = fontSize + 'px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(gids.length), bx + badgeSize/2, by + badgeSize/2);
+        }
+      }catch(e){
+        /* ignore badge errors */
       }
     });
   }
@@ -1058,10 +1129,10 @@
 
     const firstGroupRegions = state.yellowRegions
       .map((region, index)=>({ region, index }))
-      .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === firstGroupId);
+      .filter(({ region })=> regionHasGroup(region, firstGroupId));
     const secondGroupRegions = state.yellowRegions
       .map((region, index)=>({ region, index }))
-      .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === secondGroupId);
+      .filter(({ region })=> regionHasGroup(region, secondGroupId));
 
     if(firstGroupRegions.length === 0 || secondGroupRegions.length === 0){
       showToast('통합할 그룹에 영역이 없어 병합할 수 없습니다.', true);
@@ -1097,13 +1168,22 @@
     const kept = [];
 
     for(const region of state.yellowRegions){
-      const groupId = (typeof region.groupId === 'number') ? region.groupId : 0;
-      if(groupId === secondGroupId){
-        merged.push({ ...region, groupId: firstGroupId });
-      }else if(groupId === firstGroupId){
-        kept.push({ ...region, groupId: firstGroupId });
+      const ids = getRegionGroupIds(region);
+      const inSecond = ids.indexOf(secondGroupId) >= 0;
+      const inFirst = ids.indexOf(firstGroupId) >= 0;
+
+      const copy = { ...region };
+
+      if(inSecond){
+        // ensure it's in first group as well and remove second
+        addRegionToGroup(copy, firstGroupId);
+        removeRegionFromGroup(copy, secondGroupId);
+        merged.push(copy);
+      }else if(inFirst){
+        // keep as is
+        kept.push(copy);
       }else{
-        kept.push({ ...region });
+        kept.push(copy);
       }
     }
 
@@ -1157,16 +1237,18 @@
     const groupsById = new Map();
 
     for(const region of state.yellowRegions){
-      const groupId = (typeof region.groupId === 'number') ? region.groupId : 0;
-      if(!groupsById.has(groupId)){
-        groupsById.set(groupId, []);
-      }
-      groupsById.get(groupId).push({
-        x: Number(region.x),
-        y: Number(region.y),
-        size: Number(region.size),
-        canConnect: false,
-        mergeState: false
+      const gids = getRegionGroupIds(region);
+      gids.forEach((groupId)=>{
+        if(!groupsById.has(groupId)){
+          groupsById.set(groupId, []);
+        }
+        groupsById.get(groupId).push({
+          x: Number(region.x),
+          y: Number(region.y),
+          size: Number(region.size),
+          canConnect: getRegionGroupIds(region).length > 1,
+          mergeState: false
+        });
       });
     }
 
@@ -1728,7 +1810,7 @@
     let regions = state.yellowRegions;
 
     if(groupId !== undefined && groupId !== null){
-      regions = regions.filter((r)=>r.groupId === groupId);
+      regions = regions.filter((r)=> regionHasGroup(r, groupId));
     }
 
     if(regions.length < 2) return null;
@@ -2436,7 +2518,7 @@
         size: targetRegion.size
       };
       // set current group to the clicked region's group and update UI
-      const clickedGid = (typeof targetRegion.groupId === 'number') ? targetRegion.groupId : 0;
+        const clickedGid = getRegionPrimaryGroup(targetRegion);
       state.currentGroupId = clickedGid;
       pushSelectedGroupHistory(clickedGid);
       populateGroupSelect();
@@ -2444,7 +2526,7 @@
       clearCandidateSquares();
 
       setStatus(
-        '노란 영역 선택: [' + idx + '] (그룹 ' + (targetRegion.groupId === undefined ? 0 : targetRegion.groupId) + ')' +
+        '노란 영역 선택: [' + idx + '] (그룹 ' + getRegionPrimaryGroup(targetRegion) + ')' +
         ' | (' + targetRegion.x + ', ' + targetRegion.y + ') ' +
         targetRegion.size + 'x' + targetRegion.size +
         prevAngleText +
@@ -3364,12 +3446,9 @@
       return;
     }
 
-    state.yellowRegions.push({
-      x: c.x,
-      y: c.y,
-      size: c.size,
-      groupId: state.currentGroupId
-    });
+    const newRegion = { x: c.x, y: c.y, size: c.size };
+    addRegionToGroup(newRegion, state.currentGroupId);
+    state.yellowRegions.push(newRegion);
     // update group selector UI
     populateGroupSelect();
 
@@ -3440,12 +3519,9 @@
 
     if(allWhite){
 
-      state.yellowRegions.push({
-        x: s.x,
-        y: s.y,
-        size: s.size,
-        groupId: state.currentGroupId
-      });
+      const newRegion = { x: s.x, y: s.y, size: s.size };
+      addRegionToGroup(newRegion, state.currentGroupId);
+      state.yellowRegions.push(newRegion);
 
       // update group selector UI
       populateGroupSelect();
@@ -3516,11 +3592,11 @@
       return false;
     }
 
-    const gid = (typeof currentRegion.groupId === 'number') ? currentRegion.groupId : 0;
+    const gid = getRegionPrimaryGroup(currentRegion);
 
     const groupList = state.yellowRegions
       .map((region, index)=>({ region, index }))
-      .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === gid)
+      .filter(({ region })=> regionHasGroup(region, gid))
       .sort((a, b)=>a.index - b.index);
 
     if(groupList.length === 0){
@@ -3740,11 +3816,11 @@
               ? state.yellowRegions[state.selectedRegionIndex]
               : null;
           const groupId = selectedRegion
-            ? ((typeof selectedRegion.groupId === 'number') ? selectedRegion.groupId : 0)
+            ? getRegionPrimaryGroup(selectedRegion)
             : state.currentGroupId;
           const grouped = state.yellowRegions
             .map((region, index)=>({ region, index }))
-            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === groupId)
+            .filter(({ region })=> regionHasGroup(region, groupId))
             .sort((a, b)=>a.index - b.index);
 
           if(grouped.length === 0){
@@ -3788,11 +3864,11 @@
               ? state.yellowRegions[state.selectedRegionIndex]
               : null;
           const groupId = selectedRegion
-            ? ((typeof selectedRegion.groupId === 'number') ? selectedRegion.groupId : 0)
+            ? getRegionPrimaryGroup(selectedRegion)
             : state.currentGroupId;
           const grouped = state.yellowRegions
             .map((region, index)=>({ region, index }))
-            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === groupId)
+            .filter(({ region })=> regionHasGroup(region, groupId))
             .sort((a, b)=>a.index - b.index);
 
           if(grouped.length === 0){
@@ -3843,10 +3919,10 @@
             break;
           }
 
-          const groupId = (typeof current.groupId === 'number') ? current.groupId : 0;
+          const groupId = getRegionPrimaryGroup(current);
           const grouped = state.yellowRegions
             .map((region, index)=>({ region, index }))
-            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === groupId)
+            .filter(({ region })=> regionHasGroup(region, groupId))
             .sort((a, b)=>a.index - b.index);
 
           if(grouped.length === 0){
@@ -3899,10 +3975,10 @@
             break;
           }
 
-          const gid = (typeof currentR.groupId === 'number') ? currentR.groupId : 0;
+          const gid = getRegionPrimaryGroup(currentR);
           const groupList = state.yellowRegions
             .map((region, index)=>({ region, index }))
-            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === gid)
+            .filter(({ region })=> regionHasGroup(region, gid))
             .sort((a, b)=>a.index - b.index);
 
           if(groupList.length === 0){
@@ -3979,11 +4055,11 @@
             break;
           }
 
-          const gid = (typeof current.groupId === 'number') ? current.groupId : 0;
+          const gid = getRegionPrimaryGroup(current);
 
           const groupList = state.yellowRegions
             .map((region, index)=>({ region, index }))
-            .filter(({ region })=>((typeof region.groupId === 'number') ? region.groupId : 0) === gid)
+            .filter(({ region })=> regionHasGroup(region, gid))
             .sort((a, b)=>a.index - b.index);
 
           if(groupList.length === 0){
@@ -4042,7 +4118,11 @@
           const movedIndices = [];
           for(let p = startPos; p <= endPos; p++){
             const origIndex = groupList[p].index;
-            state.yellowRegions[origIndex].groupId = nextId;
+            const region = state.yellowRegions[origIndex];
+            // remove from old group and add to new group
+            const oldGroupId = getRegionPrimaryGroup(region);
+            removeRegionFromGroup(region, oldGroupId);
+            addRegionToGroup(region, nextId);
             movedIndices.push(origIndex);
           }
 
