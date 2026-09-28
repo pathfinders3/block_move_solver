@@ -3521,21 +3521,49 @@
     if(allWhite){
 
       const newRegion = { x: s.x, y: s.y, size: s.size };
-      addRegionToGroup(newRegion, state.currentGroupId);
-      state.yellowRegions.push(newRegion);
 
-      // update group selector UI
-      populateGroupSelect();
-
-      clearCandidateSquares();
-
-      setStatus(
-        '흰색 영역을 확인하여 노란색으로 칠했습니다. ' +
-        '(톨러런스 ' + T + ')',
-        false
+      // find any existing regions that overlap the new one
+      const overlapping = state.yellowRegions.filter((r)=>
+        squaresOverlap(r, newRegion)
       );
 
-      saveMeta();
+      if(overlapping.length > 0){
+        // create a new group for this new region so overlapping regions are not in same group
+        const ids = getGroupIds();
+        const nextId = ids.length ? Math.max(...ids) + 1 : 0;
+
+        addRegionToGroup(newRegion, nextId);
+        state.yellowRegions.push(newRegion);
+
+        // switch current group to the new one and update UI
+        state.currentGroupId = nextId;
+        populateGroupSelect();
+
+        clearCandidateSquares();
+
+        setStatus(
+          '흰색 영역을 확인하여 새 그룹에 추가했습니다. 새 그룹: ' + nextId + ' (톨러런스 ' + T + ')',
+          false
+        );
+
+        saveMeta();
+      }else{
+        addRegionToGroup(newRegion, state.currentGroupId);
+        state.yellowRegions.push(newRegion);
+
+        // update group selector UI
+        populateGroupSelect();
+
+        clearCandidateSquares();
+
+        setStatus(
+          '흰색 영역을 확인하여 노란색으로 칠했습니다. ' +
+          '(톨러런스 ' + T + ')',
+          false
+        );
+
+        saveMeta();
+      }
 
     }else{
 
@@ -4228,6 +4256,67 @@
         }
         e.preventDefault();
         break;
+
+      case 'Tab':
+        {
+          e.preventDefault();
+
+          // collect candidate indices to cycle among
+          let indices = [];
+
+          if(
+            state.selectedRegionIndex !== null &&
+            state.yellowRegions[state.selectedRegionIndex]
+          ){
+            const sel = state.yellowRegions[state.selectedRegionIndex];
+            indices = state.yellowRegions
+              .map((r, i)=> ({ r, i }))
+              .filter(({ r }) => r.x === sel.x && r.y === sel.y && r.size === sel.size)
+              .map(({ i }) => i);
+          }
+
+          if(indices.length === 0 && hoverOriginalPixel){
+            indices = state.yellowRegions
+              .map((r, i)=> ({ r, i }))
+              .filter(({ r }) =>
+                hoverOriginalPixel.x >= r.x && hoverOriginalPixel.x < r.x + r.size &&
+                hoverOriginalPixel.y >= r.y && hoverOriginalPixel.y < r.y + r.size
+              )
+              .map(({ i }) => i);
+          }
+
+          if(indices.length === 0 && state.selection){
+            indices = state.yellowRegions
+              .map((r, i)=> ({ r, i }))
+              .filter(({ r }) => r.x === state.selection.x && r.y === state.selection.y && r.size === state.selection.size)
+              .map(({ i }) => i);
+          }
+
+          if(indices.length === 0){
+            setStatus('같은 위치의 다른 사각형이 없습니다.', true);
+            break;
+          }
+
+          // determine next selection
+          const pos = indices.indexOf(state.selectedRegionIndex);
+
+          if(pos < 0){
+            state.selectedRegionIndex = indices[0];
+          }else{
+            state.selectedRegionIndex = indices[(pos + 1) % indices.length];
+          }
+
+          const selRegion = state.yellowRegions[state.selectedRegionIndex];
+          state.selection = { x: selRegion.x, y: selRegion.y, size: selRegion.size };
+          state.currentGroupId = getRegionPrimaryGroup(selRegion);
+          pushSelectedGroupHistory(state.currentGroupId);
+          populateGroupSelect();
+          clearCandidateSquares();
+
+          setStatus('동일 위치 사각형 선택: [' + state.selectedRegionIndex + '] (그룹 ' + state.currentGroupId + ')', false);
+          render();
+          break;
+        }
 
       case 'z':
       case 'Z':
