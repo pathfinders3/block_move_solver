@@ -1534,6 +1534,7 @@
       'Delete : 선택된 노란 영역 해제',
       'Alt+M : 최근 2개 그룹 통합',
       'Ctrl+Z : 최근 그룹 통합 취소',
+      'Alt+/ : 선택된 사각형 기준, 그룹 분할',      
       'F11 : 그룹 내 가장 큰 인덱스 선택',
       'F10 : 그룹 내 가장 작은 인덱스 선택'
     ].join('\n');
@@ -4025,7 +4026,7 @@
         {
           if(!e.altKey) break;
           e.preventDefault();
-          continuousGroupTraverse('forward', { maxGap: GROUP_TRAVERSE_MAX_GAP });
+          continuousGroupTraverse('backward', { maxGap: GROUP_TRAVERSE_MAX_GAP });
           break;
         }
 
@@ -4033,7 +4034,7 @@
         {
           if(!e.altKey) break;
           e.preventDefault();
-          continuousGroupTraverse('backward', { maxGap: GROUP_TRAVERSE_MAX_GAP });
+          continuousGroupTraverse('forward', { maxGap: GROUP_TRAVERSE_MAX_GAP });
           break;
         }
 
