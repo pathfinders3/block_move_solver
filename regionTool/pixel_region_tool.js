@@ -2040,9 +2040,18 @@
         baseRegion.size,
         size,
         direction
-      ).filter((pos)=>
-        isSquareWithinTolerance(pos.x, pos.y, size)
-      );
+      ).filter((pos)=>{
+        if(!isSquareWithinTolerance(pos.x, pos.y, size)) return false;
+
+        const candidate = { x: pos.x, y: pos.y, size };
+
+        // Existing registered regions are treated as blocked area.
+        const overlapsRegistered = state.yellowRegions.some((r)=>
+          squaresOverlap(r, candidate)
+        );
+
+        return !overlapsRegistered;
+      });
 
       attempts.push({
         size,
@@ -2872,6 +2881,7 @@
     }
 
     const size = baseRegion.size;
+    const avoidOverlapWithRegistered = (directionKey === 'W' || directionKey === 'X');
     let bestScore = -Infinity;
     bestCandidates.length = 0;
 
@@ -2908,6 +2918,11 @@
             size
           );
 
+        if(avoidOverlapWithRegistered){
+          const candidateTemp = { x, y, size };
+          const overlapsAny = state.yellowRegions.some((r)=> squaresOverlap(r, candidateTemp));
+          if(overlapsAny) continue;
+        }
         const dirMatch =
           directionMatchesCandidate(baseRegion, candidate, directionKey);
 
