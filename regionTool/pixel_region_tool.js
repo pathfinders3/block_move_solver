@@ -122,9 +122,43 @@
     return ids.indexOf(gid) >= 0;
   }
 
+  function regionOverlapsAnyOther(region, excludeRegion = null){
+    if(!Array.isArray(state.yellowRegions)) return false;
+
+    return state.yellowRegions.some((other)=>{
+      if(other === excludeRegion) return false;
+      return squaresOverlap(other, region);
+    });
+  }
+
+  function normalizeRegionGroupAssignments(){
+    if(!Array.isArray(state.yellowRegions)) return;
+
+    state.yellowRegions.forEach((region)=>{
+      const ids = getRegionGroupIds(region);
+      const overlaps = state.yellowRegions.some((other)=>
+        other !== region && squaresOverlap(other, region)
+      );
+
+      if(!overlaps && ids.length > 1){
+        const primary = ids[0] || 0;
+        region.groupIds = [primary];
+        if(region.groupId !== undefined) delete region.groupId;
+      }
+    });
+  }
+
   function addRegionToGroup(region, gid){
     const ids = new Set(getRegionGroupIds(region));
-    ids.add(gid);
+    const overlaps = regionOverlapsAnyOther(region, null);
+
+    if(overlaps){
+      ids.add(gid);
+    }else{
+      ids.clear();
+      ids.add(gid);
+    }
+
     region.groupIds = Array.from(ids);
     if(region.groupId !== undefined) delete region.groupId;
   }
@@ -995,6 +1029,8 @@
 
   function render(){
 
+    normalizeRegionGroupAssignments();
+
     if(!state.img) return;
 
 
@@ -1530,7 +1566,7 @@
       'Shift+S : 범위 확장 후보',
       'PgUp / PgDn : 후보 순환',
       'Enter : 확정',
-      'F9 : 평균 방향 추천 후 즉시 확정',            
+      'F9 : 자동 확정(S, Enter)',
       'Delete : 선택된 노란 영역 해제',
       'Alt+M : 최근 2개 그룹 통합',
       'Ctrl+Z : 최근 그룹 통합 취소',
