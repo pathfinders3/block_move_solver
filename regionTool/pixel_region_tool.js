@@ -3921,11 +3921,19 @@
 
           const sel = state.selection;
 
-          // list available groups
-          const ids = getGroupIds();
-          const listText = ids.length ? ids.join(', ') : '(없음)';
+          // list available groups, but exclude groups this selection already belongs to
+          const selGroups = new Set();
+          state.yellowRegions.forEach((r)=>{
+            if(r.x === sel.x && r.y === sel.y && r.size === sel.size){
+              getRegionGroupIds(r).forEach((g)=> selGroups.add(g));
+            }
+          });
 
-          const input = window.prompt('추가할 그룹 ID를 입력하세요. 기존 그룹: ' + listText + ' (빈칸이면 새 그룹 생성)', '');
+          const allIds = getGroupIds();
+          const selectableIds = allIds.filter((id)=> !selGroups.has(id));
+          const listText = selectableIds.length ? selectableIds.join(', ') : '(없음 - 새 그룹만 가능)';
+
+          const input = window.prompt('추가할 그룹 ID를 입력하세요. 선택 가능 그룹: ' + listText + ' (빈칸이면 새 그룹 생성)', '');
 
           if(input === null) break; // cancelled
 
@@ -3940,6 +3948,17 @@
               setStatus('유효한 그룹 ID가 아닙니다.', true);
               break;
             }
+            // disallow choosing a group that the selected region already belongs to
+            if(selGroups.has(parsed)){
+              setStatus('선택된 사각형이 이미 그룹 ' + parsed + ' 에 속해 있으므로 해당 그룹은 선택할 수 없습니다.', true);
+              break;
+            }
+            // also disallow choosing a non-selectable existing group (for consistency)
+            if(allIds.includes(parsed) && !selectableIds.includes(parsed)){
+              setStatus('선택할 수 없는 그룹입니다.', true);
+              break;
+            }
+
             targetGroupId = parsed;
           }
 
