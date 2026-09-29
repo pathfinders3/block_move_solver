@@ -3693,31 +3693,73 @@
       return;
     }
 
-    const region = state.yellowRegions[state.selectedRegionIndex];
-    if(!region){
+    const selectedRegion = state.yellowRegions[state.selectedRegionIndex];
+    if(!selectedRegion){
       setStatus('선택된 노란 영역을 찾을 수 없습니다.', true);
       return;
     }
 
-    const gids = getRegionGroupIds(region);
-    const activeGid = state.currentGroupId;
+    let activeGid = state.currentGroupId;
+    const samePosRegions = state.yellowRegions.filter((r)=>
+      r &&
+      r.x === selectedRegion.x &&
+      r.y === selectedRegion.y &&
+      r.size === selectedRegion.size
+    );
 
-    if(!regionHasGroup(region, activeGid)){
-      setStatus('선택된 영역은 현재 그룹에 속해 있지 않습니다.', true);
+    if(samePosRegions.length === 0){
+      setStatus('동일 위치의 사각형을 찾을 수 없습니다.', true);
       return;
     }
 
+    let targetForRemoval = samePosRegions.find((r)=> regionHasGroup(r, activeGid));
+    // fallback: if no region matches currentGroupId, consider a display override (Tab selection)
+    if(!targetForRemoval){
+      const disp = samePosRegions.find((r)=> typeof r.displayGroupId === 'number');
+      if(disp && typeof disp.displayGroupId === 'number'){
+        const dispG = disp.displayGroupId;
+        const found = samePosRegions.find((r)=> regionHasGroup(r, dispG));
+        if(found){
+          activeGid = dispG;
+          targetForRemoval = found;
+        }
+      }
+    }
+
+    if(!targetForRemoval){
+      setStatus('동일 위치 사각형들 중 현재 그룹에 속한 항목이 없습니다.', true);
+      return;
+    }
+
+    const targetIndex = state.yellowRegions.indexOf(targetForRemoval);
+    if(targetIndex < 0){
+      setStatus('제거 대상 사각형을 찾을 수 없습니다.', true);
+      return;
+    }
+
+    const gids = getRegionGroupIds(targetForRemoval);
     if(gids.length <= 1){
-      setStatus('이 영역은 하나의 그룹만 속해 있어 그룹에서 제거할 수 없습니다. 전체 삭제하려면 Delete를 사용하세요.', true);
+      // single-group region: remove the whole entry only when it belongs to current group
+      state.yellowRegions.splice(targetIndex, 1);
+      if(state.selectedRegionIndex === targetIndex){
+        state.selectedRegionIndex = null;
+      }else if(state.selectedRegionIndex > targetIndex){
+        state.selectedRegionIndex -= 1;
+      }
+      populateGroupSelect();
+      saveMeta();
+      clearCandidateSquares();
+      setStatus('동일 위치의 선택 그룹 사각형을 제거했습니다. (단일 그룹, 항목 전체 삭제)', false);
+      render();
       return;
     }
 
-    removeRegionFromGroup(region, activeGid);
+    removeRegionFromGroup(targetForRemoval, activeGid);
     normalizeRegionGroupAssignments();
     populateGroupSelect();
     saveMeta();
     clearCandidateSquares();
-    setStatus('선택된 영역에서 그룹 ' + activeGid + ' 을(를) 제거했습니다.', false);
+    setStatus('동일 위치의 그룹 ' + activeGid + ' 사각형 1개를 제거했습니다.', false);
     render();
   }
 
