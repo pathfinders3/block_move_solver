@@ -407,7 +407,8 @@
                 y: r.y,
                 size: r.size,
                 // preserve existing groupIds if present, else fall back to groupId or 0
-                groupIds: Array.isArray(r.groupIds) ? r.groupIds.map((g)=>Number.isInteger(g) ? g : 0) : (r.groupId !== undefined ? [Number.isInteger(r.groupId) ? r.groupId : 0] : [0])
+                groupIds: Array.isArray(r.groupIds) ? r.groupIds.map((g)=>Number.isInteger(g) ? g : 0) : (r.groupId !== undefined ? [Number.isInteger(r.groupId) ? r.groupId : 0] : [0]),
+                displayGroupId: Number.isInteger(r.displayGroupId) ? r.displayGroupId : undefined
               }))
               : [];
 
@@ -4547,11 +4548,16 @@
           const selRegion = state.yellowRegions[state.selectedRegionIndex];
           state.selection = { x: selRegion.x, y: selRegion.y, size: selRegion.size };
           state.currentGroupId = getRegionPrimaryGroup(selRegion);
-          // fix displayed color to this group's color until Tab is pressed again
-          selRegion.displayGroupId = state.currentGroupId;
+          // persist displayed color for this location (all overlapping same-geometry items)
+          state.yellowRegions.forEach((r)=>{
+            if(r.x === selRegion.x && r.y === selRegion.y && r.size === selRegion.size){
+              r.displayGroupId = state.currentGroupId;
+            }
+          });
           pushSelectedGroupHistory(state.currentGroupId);
           populateGroupSelect();
           clearCandidateSquares();
+          saveMeta();
 
           setStatus('동일 위치 사각형 선택: [' + state.selectedRegionIndex + '] (그룹 ' + state.currentGroupId + ')', false);
           render();
