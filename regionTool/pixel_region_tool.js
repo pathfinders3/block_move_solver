@@ -3746,6 +3746,14 @@
       }else if(state.selectedRegionIndex > targetIndex){
         state.selectedRegionIndex -= 1;
       }
+      // after removal, update any same-position regions' display override
+      state.yellowRegions.filter((r)=>
+        r && r.x === selectedRegion.x && r.y === selectedRegion.y && r.size === selectedRegion.size
+      ).forEach((r)=>{
+        if(typeof r.displayGroupId === 'number' && r.displayGroupId === activeGid){
+          r.displayGroupId = getRegionPrimaryGroup(r);
+        }
+      });
       populateGroupSelect();
       saveMeta();
       clearCandidateSquares();
@@ -3755,6 +3763,14 @@
     }
 
     removeRegionFromGroup(targetForRemoval, activeGid);
+    // ensure display color reflects remaining groups for same-position regions
+    state.yellowRegions.filter((r)=>
+      r && r.x === selectedRegion.x && r.y === selectedRegion.y && r.size === selectedRegion.size
+    ).forEach((r)=>{
+      if(typeof r.displayGroupId === 'number' && r.displayGroupId === activeGid){
+        r.displayGroupId = getRegionPrimaryGroup(r);
+      }
+    });
     normalizeRegionGroupAssignments();
     populateGroupSelect();
     saveMeta();
