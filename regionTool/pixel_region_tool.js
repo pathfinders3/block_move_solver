@@ -149,17 +149,22 @@
   }
 
   function addRegionToGroup(region, gid){
-    const ids = new Set(getRegionGroupIds(region));
     const overlaps = regionOverlapsAnyOther(region, null);
 
-    if(overlaps){
-      ids.add(gid);
-    }else{
-      ids.clear();
-      ids.add(gid);
+    // compute existing ids but avoid inheriting the default 0 when this region
+    // has no explicit group metadata (newly created region)
+    let existing = getRegionGroupIds(region).filter((g)=> g !== gid);
+    if(!Object.prototype.hasOwnProperty.call(region, 'groupIds') && region.groupId === undefined){
+      existing = existing.filter((g)=> g !== 0);
     }
 
-    region.groupIds = Array.from(ids);
+    if(overlaps){
+      // place the newly added group as primary
+      region.groupIds = [gid, ...existing.filter((g)=> g !== gid)];
+    }else{
+      region.groupIds = [gid];
+    }
+
     if(region.groupId !== undefined) delete region.groupId;
   }
 
