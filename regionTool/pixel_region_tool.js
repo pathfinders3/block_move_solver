@@ -3653,6 +3653,41 @@
     );
   }
 
+
+  function removeSelectedRegionFromActiveGroup(){
+    if(state.selectedRegionIndex === null){
+      setStatus('선택된 노란 영역이 없습니다.', true);
+      return;
+    }
+
+    const region = state.yellowRegions[state.selectedRegionIndex];
+    if(!region){
+      setStatus('선택된 노란 영역을 찾을 수 없습니다.', true);
+      return;
+    }
+
+    const gids = getRegionGroupIds(region);
+    const activeGid = state.currentGroupId;
+
+    if(!regionHasGroup(region, activeGid)){
+      setStatus('선택된 영역은 현재 그룹에 속해 있지 않습니다.', true);
+      return;
+    }
+
+    if(gids.length <= 1){
+      setStatus('이 영역은 하나의 그룹만 속해 있어 그룹에서 제거할 수 없습니다. 전체 삭제하려면 Delete를 사용하세요.', true);
+      return;
+    }
+
+    removeRegionFromGroup(region, activeGid);
+    normalizeRegionGroupAssignments();
+    populateGroupSelect();
+    saveMeta();
+    clearCandidateSquares();
+    setStatus('선택된 영역에서 그룹 ' + activeGid + ' 을(를) 제거했습니다.', false);
+    render();
+  }
+
   // 연속 그룹 탐색: direction = 'forward' | 'backward'
   function continuousGroupTraverse(direction, options){
     const opts = options || {};
@@ -4572,6 +4607,16 @@
         }
         break;
 
+      case 'r':
+      case 'R':
+        {
+          if(e.altKey){
+            e.preventDefault();
+            removeSelectedRegionFromActiveGroup();
+          }
+          break;
+        }
+
       case 'Enter':
         acceptSelectedCandidate();
         e.preventDefault();
@@ -4579,9 +4624,15 @@
 
       case 'Delete':
       case 'Backspace':
-        deleteSelectedRegion();
-        e.preventDefault();
-        break;
+        if(e.altKey){
+          removeSelectedRegionFromActiveGroup();
+          e.preventDefault();
+          break;
+        }else{
+          deleteSelectedRegion();
+          e.preventDefault();
+          break;
+        }
 
       default:
         break;
