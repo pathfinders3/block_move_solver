@@ -1593,7 +1593,8 @@
       'Ctrl+Z : 최근 그룹 통합 취소',
       'Alt+/ : 선택된 사각형 기준, 그룹 분할',      
       'F11 : 그룹 내 가장 큰 인덱스 선택',
-      'F10 : 그룹 내 가장 작은 인덱스 선택'
+      'F10 : 그룹 내 가장 작은 인덱스 선택',
+      'Tab: 동일 위치 사각형 순환 선택'
     ].join('\n');
 
     statusOverlayContent.textContent = keyHelpText;
@@ -1624,6 +1625,17 @@
     }
 
     return null;
+  }
+
+  function getSamePositionRegions(region){
+    if(!region) return [];
+
+    return state.yellowRegions.filter((r)=>
+      r &&
+      r.x === region.x &&
+      r.y === region.y &&
+      r.size === region.size
+    );
   }
 
 
@@ -3809,6 +3821,11 @@
             break;
           }
 
+          const samePosRegions = getSamePositionRegions(region);
+          const allGroups = Array.from(new Set(
+            samePosRegions.flatMap((r)=>getRegionGroupIds(r))
+          )).sort((a, b)=>a - b);
+
           const stats = getRegionChannelStats(region);
 
           if(!stats){
@@ -3841,6 +3858,10 @@
           const regionText =
             '(' + region.x + ', ' + region.y + ') ' +
             region.size + 'x';
+
+          const groupText = allGroups.length
+            ? '그룹 ' + allGroups.join(', ')
+            : '그룹 없음';
 
           const minPixelText =
             stats.minPixels && stats.minPixels.length
@@ -3880,6 +3901,7 @@
 
           const msg =
             'F1: 선택 영역 ' + regionText +
+            '\n' + groupText +
             '\nminChannel=' + stats.minChannel + ', maxChannel=' + stats.maxChannel +
             '\ntolerance 미만 픽셀=' + lowToleranceText +
             '\nrelation=' + relation.label +
@@ -3887,6 +3909,7 @@
 
           const detailMsg =
             'F1: 선택 영역 ' + regionText +
+            '\n' + groupText +
             '\nminChannel=' + stats.minChannel + ', maxChannel=' + stats.maxChannel +
             '\nmin pixels=' + minPixelText +
             '\ntolerance 미만 픽셀=' + lowToleranceText +
