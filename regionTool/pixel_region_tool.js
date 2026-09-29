@@ -3515,18 +3515,36 @@
     );
 
     if(overlapRegion){
-      const overlapText =
-        '(' + c.x + ', ' + c.y + ') ' + c.size + 'x' + c.size +
-        ' | 기존 영역과 겹쳐서 추가 못함';
+      const overlapText = '(' + c.x + ', ' + c.y + ') ' + c.size + 'x' + c.size + ' | 기존 영역과 겹칩니다.';
+      // ask user whether to allow overlapping addition
+      try{
+        const allow = window.confirm(overlapText + '\n겹쳐서 추가하시겠습니까? 확인하면 현재 활성 그룹에 겹쳐 추가됩니다.');
+        if(!allow){
+          showToast('추가 취소됨: 기존 영역과 겹침', true);
+          clearCandidateSquares();
+          setStatus('기존 영역과 겹쳐서 추가하지 않았습니다.', true);
+          render();
+          return;
+        }
+      }catch(e){
+        // if window.confirm not available, fallback to rejection
+        showToast(overlapText + ' | 추가 못함', true);
+        clearCandidateSquares();
+        setStatus('기존 영역과 겹쳐서 추가할 수 없습니다.', true);
+        render();
+        return;
+      }
 
-      showToast(overlapText, true);
+      // User confirmed: add overlapping region to current group
+      const newRegion = { x: c.x, y: c.y, size: c.size };
+      addRegionToGroup(newRegion, state.currentGroupId);
+      state.yellowRegions.push(newRegion);
+      populateGroupSelect();
+      state.selectedRegionIndex = state.yellowRegions.length - 1;
+      state.selection = { x: c.x, y: c.y, size: c.size };
       clearCandidateSquares();
-
-      setStatus(
-        '기존 영역과 겹쳐서 추가할 수 없습니다.',
-        true
-      );
-
+      saveMeta();
+      setStatus('겹쳐서 후보 사각형을 추가했습니다. (그룹 ' + state.currentGroupId + ')', false);
       render();
       return;
     }
