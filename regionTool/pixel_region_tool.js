@@ -3875,6 +3875,119 @@
           break;
         }
 
+      case 'F7':
+        {
+          e.preventDefault();
+
+          if(!state.selection){
+            setStatus('F7: 추가할 사각형을 먼저 선택하세요.', true);
+            break;
+          }
+
+          const sel = state.selection;
+
+          // list available groups
+          const ids = getGroupIds();
+          const listText = ids.length ? ids.join(', ') : '(없음)';
+
+          const input = window.prompt('추가할 그룹 ID를 입력하세요. 기존 그룹: ' + listText + ' (빈칸이면 새 그룹 생성)', '');
+
+          if(input === null) break; // cancelled
+
+          let targetGroupId;
+
+          if(input.trim() === ''){
+            const newIds = getGroupIds();
+            targetGroupId = newIds.length ? Math.max(...newIds) + 1 : 0;
+          }else{
+            const parsed = parseInt(input, 10);
+            if(Number.isNaN(parsed)){
+              setStatus('유효한 그룹 ID가 아닙니다.', true);
+              break;
+            }
+            targetGroupId = parsed;
+          }
+
+          // prepare new region
+          const newRegion = { x: sel.x, y: sel.y, size: sel.size };
+
+          // find indices of regions belonging to target group
+          const groupList = state.yellowRegions
+            .map((region, index)=>({ region, index }))
+            .filter(({ region })=> regionHasGroup(region, targetGroupId))
+            .sort((a, b)=>a.index - b.index);
+
+          if(groupList.length === 0){
+            // empty group: just append
+            addRegionToGroup(newRegion, targetGroupId);
+            state.yellowRegions.push(newRegion);
+            state.currentGroupId = targetGroupId;
+            populateGroupSelect();
+            saveMeta();
+            setStatus('그룹 ' + targetGroupId + '에 새 사각형을 추가했습니다. (빈 그룹)', false);
+            render();
+            break;
+          }
+
+          // compute nearest region in that group by center distance
+          function centerOf(r){ return { x: r.x + r.size/2, y: r.y + r.size/2 }; }
+
+          const selCenter = centerOf(newRegion);
+
+          let nearest = null;
+          let nearestDist = Infinity;
+
+          for(const item of groupList){
+            const c = centerOf(item.region);
+            const d = Math.hypot(c.x - selCenter.x, c.y - selCenter.y);
+            if(d < nearestDist){ nearestDist = d; nearest = item; }
+          }
+
+          if(!nearest){
+            // fallback append
+            addRegionToGroup(newRegion, targetGroupId);
+            state.yellowRegions.push(newRegion);
+            populateGroupSelect();
+            saveMeta();
+            setStatus('그룹 ' + targetGroupId + '에 새 사각형을 추가했습니다.', false);
+            render();
+            break;
+          }
+
+          const firstIdx = groupList[0].index;
+          const lastIdx = groupList[groupList.length - 1].index;
+          const nearestIdx = nearest.index;
+
+          let insertAt = null;
+
+          if(nearestIdx === firstIdx){
+            // insert before first (becomes new first)
+            insertAt = firstIdx;
+          }else if(nearestIdx === lastIdx){
+            // insert after last
+            insertAt = lastIdx + 1;
+          }else{
+            // insert after nearest by default
+            insertAt = nearestIdx + 1;
+          }
+
+          // insert into array at computed position
+          addRegionToGroup(newRegion, targetGroupId);
+          state.yellowRegions.splice(insertAt, 0, newRegion);
+
+          // update selection to the newly inserted region
+          state.selectedRegionIndex = insertAt;
+          state.selection = { x: newRegion.x, y: newRegion.y, size: newRegion.size };
+          state.currentGroupId = targetGroupId;
+
+          populateGroupSelect();
+          saveMeta();
+          clearCandidateSquares();
+          setStatus('그룹 ' + targetGroupId + '에 사각형을 추가했습니다. 위치: index ' + insertAt, false);
+          render();
+          break;
+        }
+
       case 'F9':
         {
           e.preventDefault();
