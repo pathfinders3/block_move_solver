@@ -536,13 +536,14 @@
   // ---------- rendering ----------
 
   function drawRegionsOn(ctx, scale){
-    state.yellowRegions.forEach((r, idx)=>{
-
+    function drawOneRegion(r, idx){
       const selected = (idx === state.selectedRegionIndex);
-      const gid = getRegionPrimaryGroup(r);
-      const colors = getGroupColor(gid);
+      // allow a display override so Tab-selection can fix a region's displayed group
+      const displayGid = (typeof r.displayGroupId === 'number') ? r.displayGroupId : getRegionPrimaryGroup(r);
+      const colors = getGroupColor(displayGid);
 
-      ctx.fillStyle = selected ? '#ffb84d' : colors.fill;
+      // selected 상태여도 그룹 색상을 유지한다.
+      ctx.fillStyle = colors.fill;
 
       ctx.fillRect(
         r.x * scale,
@@ -600,7 +601,21 @@
       }catch(e){
         /* ignore badge errors */
       }
+    }
+
+    // draw non-selected regions first
+    state.yellowRegions.forEach((r, idx)=>{
+      if(idx === state.selectedRegionIndex) return;
+      drawOneRegion(r, idx);
     });
+
+    // draw selected region last so overlap cannot hide it
+    if(
+      state.selectedRegionIndex !== null &&
+      state.yellowRegions[state.selectedRegionIndex]
+    ){
+      drawOneRegion(state.yellowRegions[state.selectedRegionIndex], state.selectedRegionIndex);
+    }
   }
 
 
@@ -4532,6 +4547,8 @@
           const selRegion = state.yellowRegions[state.selectedRegionIndex];
           state.selection = { x: selRegion.x, y: selRegion.y, size: selRegion.size };
           state.currentGroupId = getRegionPrimaryGroup(selRegion);
+          // fix displayed color to this group's color until Tab is pressed again
+          selRegion.displayGroupId = state.currentGroupId;
           pushSelectedGroupHistory(state.currentGroupId);
           populateGroupSelect();
           clearCandidateSquares();
