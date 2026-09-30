@@ -2632,11 +2632,18 @@
       clearCandidateSquares();
 
       setStatus(
-        '노란 영역 선택: [' + idx + '] (그룹 ' + getRegionPrimaryGroup(targetRegion) + ')' +
-        ' | (' + targetRegion.x + ', ' + targetRegion.y + ') ' +
-        targetRegion.size + 'x' + targetRegion.size +
-        prevAngleText +
-        ' | Delete 키로 삭제가능.',
+        (function(){
+          const samePos = getSamePositionRegions(targetRegion);
+          const allGroups = Array.from(new Set(
+            samePos.flatMap((r)=> getRegionGroupIds(r))
+          )).sort((a,b)=>a-b);
+          const gidText = allGroups.length ? allGroups.join(', ') : '없음';
+          return '노란 영역 선택: [' + idx + '] (그룹 ' + gidText + ')' +
+            ' | (' + targetRegion.x + ', ' + targetRegion.y + ') ' +
+            targetRegion.size + 'x' + targetRegion.size +
+            prevAngleText +
+            ' | Delete 키로 삭제가능.';
+        })(),
         false
       );
 
