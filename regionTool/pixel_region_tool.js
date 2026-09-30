@@ -3978,24 +3978,29 @@
               ? stats.underTolerancePixels.length + '개'
               : '0개';
 
-          // compute relation to previous and next region for each group this region belongs to
-          const gids = getRegionGroupIds(region);
-          const neighborInfos = gids.map((gid)=>{
+          const neighborInfos = allGroups.map((gid)=>{
             const info = { gid, prevInfo: { label: 'unknown', distance: null }, nextInfo: { label: 'unknown', distance: null } };
 
             const groupList = state.yellowRegions
               .map((r, index)=>({ region: r, index }))
-              .filter(({ region })=> regionHasGroup(region, gid))
+              .filter(({ region: r })=> regionHasGroup(r, gid))
               .sort((a, b)=> a.index - b.index);
 
-            const pos = groupList.findIndex((g)=> g.region.x === region.x && g.region.y === region.y && g.region.size === region.size);
-            
+            // 객체 참조 비교: 이 그룹에 속하면서 같은 위치인 region 중 선택된 것/없으면 첫 번째
+            let pos = groupList.findIndex((g)=> g.region === region);
+            if(pos < 0){
+              pos = groupList.findIndex((g)=>
+                samePosRegions.includes(g.region)
+              );
+            }
+
+            const cur = pos >= 0 ? groupList[pos].region : region;
 
             if(pos >= 0){
               const prev = pos > 0 ? groupList[pos - 1].region : null;
               const next = pos < groupList.length - 1 ? groupList[pos + 1].region : null;
-              info.prevInfo = relationBetween(region, prev);
-              info.nextInfo = relationBetween(region, next);
+              info.prevInfo = relationBetween(cur, prev);
+              info.nextInfo = relationBetween(cur, next);
             }
 
             return info;
@@ -4019,8 +4024,8 @@
 
           const groupSummary = neighborInfos.length
             ? neighborInfos.map((ni)=>
-                'G' + ni.gid + ': prev=' + ni.prevInfo.label + (ni.prevInfo.distance !== null ? ' dist=' + Math.round(ni.prevInfo.distance) : '') +
-                ' | next=' + ni.nextInfo.label + (ni.nextInfo.distance !== null ? ' dist=' + Math.round(ni.nextInfo.distance) : '')
+                'G' + ni.gid + ': ◀prev=' + ni.prevInfo.label + (ni.prevInfo.distance !== null ? ' dist=' + Math.round(ni.prevInfo.distance) : '') +
+                ' | next▶=' + ni.nextInfo.label + (ni.nextInfo.distance !== null ? ' dist=' + Math.round(ni.nextInfo.distance) : '')
               ).join(' ; ')
             : 'relation=unknown';
 
@@ -4034,8 +4039,8 @@
 
           const groupDetails = neighborInfos.length
             ? neighborInfos.map((ni)=>
-                'Group ' + ni.gid + ' prev=' + ni.prevInfo.label + (ni.prevInfo.distance !== null ? ' dist=' + Math.round(ni.prevInfo.distance) : '') +
-                ' | next=' + ni.nextInfo.label + (ni.nextInfo.distance !== null ? ' dist=' + Math.round(ni.nextInfo.distance) : '')
+                'Group ' + ni.gid + '◀prev=' + ni.prevInfo.label + (ni.prevInfo.distance !== null ? ' dist=' + Math.round(ni.prevInfo.distance) : '') +
+                ' | next▶=' + ni.nextInfo.label + (ni.nextInfo.distance !== null ? ' dist=' + Math.round(ni.nextInfo.distance) : '')
               ).join('\n')
             : 'relation=unknown';
 
