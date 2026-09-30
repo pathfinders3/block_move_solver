@@ -3953,11 +3953,52 @@
               ? stats.underTolerancePixels.length + '개'
               : '0개';
 
-          const relation = getRelationToRecentYellowRegion(region);
-          const relationText =
-            relation.distance === null
-              ? 'relation=unknown'
-              : 'relation=' + relation.label + ' dist=' + Math.round(relation.distance);
+          // compute relation to previous and next region within the same primary group
+          const primaryG = getRegionPrimaryGroup(region);
+          let prevInfo = { label: 'unknown', distance: null };
+          let nextInfo = { label: 'unknown', distance: null };
+
+          if(typeof primaryG === 'number'){
+            const groupList = state.yellowRegions
+              .map((region, index)=>({ region, index }))
+              .filter(({ region })=> regionHasGroup(region, primaryG))
+              .sort((a, b)=> a.index - b.index);
+
+            const pos = groupList.findIndex((g)=> g.region.x === region.x && g.region.y === region.y && g.region.size === region.size);
+
+            function relationBetween(a, b){
+              if(!a || !b) return { label: 'unknown', distance: null };
+              const aLeft = a.x;
+              const aRight = a.x + a.size;
+              const aTop = a.y;
+              const aBottom = a.y + a.size;
+
+              const bLeft = b.x;
+              const bRight = b.x + b.size;
+              const bTop = b.y;
+              const bBottom = b.y + b.size;
+
+              const overlapsOrTouches =
+                aLeft <= bRight &&
+                bLeft <= aRight &&
+                aTop <= bBottom &&
+                bTop <= aBottom;
+
+              const distance = Math.hypot(
+                (aLeft + aRight) / 2 - (bLeft + bRight) / 2,
+                (aTop + aBottom) / 2 - (bTop + bBottom) / 2
+              );
+
+              return { label: overlapsOrTouches ? 'near' : 'far', distance };
+            }
+
+            if(pos >= 0){
+              const prev = pos > 0 ? groupList[pos - 1].region : null;
+              const next = pos < groupList.length - 1 ? groupList[pos + 1].region : null;
+              prevInfo = relationBetween(region, prev);
+              nextInfo = relationBetween(region, next);
+            }
+          }
 
           const expansionResults = getExpansionStatusForRegion(region, 1);
           const lowerRight = expansionResults.find((item)=>item.label === '우하단') || expansionResults[0];
@@ -3980,7 +4021,8 @@
             '\n' + groupText +
             '\nminChannel=' + stats.minChannel + ', maxChannel=' + stats.maxChannel +
             '\ntolerance 미만 픽셀=' + lowToleranceText +
-            '\nrelation=' + relation.label +
+            '\n⇦prev=' + prevInfo.label + (prevInfo.distance !== null ? ' dist=' + Math.round(prevInfo.distance) : '') +
+            ' | ⇨next=' + nextInfo.label + (nextInfo.distance !== null ? ' dist=' + Math.round(nextInfo.distance) : '') +
             '\n1칸 확장(8x8)=' + expansionText;
 
           const detailMsg =
@@ -3989,7 +4031,8 @@
             '\nminChannel=' + stats.minChannel + ', maxChannel=' + stats.maxChannel +
             '\nmin pixels=' + minPixelText +
             '\ntolerance 미만 픽셀=' + lowToleranceText +
-            '\n' + relationText +
+            '\nprev relation⇦=' + prevInfo.label + (prevInfo.distance !== null ? ' dist=' + Math.round(prevInfo.distance) : '') +
+            '\nnext relation⇨=' + nextInfo.label + (nextInfo.distance !== null ? ' dist=' + Math.round(nextInfo.distance) : '') +
             '\n1칸 확장(8x8)=' + expansionText +
             '\n불가 원인=' + expansionFailureText;
 
