@@ -1673,6 +1673,33 @@
     return { label, distance };
   }
 
+  // helper: relation (near/far and center distance) between two regions
+  function relationBetween(a, b){
+    if(!a || !b) return { label: 'unknown', distance: null };
+    const aLeft = a.x;
+    const aRight = a.x + a.size;
+    const aTop = a.y;
+    const aBottom = a.y + a.size;
+
+    const bLeft = b.x;
+    const bRight = b.x + b.size;
+    const bTop = b.y;
+    const bBottom = b.y + b.size;
+
+    const overlapsOrTouches =
+      aLeft <= bRight &&
+      bLeft <= aRight &&
+      aTop <= bBottom &&
+      bTop <= aBottom;
+
+    const distance = Math.hypot(
+      (aLeft + aRight) / 2 - (bLeft + bRight) / 2,
+      (aTop + aBottom) / 2 - (bTop + bBottom) / 2
+    );
+
+    return { label: overlapsOrTouches ? 'near' : 'far', distance };
+  }
+
 
   function getExpandedSquares(x, y, n){
     return [
@@ -2676,20 +2703,18 @@
       !state.img
     ) return;
 
-    const s =
-      state.selection;
+    const s = state.selection;
 
-    s.x =
-      Math.min(
-        Math.max(
-          s.x + dx,
-          0
-        ),
-        Math.max(
-          0,
-          state.width - s.size
-        )
-      );
+    s.x = Math.min(
+      Math.max(
+        s.x + dx,
+        0
+      ),
+      Math.max(
+        0,
+        state.width - s.size
+      )
+    );
 
     s.y =
       Math.min(
@@ -3953,52 +3978,28 @@
               ? stats.underTolerancePixels.length + '개'
               : '0개';
 
-          // compute relation to previous and next region within the same primary group
-          const primaryG = getRegionPrimaryGroup(region);
-          let prevInfo = { label: 'unknown', distance: null };
-          let nextInfo = { label: 'unknown', distance: null };
+          // compute relation to previous and next region for each group this region belongs to
+          const gids = getRegionGroupIds(region);
+          const neighborInfos = gids.map((gid)=>{
+            const info = { gid, prevInfo: { label: 'unknown', distance: null }, nextInfo: { label: 'unknown', distance: null } };
 
-          if(typeof primaryG === 'number'){
             const groupList = state.yellowRegions
-              .map((region, index)=>({ region, index }))
-              .filter(({ region })=> regionHasGroup(region, primaryG))
+              .map((r, index)=>({ region: r, index }))
+              .filter(({ region })=> regionHasGroup(region, gid))
               .sort((a, b)=> a.index - b.index);
 
             const pos = groupList.findIndex((g)=> g.region.x === region.x && g.region.y === region.y && g.region.size === region.size);
-
-            function relationBetween(a, b){
-              if(!a || !b) return { label: 'unknown', distance: null };
-              const aLeft = a.x;
-              const aRight = a.x + a.size;
-              const aTop = a.y;
-              const aBottom = a.y + a.size;
-
-              const bLeft = b.x;
-              const bRight = b.x + b.size;
-              const bTop = b.y;
-              const bBottom = b.y + b.size;
-
-              const overlapsOrTouches =
-                aLeft <= bRight &&
-                bLeft <= aRight &&
-                aTop <= bBottom &&
-                bTop <= aBottom;
-
-              const distance = Math.hypot(
-                (aLeft + aRight) / 2 - (bLeft + bRight) / 2,
-                (aTop + aBottom) / 2 - (bTop + bBottom) / 2
-              );
-
-              return { label: overlapsOrTouches ? 'near' : 'far', distance };
-            }
+            
 
             if(pos >= 0){
               const prev = pos > 0 ? groupList[pos - 1].region : null;
               const next = pos < groupList.length - 1 ? groupList[pos + 1].region : null;
-              prevInfo = relationBetween(region, prev);
-              nextInfo = relationBetween(region, next);
+              info.prevInfo = relationBetween(region, prev);
+              info.nextInfo = relationBetween(region, next);
             }
-          }
+
+            return info;
+          });
 
           const expansionResults = getExpansionStatusForRegion(region, 1);
           const lowerRight = expansionResults.find((item)=>item.label === '우하단') || expansionResults[0];
@@ -4016,14 +4017,27 @@
               ? '우하단:' + (lowerRight.canExpand ? '가능' : '불가')
               : '우하단:검사없음';
 
+          const groupSummary = neighborInfos.length
+            ? neighborInfos.map((ni)=>
+                'G' + ni.gid + ': prev=' + ni.prevInfo.label + (ni.prevInfo.distance !== null ? ' dist=' + Math.round(ni.prevInfo.distance) : '') +
+                ' | next=' + ni.nextInfo.label + (ni.nextInfo.distance !== null ? ' dist=' + Math.round(ni.nextInfo.distance) : '')
+              ).join(' ; ')
+            : 'relation=unknown';
+
           const msg =
             'F1: 선택 영역 ' + regionText +
             '\n' + groupText +
             '\nminChannel=' + stats.minChannel + ', maxChannel=' + stats.maxChannel +
             '\ntolerance 미만 픽셀=' + lowToleranceText +
-            '\n⇦prev=' + prevInfo.label + (prevInfo.distance !== null ? ' dist=' + Math.round(prevInfo.distance) : '') +
-            ' | ⇨next=' + nextInfo.label + (nextInfo.distance !== null ? ' dist=' + Math.round(nextInfo.distance) : '') +
+            '\n' + groupSummary +
             '\n1칸 확장(8x8)=' + expansionText;
+
+          const groupDetails = neighborInfos.length
+            ? neighborInfos.map((ni)=>
+                'Group ' + ni.gid + ' prev=' + ni.prevInfo.label + (ni.prevInfo.distance !== null ? ' dist=' + Math.round(ni.prevInfo.distance) : '') +
+                ' | next=' + ni.nextInfo.label + (ni.nextInfo.distance !== null ? ' dist=' + Math.round(ni.nextInfo.distance) : '')
+              ).join('\n')
+            : 'relation=unknown';
 
           const detailMsg =
             'F1: 선택 영역 ' + regionText +
@@ -4031,8 +4045,7 @@
             '\nminChannel=' + stats.minChannel + ', maxChannel=' + stats.maxChannel +
             '\nmin pixels=' + minPixelText +
             '\ntolerance 미만 픽셀=' + lowToleranceText +
-            '\nprev relation⇦=' + prevInfo.label + (prevInfo.distance !== null ? ' dist=' + Math.round(prevInfo.distance) : '') +
-            '\nnext relation⇨=' + nextInfo.label + (nextInfo.distance !== null ? ' dist=' + Math.round(nextInfo.distance) : '') +
+            '\n' + groupDetails +
             '\n1칸 확장(8x8)=' + expansionText +
             '\n불가 원인=' + expansionFailureText;
 
