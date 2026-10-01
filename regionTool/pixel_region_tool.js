@@ -1870,8 +1870,8 @@
   // 방향 정의 (표시 순서 포함)
   const DIRS = [
     ['top',    '위쪽'],
-    ['left',   '왼쪽'],
     ['bottom', '아래쪽'],
+    ['left',   '왼쪽'],
     ['right',  '우측'],
   ];
 
@@ -1883,14 +1883,21 @@
       others.some((o) => px >= o.x && px < o.x + o.size &&
                         py >= o.y && py < o.y + o.size);
 
-    const count = (pixels) => {
-      let exposed = 0;
-      for (const [px, py] of pixels) if (!isCovered(px, py)) exposed++;
-      return { exposed, max: pixels.length };
-    };
-
     const range = (from, to) =>
       Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+    // pixels는 [모서리, 면..., 모서리] 순서 (길이 size + 2)
+    const count = (pixels) => {
+      const open = pixels.map(([px, py]) => !isCovered(px, py));
+      const exposed = open.filter(Boolean).length;
+      const inner = open.slice(1, -1);                 // 양 끝 모서리 제외
+      return {
+        exposed,                                        // 모서리 포함
+        max: open.length,
+        edgeExposed: inner.filter(Boolean).length,      // 면만
+        edgeMax: inner.length,
+      };
+    };
 
     return {
       top:    count(range(x - 1, x + size).map((xx) => [xx, y - 1])),
@@ -1899,7 +1906,6 @@
       right:  count(range(y - 1, y + size).map((yy) => [x + size, yy])),
     };
   }
-
   
   function getExpandedSquares(x, y, n){
     return [
@@ -4871,8 +4877,11 @@
 
         // 방향별 { 이름, 뚫린수/최대, 판정 } 한 번만 계산
         const dirInfo = DIRS.map(([key, name]) => {
-          const { exposed: ex, max } = dirCounts[key];
-          return { name, ex, max, verdict: assess(ex, max) };
+          const { exposed: ex, max, edgeExposed: eEx, edgeMax: eMax } = dirCounts[key];
+          return {
+            name, ex, max, verdict: assess(ex, max),
+            eEx, eMax, eVerdict: assess(eEx, eMax),
+          };
         });
 
         const neighborLines = neighbors.map(({ region, index }) => {
@@ -4902,12 +4911,21 @@
           `E: 인접 사각형 ${neighbors.length}개 | 뚫린 픽셀 ${exposed}/${maxPossible} | ` +
           grouped.map((g) => `${g.label} [${g.items.map((d) => `${d.verdict}(${d.ex}/${d.max})`).join(' | ')}]`).join(', ');
 
+
+        // dirInfo는 [위, 아래, 왼쪽, 우측] 순서
+        // getVerdict로 어떤 기준(모서리 포함/면만)을 쓸지 지정
+        const fmtPair = (a, b, fmt) => `${fmt(a)}, ${fmt(b)}`;
+
+        const fmtGroups = (info, fmt) =>
+          `(상하) ${fmtPair(info[0], info[1], fmt)} (좌우) ${fmtPair(info[2], info[3], fmt)}`;
+
         const detail =
           `뚫린 픽셀: ${exposed}/${maxPossible}\n` +
-          '방향별: \n' +
-          grouped.map((g) => `${g.label} [${g.items.map((d) => `${d.name} ${d.verdict}(${d.ex}/${d.max})`).join(' | ')}]`).join(', \n') + '\n' +
+          '방향별(모서리 포함): ' + fmtGroups(dirInfo, (d) => `${d.ex}/${d.max} ${d.verdict}`) + '\n' +
+          '방향별(면만): ' + fmtGroups(dirInfo, (d) => `${d.eEx}/${d.eMax} ${d.eVerdict}`) + '\n' +
           neighborLines.join('\n');
-
+          
+  
         setStatus(summary, false, detail);
         render();
         break;
