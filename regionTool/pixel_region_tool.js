@@ -18,6 +18,8 @@
   const infoGroupHistory = document.getElementById('infoGroupHistory');
   const keyHelpSummary = document.getElementById('keyHelpSummary');
   const exportJsonBtn = document.getElementById('exportJsonBtn');
+  const importJsonBtn = document.getElementById('importJsonBtn');
+  const importJsonInput = document.getElementById('importJsonInput');
   const groupSelect = document.getElementById('groupSelect');
   const groupSwatch = document.getElementById('groupSwatch');
   const statusLine = document.getElementById('statusLine');
@@ -1284,6 +1286,107 @@
   }
 
 
+  function importJsonPayload(payload){
+    if(!payload || typeof payload !== 'object'){
+      throw new Error('JSON 형식이 올바르지 않습니다.');
+    }
+
+    const groups = Array.isArray(payload.groups) ? payload.groups : [];
+    if(groups.length === 0){
+      throw new Error('가져올 그룹 데이터가 없습니다.');
+    }
+
+    const existingGroupIds = getGroupIds();
+    let nextGroupId = Math.max(0, ...existingGroupIds, state.currentGroupId) + 1;
+    const groupIdMap = new Map();
+
+    groups.forEach((group, idx) => {
+      const rawId = (group && group.id) ? String(group.id) : 'group-' + String(idx + 1);
+      const parsed = Number(rawId.replace(/^group-/i, ''));
+      let gid = Number.isInteger(parsed) && parsed > 0 ? parsed : idx + 1;
+      if(existingGroupIds.includes(gid)){
+        gid = nextGroupId++;
+      }
+      groupIdMap.set(rawId, gid);
+    });
+
+    const importedRegions = new Map();
+
+    groups.forEach((group, idx) => {
+      const rawId = (group && group.id) ? String(group.id) : 'group-' + String(idx + 1);
+      const gid = groupIdMap.get(rawId);
+      const segments = Array.isArray(group && group.segments) ? group.segments : [];
+
+      segments.forEach((segment) => {
+        const points = Array.isArray(segment && segment.points) ? segment.points : [];
+        points.forEach((point) => {
+          if(!point || !Number.isFinite(point.x) || !Number.isFinite(point.y) || !Number.isFinite(point.size) || point.size <= 0){
+            return;
+          }
+
+          const x = Number(point.x);
+          const y = Number(point.y);
+          const size = Number(point.size);
+          const key = `${x},${y},${size}`;
+          const existing = importedRegions.get(key);
+          const groupIds = existing ? [...existing.groupIds] : [];
+          if(!groupIds.includes(gid)) groupIds.push(gid);
+
+          importedRegions.set(key, {
+            x,
+            y,
+            size,
+            groupIds
+          });
+        });
+      });
+    });
+
+    const normalizedRegions = Array.from(importedRegions.values()).map((region)=>({
+      x: Number(region.x),
+      y: Number(region.y),
+      size: Number(region.size),
+      groupIds: Array.isArray(region.groupIds) ? region.groupIds.slice() : [0]
+    }));
+
+    if(normalizedRegions.length === 0){
+      throw new Error('복원 가능한 사각형 데이터가 없습니다.');
+    }
+
+    state.yellowRegions = normalizedRegions;
+    state.currentGroupId = Math.max(...normalizedRegions.flatMap((r) => r.groupIds), 0);
+    state.selectedRegionIndex = null;
+    state.selection = null;
+    state.candidateSquares = [];
+    state.selectedCandidateIndex = 0;
+    state.candidateMode = null;
+    state.candidateDirectionKey = null;
+    state.candidateSizeGroups = [];
+    state.candidateGroupIndex = 0;
+    state.expansionBaseRegionIndex = null;
+    state.selectedGroupHistory = [];
+
+    populateGroupSelect();
+    saveMeta();
+    render();
+    setStatus('JSON IMPORT 완료: ' + normalizedRegions.length + '개 사각형 복원했습니다.', false);
+    showToast('JSON IMPORT 완료', false);
+  }
+
+  async function importJsonFile(file){
+    if(!file){ return; }
+
+    try{
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      importJsonPayload(payload);
+    }catch(err){
+      console.error('JSON IMPORT 실패:', err);
+      setStatus('JSON IMPORT 실패: ' + (err && err.message ? err.message : '알 수 없는 오류'), true);
+      showToast('JSON IMPORT 실패', true);
+    }
+  }
+
   function exportCurrentGroupsAsJson(){
     if(state.yellowRegions.length === 0){
       showToast('내보낼 노란 사각형이 없습니다.', true);
@@ -2532,6 +2635,16 @@
     exportCurrentGroupsAsJson();
   });
 
+  importJsonBtn.addEventListener('click', ()=>{
+    importJsonInput.click();
+  });
+
+  importJsonInput.addEventListener('change', async (event)=>{
+    const file = event.target.files && event.target.files[0];
+    if(!file){ return; }
+    await importJsonFile(file);
+    event.target.value = '';
+  });
 
   clearRegionsBtn.addEventListener('click', ()=>{
 
