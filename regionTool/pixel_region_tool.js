@@ -1700,6 +1700,19 @@
     return { label: overlapsOrTouches ? 'near' : 'far', distance };
   }
 
+  function getDirectionArrows(fromRegion, toRegion){
+    if(!fromRegion || !toRegion) return '';
+    const a = getRegionCenter(fromRegion);
+    const b = getRegionCenter(toRegion);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    let horiz = '';
+    let vert = '';
+    if(dx > 0) horiz = '→'; else if(dx < 0) horiz = '←';
+    if(dy > 0) vert = '↓'; else if(dy < 0) vert = '↑';
+    return horiz + vert;
+  }
+
 
   function getExpandedSquares(x, y, n){
     return [
@@ -4637,8 +4650,44 @@
 
       case 'e':
       case 'E':
-        startDirectionalCandidates('E');
         e.preventDefault();
+
+        // show neighbor info for selected region (fallback to directional suggestion when no selection)
+        let activeRegion = null;
+        if(state.selectedRegionIndex !== null && state.yellowRegions[state.selectedRegionIndex]){
+          activeRegion = state.yellowRegions[state.selectedRegionIndex];
+        }else if(state.selection){
+          // try to find a region at the selection
+          activeRegion = state.yellowRegions.find((r)=> r.x === state.selection.x && r.y === state.selection.y && r.size === state.selection.size) || null;
+        }
+
+        if(!activeRegion){
+          // fallback to existing behavior
+          startDirectionalCandidates('E');
+          break;
+        }
+
+        const neighbors = state.yellowRegions
+          .map((r, i)=> ({ region: r, index: i }))
+          .filter(({ region })=> region !== activeRegion)
+          .filter(({ region })=> squaresTouchOrCorner(activeRegion, region) || squaresOverlap(activeRegion, region));
+
+        if(neighbors.length === 0){
+          setStatus('E: 선택된 사각형 주변에 인접한 다른 사각형이 없습니다.', true);
+          render();
+          break;
+        }
+
+        const lines = neighbors.map(({ region, index })=>{
+          const arrows = getDirectionArrows(activeRegion, region) || '-';
+          const gids = getRegionGroupIds(region).join(', ') || '없음';
+          return '[' + index + '] (' + region.x + ', ' + region.y + ') ' + region.size + 'x | ' + arrows + ' | 그룹 ' + gids;
+        });
+
+        const summary = 'E: 인접 사각형 ' + neighbors.length + '개';
+        const detail = lines.join('\n');
+        setStatus(summary, false, detail);
+        render();
         break;
 
       case 'a':
