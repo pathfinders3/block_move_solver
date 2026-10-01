@@ -4768,13 +4768,31 @@
           return `[${index}] (${region.x}, ${region.y}) ${region.size}x | ${arrows} | 그룹 ${gids}`;
         });
 
+        const grouped = [
+          {
+            label: '⇧⇩',
+            items: [
+              { name: '위쪽', ...dirInfo.find((d) => d.name === '위쪽') },
+              { name: '아래쪽', ...dirInfo.find((d) => d.name === '아래쪽') },
+            ],
+          },
+          {
+            label: '⇦⇨',
+            items: [
+              { name: '왼쪽', ...dirInfo.find((d) => d.name === '왼쪽') },
+              { name: '우측', ...dirInfo.find((d) => d.name === '우측') },
+            ],
+          },
+        ];
+
         const summary =
           `E: 인접 사각형 ${neighbors.length}개 | 뚫린 픽셀 ${exposed}/${maxPossible} | ` +
-          dirInfo.map((d) => `${d.name}으로 ${d.verdict}`).join(', ');
+          grouped.map((g) => `${g.label} [${g.items.map((d) => `${d.verdict}(${d.ex}/${d.max})`).join(' | ')}]`).join(', ');
 
         const detail =
           `뚫린 픽셀: ${exposed}/${maxPossible}\n` +
-          '방향별: ' + dirInfo.map((d) => `${d.name}(${d.ex}/${d.max}) → ${d.verdict}`).join(', ') + '\n' +
+          '방향별: \n' +
+          grouped.map((g) => `${g.label} [${g.items.map((d) => `${d.name} ${d.verdict}(${d.ex}/${d.max})`).join(' | ')}]`).join(', \n') + '\n' +
           neighborLines.join('\n');
 
         setStatus(summary, false, detail);
