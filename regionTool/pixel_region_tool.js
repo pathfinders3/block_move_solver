@@ -1713,6 +1713,42 @@
     return horiz + vert;
   }
 
+  function countExposedPixels(region){
+    if(!region) return { exposed: 0, maxPossible: 0 };
+    const others = state.yellowRegions.filter((r) => r !== region);
+    const { x, y, size } = region;
+    let exposed = 0;
+    let maxPossible = 0;
+
+    const isCovered = (px, py) =>
+      others.some((o) => px >= o.x && px < o.x + o.size &&
+                        py >= o.y && py < o.y + o.size);
+
+    // 위쪽 줄과 아래쪽 줄 (모서리 포함: x-1 ~ x+size)
+    for (let xx = x - 1; xx <= x + size; xx++) {
+      if (y - 1 >= 0 && xx >= 0 && xx < state.width) {
+        maxPossible++;
+        if (!isCovered(xx, y - 1)) exposed++;
+      }
+      if (y + size < state.height && xx >= 0 && xx < state.width) {
+        maxPossible++;
+        if (!isCovered(xx, y + size)) exposed++;
+      }
+    }
+    // 왼쪽 줄과 오른쪽 줄 (모서리 제외)
+    for (let yy = y; yy < y + size; yy++) {
+      if (x - 1 >= 0 && yy >= 0 && yy < state.height) {
+        maxPossible++;
+        if (!isCovered(x - 1, yy)) exposed++;
+      }
+      if (x + size < state.width && yy >= 0 && yy < state.height) {
+        maxPossible++;
+        if (!isCovered(x + size, yy)) exposed++;
+      }
+    }
+
+    return { exposed, maxPossible };
+  }
 
   function getExpandedSquares(x, y, n){
     return [
@@ -4684,8 +4720,9 @@
           return '[' + index + '] (' + region.x + ', ' + region.y + ') ' + region.size + 'x | ' + arrows + ' | 그룹 ' + gids;
         });
 
-        const summary = 'E: 인접 사각형 ' + neighbors.length + '개';
-        const detail = lines.join('\n');
+        const { exposed, maxPossible } = countExposedPixels(activeRegion);
+        const summary = 'E: 인접 사각형 ' + neighbors.length + '개 | 뚫린 픽셀 ' + exposed + '/' + maxPossible;
+        const detail = '뚫린 픽셀: ' + exposed + '/' + maxPossible + '\n' + lines.join('\n');
         setStatus(summary, false, detail);
         render();
         break;
