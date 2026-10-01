@@ -1750,6 +1750,54 @@
     return { exposed, maxPossible };
   }
 
+  // 헬퍼: 선택된 사각형 찾기
+  function getActiveRegion(){
+    const { selectedRegionIndex: i, selection: s, yellowRegions: regions } = state;
+    if(i !== null && regions[i]) return regions[i];
+    if(s) return regions.find((r) => r.x === s.x && r.y === s.y && r.size === s.size) || null;
+    return null;
+  }
+
+  // 헬퍼: 뚫림 정도 판정
+  const assess = (ex, m) =>
+    m === 0 ? '경계 없음' :
+    ex === m ? '뚫림' :
+    ex >= Math.ceil(m / 2) ? '반 뚫림' : '거의 닫힘';
+
+  // 방향 정의 (표시 순서 포함)
+  const DIRS = [
+    ['top',    '위쪽'],
+    ['left',   '왼쪽'],
+    ['bottom', '아래쪽'],
+    ['right',  '우측'],
+  ];
+
+  // 방향별(위/아래/좌/우)로 노출된 링 픽셀 수와 각 방향의 최대 가능 수를 계산
+  function countExposedByDirection(region){
+    const { x, y, size } = region;
+    const others = state.yellowRegions.filter((r) => r !== region);
+    const isCovered = (px, py) =>
+      others.some((o) => px >= o.x && px < o.x + o.size &&
+                        py >= o.y && py < o.y + o.size);
+
+    const count = (pixels) => {
+      let exposed = 0;
+      for (const [px, py] of pixels) if (!isCovered(px, py)) exposed++;
+      return { exposed, max: pixels.length };
+    };
+
+    const range = (from, to) =>
+      Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+    return {
+      top:    count(range(x - 1, x + size).map((xx) => [xx, y - 1])),
+      bottom: count(range(x - 1, x + size).map((xx) => [xx, y + size])),
+      left:   count(range(y - 1, y + size).map((yy) => [x - 1, yy])),
+      right:  count(range(y - 1, y + size).map((yy) => [x + size, yy])),
+    };
+  }
+
+  
   function getExpandedSquares(x, y, n){
     return [
       { x: x - 1, y: y - 1 },
@@ -4685,28 +4733,19 @@
         break;
 
       case 'e':
-      case 'E':
+      case 'E': {
         e.preventDefault();
 
-        // show neighbor info for selected region (fallback to directional suggestion when no selection)
-        let activeRegion = null;
-        if(state.selectedRegionIndex !== null && state.yellowRegions[state.selectedRegionIndex]){
-          activeRegion = state.yellowRegions[state.selectedRegionIndex];
-        }else if(state.selection){
-          // try to find a region at the selection
-          activeRegion = state.yellowRegions.find((r)=> r.x === state.selection.x && r.y === state.selection.y && r.size === state.selection.size) || null;
-        }
-
+        const activeRegion = getActiveRegion();
         if(!activeRegion){
-          // fallback to existing behavior
           startDirectionalCandidates('E');
           break;
         }
 
         const neighbors = state.yellowRegions
-          .map((r, i)=> ({ region: r, index: i }))
-          .filter(({ region })=> region !== activeRegion)
-          .filter(({ region })=> squaresTouchOrCorner(activeRegion, region) || squaresOverlap(activeRegion, region));
+          .map((region, index) => ({ region, index }))
+          .filter(({ region }) => region !== activeRegion &&
+            (squaresTouchOrCorner(activeRegion, region) || squaresOverlap(activeRegion, region)));
 
         if(neighbors.length === 0){
           setStatus('E: 선택된 사각형 주변에 인접한 다른 사각형이 없습니다.', true);
@@ -4714,19 +4753,34 @@
           break;
         }
 
-        const lines = neighbors.map(({ region, index })=>{
-          const arrows = getDirectionArrows(activeRegion, region) || '-';
-          const gids = getRegionGroupIds(region).join(', ') || '없음';
-          return '[' + index + '] (' + region.x + ', ' + region.y + ') ' + region.size + 'x | ' + arrows + ' | 그룹 ' + gids;
+        const { exposed, maxPossible } = countExposedPixels(activeRegion);
+        const dirCounts = countExposedByDirection(activeRegion);
+
+        // 방향별 { 이름, 뚫린수/최대, 판정 } 한 번만 계산
+        const dirInfo = DIRS.map(([key, name]) => {
+          const { exposed: ex, max } = dirCounts[key];
+          return { name, ex, max, verdict: assess(ex, max) };
         });
 
-        const { exposed, maxPossible } = countExposedPixels(activeRegion);
-        const summary = 'E: 인접 사각형 ' + neighbors.length + '개 | 뚫린 픽셀 ' + exposed + '/' + maxPossible;
-        const detail = '뚫린 픽셀: ' + exposed + '/' + maxPossible + '\n' + lines.join('\n');
+        const neighborLines = neighbors.map(({ region, index }) => {
+          const arrows = getDirectionArrows(activeRegion, region) || '-';
+          const gids = getRegionGroupIds(region).join(', ') || '없음';
+          return `[${index}] (${region.x}, ${region.y}) ${region.size}x | ${arrows} | 그룹 ${gids}`;
+        });
+
+        const summary =
+          `E: 인접 사각형 ${neighbors.length}개 | 뚫린 픽셀 ${exposed}/${maxPossible} | ` +
+          dirInfo.map((d) => `${d.name}으로 ${d.verdict}`).join(', ');
+
+        const detail =
+          `뚫린 픽셀: ${exposed}/${maxPossible}\n` +
+          '방향별: ' + dirInfo.map((d) => `${d.name}(${d.ex}/${d.max}) → ${d.verdict}`).join(', ') + '\n' +
+          neighborLines.join('\n');
+
         setStatus(summary, false, detail);
         render();
         break;
-
+      }
       case 'a':
       case 'A':
         startDirectionalCandidates('A');
