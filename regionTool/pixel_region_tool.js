@@ -1632,16 +1632,14 @@
   }
 
   function setStatus(msg, isWarn, detailText){
-
-    statusLine.textContent = msg;
+    // clear any previous HTML (grid/overlay) first, then set plain text
     statusLine.innerHTML = '';
+    statusLine.textContent = msg;
     statusLine.dataset.fullText = (detailText !== undefined ? detailText : msg) || '';
     delete statusLine.dataset.detailHtml;
     delete statusLine.dataset.overlayHtml;
 
-    statusLine.className =
-      'status' +
-      (isWarn ? ' warn' : '');
+    statusLine.className = 'status' + (isWarn ? ' warn' : '');
   }
 
   function buildSelectedRegionStatus(region, idx, prevRegion = null){
