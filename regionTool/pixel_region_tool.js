@@ -1636,10 +1636,29 @@
     statusLine.textContent = msg;
     statusLine.innerHTML = '';
     statusLine.dataset.fullText = (detailText !== undefined ? detailText : msg) || '';
+    delete statusLine.dataset.detailHtml;
+    delete statusLine.dataset.overlayHtml;
 
     statusLine.className =
       'status' +
       (isWarn ? ' warn' : '');
+  }
+
+  function buildSelectedRegionStatus(region, idx, prevRegion = null){
+    const samePos = getSamePositionRegions(region);
+    const allGroups = Array.from(new Set(
+      samePos.flatMap((r)=> getRegionGroupIds(r))
+    )).sort((a,b)=>a-b);
+    const gidText = allGroups.length ? allGroups.join(', ') : '없음';
+    const prevAngleText = prevRegion
+      ? formatCartesianAngleSummary(region, prevRegion)
+      : ' | 이전 노란 영역 없음';
+
+    return '노란 영역 선택: [' + idx + '] (그룹 ' + gidText + ')' +
+      ' | (' + region.x + ', ' + region.y + ') ' +
+      region.size + 'x' + region.size +
+      prevAngleText +
+      ' | Delete 키로 삭제가능.';
   }
 
   function buildStatusGridHtml(gridMap){
@@ -2875,9 +2894,6 @@
 
       const targetRegion = state.yellowRegions[idx];
       const prevRegion = idx > 0 ? state.yellowRegions[idx - 1] : null;
-      const prevAngleText = prevRegion
-        ? formatCartesianAngleSummary(targetRegion, prevRegion)
-        : ' | 이전 노란 영역 없음';
 
       state.selectedRegionIndex = idx;
       state.selection = {
@@ -2886,28 +2902,14 @@
         size: targetRegion.size
       };
       // set current group to the clicked region's group and update UI
-        const clickedGid = getRegionPrimaryGroup(targetRegion);
+      const clickedGid = getRegionPrimaryGroup(targetRegion);
       state.currentGroupId = clickedGid;
       pushSelectedGroupHistory(clickedGid);
       populateGroupSelect();
       saveMeta();
       clearCandidateSquares();
 
-      setStatus(
-        (function(){
-          const samePos = getSamePositionRegions(targetRegion);
-          const allGroups = Array.from(new Set(
-            samePos.flatMap((r)=> getRegionGroupIds(r))
-          )).sort((a,b)=>a-b);
-          const gidText = allGroups.length ? allGroups.join(', ') : '없음';
-          return '노란 영역 선택: [' + idx + '] (그룹 ' + gidText + ')' +
-            ' | (' + targetRegion.x + ', ' + targetRegion.y + ') ' +
-            targetRegion.size + 'x' + targetRegion.size +
-            prevAngleText +
-            ' | Delete 키로 삭제가능.';
-        })(),
-        false
-      );
+      setStatus(buildSelectedRegionStatus(targetRegion, idx, prevRegion), false);
 
     }else{
 
