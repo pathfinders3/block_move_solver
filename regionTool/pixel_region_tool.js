@@ -1661,11 +1661,14 @@
     ].join('');
   }
 
-  function setStatusGrid(gridMap, isWarn, detailText){
+  function setStatusGrid(gridMap, isWarn, detailText, overlayGridMap){
     const html = buildStatusGridHtml(gridMap);
+    const overlayHtml = overlayGridMap ? buildStatusGridHtml(overlayGridMap) : html;
+
     statusLine.innerHTML = html;
     statusLine.dataset.fullText = (detailText !== undefined ? detailText : '') || '';
     statusLine.dataset.detailHtml = html;
+    statusLine.dataset.overlayHtml = overlayHtml;
     statusLine.className = 'status' + (isWarn ? ' warn' : '');
   }
 
@@ -1699,13 +1702,13 @@
 
 
   function openStatusOverlay(){
-    const gridHtml = statusLine.dataset.detailHtml;
+    const overlayHtml = statusLine.dataset.overlayHtml || statusLine.dataset.detailHtml;
     const msg = statusLine.dataset.fullText || statusLine.textContent || '';
 
-    if(!msg.trim() && !gridHtml) return;
+    if(!msg.trim() && !overlayHtml) return;
 
-    if(gridHtml){
-      statusOverlayContent.innerHTML = gridHtml;
+    if(overlayHtml){
+      statusOverlayContent.innerHTML = overlayHtml;
     }else{
       statusOverlayContent.textContent = msg.replace(/\s*\|\s*/g, '\n');
     }
@@ -4967,6 +4970,14 @@
           bottom: '하 ' + bottomDir.eVerdict + '\n(' + bottomDir.eEx + '/' + bottomDir.eMax + ')'
         };
 
+        const overlayGrid = {
+          top: '상 ' + topDir.verdict + '\n(' + topDir.ex + '/' + topDir.max + ')',
+          left: '좌 ' + leftDir.verdict + '\n(' + leftDir.ex + '/' + leftDir.max + ')',
+          center: '총 ' + exposed + '/' + maxPossible,
+          right: '우 ' + rightDir.verdict + '\n(' + rightDir.ex + '/' + rightDir.max + ')',
+          bottom: '하 ' + bottomDir.verdict + '\n(' + bottomDir.ex + '/' + bottomDir.max + ')'
+        };
+
         const detail =
           `뚫린 픽셀: ${exposed}/${maxPossible}\n` +
           '방향별: 위쪽(' + topDir.ex + '/' + topDir.max + ') → ' + topDir.verdict + ', ' +
@@ -4975,7 +4986,7 @@
           '우측(' + rightDir.ex + '/' + rightDir.max + ') → ' + rightDir.verdict + '\n' +
           neighborLines.join('\n');
 
-        setStatusGrid(directionGrid, false, detail);
+        setStatusGrid(directionGrid, false, detail, overlayGrid);
         render();
         break;
       }
