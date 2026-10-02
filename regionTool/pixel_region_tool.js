@@ -4972,6 +4972,16 @@
             const frac = faceExposed / faceMaxPossible;
             const verdict = (frac >= 2/3) ? '거의 열림' : '닫힘';
             centerText += ' (' + verdict + ')';
+
+            // count fully-open face directions (edgeEx === edgeMax)
+            const fullDirs = [];
+            if(topDir.eEx === topDir.eMax) fullDirs.push('상');
+            if(bottomDir.eEx === bottomDir.eMax) fullDirs.push('하');
+            if(leftDir.eEx === leftDir.eMax) fullDirs.push('좌');
+            if(rightDir.eEx === rightDir.eMax) fullDirs.push('우');
+            if(fullDirs.length > 0){
+              centerText += ' 《' + fullDirs.length + ':' + fullDirs.join(' ') + '》';
+            }
           }
 
           return {
@@ -4990,6 +5000,16 @@
             const frac = exposed / maxPossible;
             const verdict = (frac >= 2/3) ? '거의 열림' : '닫힘';
             centerText += ' (' + verdict + ')';
+
+            // count fully-open corner-inclusive directions (ex === max)
+            const fullDirsO = [];
+            if(topDir.ex === topDir.max) fullDirsO.push('상');
+            if(bottomDir.ex === bottomDir.max) fullDirsO.push('하');
+            if(leftDir.ex === leftDir.max) fullDirsO.push('좌');
+            if(rightDir.ex === rightDir.max) fullDirsO.push('우');
+            if(fullDirsO.length > 0){
+              centerText += ' 《' + fullDirsO.length + ':' + fullDirsO.join(' ') + '》';
+            }
           }
 
           return {
