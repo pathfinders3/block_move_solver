@@ -1726,6 +1726,23 @@
 
     if(overlayHtml){
       statusOverlayContent.innerHTML = overlayHtml;
+      try{
+        // ensure center summary (with full-dir list) is visible in overlay — duplicate as a plain line below grid
+        const tmp = document.createElement('div');
+        tmp.innerHTML = overlayHtml;
+        const centerNode = tmp.querySelector('.status-center');
+        const centerText = centerNode ? centerNode.textContent.trim() : '';
+        if(centerText){
+          const extra = document.createElement('div');
+          extra.style.marginTop = '8px';
+          extra.style.fontWeight = '700';
+          extra.style.color = 'var(--accent)';
+          extra.textContent = centerText;
+          statusOverlayContent.appendChild(extra);
+        }
+      }catch(e){
+        // ignore parsing errors
+      }
     }else{
       statusOverlayContent.textContent = msg.replace(/\s*\|\s*/g, '\n');
     }
