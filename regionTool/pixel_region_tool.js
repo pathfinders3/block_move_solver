@@ -1652,15 +1652,11 @@
 
     const html = [
       '<div class="status-grid">',
-      '<div class="status-cell status-empty"></div>',
       '<div class="status-cell status-top">↑<br>' + top + '</div>',
-      '<div class="status-cell status-empty"></div>',
       '<div class="status-cell status-left">←<br>' + left + '</div>',
       '<div class="status-cell status-center">' + center + '</div>',
       '<div class="status-cell status-right">→<br>' + right + '</div>',
-      '<div class="status-cell status-empty"></div>',
       '<div class="status-cell status-bottom">↓<br>' + bottom + '</div>',
-      '<div class="status-cell status-empty"></div>',
       '</div>'
     ].join('');
 

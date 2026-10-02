@@ -219,6 +219,11 @@ canvas{
 .status-bottom{
   color: var(--text);
 }
+.status-top    { grid-area: 1 / 2; }
+.status-left   { grid-area: 2 / 1; }
+.status-center { grid-area: 2 / 2; }
+.status-right  { grid-area: 2 / 3; }
+.status-bottom { grid-area: 3 / 2; }
 .status-center{
   color: var(--accent);
   font-weight: 700;
