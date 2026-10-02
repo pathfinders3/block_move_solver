@@ -1686,6 +1686,13 @@
     statusLine.dataset.fullText = (detailText !== undefined ? detailText : '') || '';
     statusLine.dataset.detailHtml = html;
     statusLine.dataset.overlayHtml = overlayHtml;
+    // store center summary text (already formatted in gridMap.center)
+    try{
+      statusLine.dataset.detailCenter = String(gridMap.center || '');
+      statusLine.dataset.overlayCenter = String((overlayGridMap && overlayGridMap.center) ? overlayGridMap.center : gridMap.center || '');
+    }catch(e){
+      // ignore
+    }
     statusLine.className = 'status' + (isWarn ? ' warn' : '');
   }
 
@@ -1726,22 +1733,15 @@
 
     if(overlayHtml){
       statusOverlayContent.innerHTML = overlayHtml;
-      try{
-        // ensure center summary (with full-dir list) is visible in overlay — duplicate as a plain line below grid
-        const tmp = document.createElement('div');
-        tmp.innerHTML = overlayHtml;
-        const centerNode = tmp.querySelector('.status-center');
-        const centerText = centerNode ? centerNode.textContent.trim() : '';
-        if(centerText){
-          const extra = document.createElement('div');
-          extra.style.marginTop = '8px';
-          extra.style.fontWeight = '700';
-          extra.style.color = 'var(--accent)';
-          extra.textContent = centerText;
-          statusOverlayContent.appendChild(extra);
-        }
-      }catch(e){
-        // ignore parsing errors
+      // append precomputed center summary if available
+      const centerText = statusLine.dataset.overlayCenter || statusLine.dataset.detailCenter || '';
+      if(centerText){
+        const extra = document.createElement('div');
+        extra.style.marginTop = '8px';
+        extra.style.fontWeight = '700';
+        extra.style.color = 'var(--accent)';
+        extra.textContent = centerText;
+        statusOverlayContent.appendChild(extra);
       }
     }else{
       statusOverlayContent.textContent = msg.replace(/\s*\|\s*/g, '\n');
@@ -2016,21 +2016,26 @@
       const verdict = (frac >= threshold) ? '거의 열림' : '닫힘';
       text += ' (' + verdict + ')';
 
-      if(Array.isArray(dirInfo)){
-        const full = [];
-        dirInfo.forEach((d)=>{
-          if(checkEdge){
-            if(d.eEx === d.eMax) full.push(shortDirLabel(d.name));
-          }else{
-            if(d.ex === d.max) full.push(shortDirLabel(d.name));
-          }
-        });
-        if(full.length > 0){
-          text += ' 《' + full.length + ':' + full.join(' ') + '》';
-        }
+      const full = getFullyOpenDirs(dirInfo, checkEdge);
+      if(full.length > 0){
+        text += ' 《' + full.length + ':' + full.join(' ') + '》';
       }
     }
     return text;
+  }
+
+  // 헬퍼: 완전 뚫린 방향 목록 반환 (['상','우'] 형식)
+  function getFullyOpenDirs(dirInfo, checkEdge = false){
+    const list = [];
+    if(!Array.isArray(dirInfo)) return list;
+    dirInfo.forEach((d)=>{
+      if(checkEdge){
+        if(d.eEx === d.eMax) list.push(shortDirLabel(d.name));
+      }else{
+        if(d.ex === d.max) list.push(shortDirLabel(d.name));
+      }
+    });
+    return list;
   }
 
   // 헬퍼: 방향 셀 문자열 생성 (useEdge=true => 면 기준, false => 모서리 포함)
