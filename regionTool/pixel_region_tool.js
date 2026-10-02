@@ -4950,11 +4950,11 @@
         const bottomDir = dirInfo.find((d) => d.name === '아래쪽');
 
         const directionGrid = {
-          top: '위쪽<br>' + topDir.verdict + '(' + topDir.ex + '/' + topDir.max + ')',
-          left: '왼쪽<br>' + leftDir.verdict + '(' + leftDir.ex + '/' + leftDir.max + ')',
+          top: '상 ' + topDir.verdict + '\n(' + topDir.ex + '/' + topDir.max + ')',
+          left: '좌 ' + leftDir.verdict + '\n(' + leftDir.ex + '/' + leftDir.max + ')',
           center: '총 ' + exposed + '/' + maxPossible,
-          right: '우측<br>' + rightDir.verdict + '(' + rightDir.ex + '/' + rightDir.max + ')',
-          bottom: '아래쪽<br>' + bottomDir.verdict + '(' + bottomDir.ex + '/' + bottomDir.max + ')'
+          right: '우 ' + rightDir.verdict + '\n(' + rightDir.ex + '/' + rightDir.max + ')',
+          bottom: '하 ' + bottomDir.verdict + '\n(' + bottomDir.ex + '/' + bottomDir.max + ')'
         };
 
         const detail =
