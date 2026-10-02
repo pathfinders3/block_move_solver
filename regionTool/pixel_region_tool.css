@@ -193,6 +193,43 @@ canvas{
   background: rgba(94, 230, 200, 0.04);
   white-space: pre-line;
 }
+.status-grid{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  align-items: stretch;
+}
+.status-cell{
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+  padding: 6px 4px;
+  text-align: center;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.status-top,
+.status-left,
+.status-right,
+.status-bottom{
+  color: var(--text);
+}
+.status-center{
+  color: var(--accent);
+  font-weight: 700;
+}
+.status-empty{
+  visibility: hidden;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-height: 0;
+}
 .status:focus{
   outline: 1px solid var(--accent);
   border-radius: 4px;

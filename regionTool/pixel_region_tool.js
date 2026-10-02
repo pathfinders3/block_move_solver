@@ -1622,14 +1622,51 @@
   }
 
 
+  function escapeHtml(value){
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function setStatus(msg, isWarn, detailText){
 
     statusLine.textContent = msg;
+    statusLine.innerHTML = '';
     statusLine.dataset.fullText = (detailText !== undefined ? detailText : msg) || '';
 
     statusLine.className =
       'status' +
       (isWarn ? ' warn' : '');
+  }
+
+  function setStatusGrid(gridMap, isWarn, detailText){
+    const sanitize = (value) => escapeHtml(value ?? '-');
+    const top = sanitize(gridMap.top);
+    const left = sanitize(gridMap.left);
+    const center = sanitize(gridMap.center);
+    const right = sanitize(gridMap.right);
+    const bottom = sanitize(gridMap.bottom);
+
+    const html = [
+      '<div class="status-grid">',
+      '<div class="status-cell status-empty"></div>',
+      '<div class="status-cell status-top">↑<br>' + top + '</div>',
+      '<div class="status-cell status-empty"></div>',
+      '<div class="status-cell status-left">←<br>' + left + '</div>',
+      '<div class="status-cell status-center">' + center + '</div>',
+      '<div class="status-cell status-right">→<br>' + right + '</div>',
+      '<div class="status-cell status-empty"></div>',
+      '<div class="status-cell status-bottom">↓<br>' + bottom + '</div>',
+      '<div class="status-cell status-empty"></div>',
+      '</div>'
+    ].join('');
+
+    statusLine.innerHTML = html;
+    statusLine.dataset.fullText = (detailText !== undefined ? detailText : '') || '';
+    statusLine.className = 'status' + (isWarn ? ' warn' : '');
   }
 
 
@@ -4911,22 +4948,28 @@
           `E: 인접 사각형 ${neighbors.length}개 | 뚫린 픽셀 ${exposed}/${maxPossible} | ` +
           grouped.map((g) => `${g.label} [${g.items.map((d) => `${d.verdict}(${d.ex}/${d.max})`).join(' | ')}]`).join(', ');
 
+        const topDir = dirInfo.find((d) => d.name === '위쪽');
+        const leftDir = dirInfo.find((d) => d.name === '왼쪽');
+        const rightDir = dirInfo.find((d) => d.name === '우측');
+        const bottomDir = dirInfo.find((d) => d.name === '아래쪽');
 
-        // dirInfo는 [위, 아래, 왼쪽, 우측] 순서
-        // getVerdict로 어떤 기준(모서리 포함/면만)을 쓸지 지정
-        const fmtPair = (a, b, fmt) => `${fmt(a)}, ${fmt(b)}`;
-
-        const fmtGroups = (info, fmt) =>
-          `(상하) ${fmtPair(info[0], info[1], fmt)} (좌우) ${fmtPair(info[2], info[3], fmt)}`;
+        const directionGrid = {
+          top: '위쪽<br>' + topDir.verdict + '(' + topDir.ex + '/' + topDir.max + ')',
+          left: '왼쪽<br>' + leftDir.verdict + '(' + leftDir.ex + '/' + leftDir.max + ')',
+          center: '총 ' + exposed + '/' + maxPossible,
+          right: '우측<br>' + rightDir.verdict + '(' + rightDir.ex + '/' + rightDir.max + ')',
+          bottom: '아래쪽<br>' + bottomDir.verdict + '(' + bottomDir.ex + '/' + bottomDir.max + ')'
+        };
 
         const detail =
           `뚫린 픽셀: ${exposed}/${maxPossible}\n` +
-          '방향별(모서리 포함): ' + fmtGroups(dirInfo, (d) => `${d.ex}/${d.max} ${d.verdict}`) + '\n' +
-          '방향별(면만): ' + fmtGroups(dirInfo, (d) => `${d.eEx}/${d.eMax} ${d.eVerdict}`) + '\n' +
+          '방향별: 위쪽(' + topDir.ex + '/' + topDir.max + ') → ' + topDir.verdict + ', ' +
+          '왼쪽(' + leftDir.ex + '/' + leftDir.max + ') → ' + leftDir.verdict + ', ' +
+          '아래쪽(' + bottomDir.ex + '/' + bottomDir.max + ') → ' + bottomDir.verdict + ', ' +
+          '우측(' + rightDir.ex + '/' + rightDir.max + ') → ' + rightDir.verdict + '\n' +
           neighborLines.join('\n');
-          
-  
-        setStatus(summary, false, detail);
+
+        setStatusGrid(directionGrid, false, detail);
         render();
         break;
       }
