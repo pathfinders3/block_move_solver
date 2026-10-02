@@ -4950,13 +4950,13 @@
         const bottomDir = dirInfo.find((d) => d.name === '아래쪽');
 
         const directionGrid = {
-          top: '상 ' + topDir.verdict + '\n(' + topDir.ex + '/' + topDir.max + ')',
-          left: '좌 ' + leftDir.verdict + '\n(' + leftDir.ex + '/' + leftDir.max + ')',
+          top: '상 ' + topDir.eVerdict + '\n(' + topDir.eEx + '/' + topDir.eMax + ')',
+          left: '좌 ' + leftDir.eVerdict + '\n(' + leftDir.eEx + '/' + leftDir.eMax + ')',
           center: '총 ' + exposed + '/' + maxPossible,
-          right: '우 ' + rightDir.verdict + '\n(' + rightDir.ex + '/' + rightDir.max + ')',
-          bottom: '하 ' + bottomDir.verdict + '\n(' + bottomDir.ex + '/' + bottomDir.max + ')'
+          right: '우 ' + rightDir.eVerdict + '\n(' + rightDir.eEx + '/' + rightDir.eMax + ')',
+          bottom: '하 ' + bottomDir.eVerdict + '\n(' + bottomDir.eEx + '/' + bottomDir.eMax + ')'
         };
-
+        
         const detail =
           `뚫린 픽셀: ${exposed}/${maxPossible}\n` +
           '방향별: 위쪽(' + topDir.ex + '/' + topDir.max + ') → ' + topDir.verdict + ', ' +
