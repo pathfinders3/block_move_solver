@@ -4965,13 +4965,23 @@
         const faceExposed = dirInfo.reduce((sum, d) => sum + d.eEx, 0);
         const faceMaxPossible = dirInfo.reduce((sum, d) => sum + d.eMax, 0);
 
-        const directionGrid = {
-          top: '상 ' + topDir.eVerdict + '\n(' + topDir.eEx + '/' + topDir.eMax + ')',
-          left: '좌 ' + leftDir.eVerdict + '\n(' + leftDir.eEx + '/' + leftDir.eMax + ')',
-          center: '총 ' + faceExposed + '/' + faceMaxPossible,
-          right: '우 ' + rightDir.eVerdict + '\n(' + rightDir.eEx + '/' + rightDir.eMax + ')',
-          bottom: '하 ' + bottomDir.eVerdict + '\n(' + bottomDir.eEx + '/' + bottomDir.eMax + ')'
-        };
+        const directionGrid = (function(){
+          const centerBase = '총 ' + faceExposed + '/' + faceMaxPossible;
+          let centerText = centerBase;
+          if(faceMaxPossible > 0){
+            const frac = faceExposed / faceMaxPossible;
+            const verdict = (frac >= 2/3) ? '거의 열림' : '닫힘';
+            centerText += ' (' + verdict + ')';
+          }
+
+          return {
+            top: '상 ' + topDir.eVerdict + '\n(' + topDir.eEx + '/' + topDir.eMax + ')',
+            left: '좌 ' + leftDir.eVerdict + '\n(' + leftDir.eEx + '/' + leftDir.eMax + ')',
+            center: centerText,
+            right: '우 ' + rightDir.eVerdict + '\n(' + rightDir.eEx + '/' + rightDir.eMax + ')',
+            bottom: '하 ' + bottomDir.eVerdict + '\n(' + bottomDir.eEx + '/' + bottomDir.eMax + ')'
+          };
+        })();
 
         const overlayGrid = {
           top: '상 ' + topDir.verdict + '\n(' + topDir.ex + '/' + topDir.max + ')',
