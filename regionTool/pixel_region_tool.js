@@ -4962,10 +4962,13 @@
         const rightDir = dirInfo.find((d) => d.name === '우측');
         const bottomDir = dirInfo.find((d) => d.name === '아래쪽');
 
+        const faceExposed = dirInfo.reduce((sum, d) => sum + d.eEx, 0);
+        const faceMaxPossible = dirInfo.reduce((sum, d) => sum + d.eMax, 0);
+
         const directionGrid = {
           top: '상 ' + topDir.eVerdict + '\n(' + topDir.eEx + '/' + topDir.eMax + ')',
           left: '좌 ' + leftDir.eVerdict + '\n(' + leftDir.eEx + '/' + leftDir.eMax + ')',
-          center: '총 ' + exposed + '/' + maxPossible,
+          center: '총 ' + faceExposed + '/' + faceMaxPossible,
           right: '우 ' + rightDir.eVerdict + '\n(' + rightDir.eEx + '/' + rightDir.eMax + ')',
           bottom: '하 ' + bottomDir.eVerdict + '\n(' + bottomDir.eEx + '/' + bottomDir.eMax + ')'
         };
