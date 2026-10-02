@@ -1642,7 +1642,7 @@
       (isWarn ? ' warn' : '');
   }
 
-  function setStatusGrid(gridMap, isWarn, detailText){
+  function buildStatusGridHtml(gridMap){
     const sanitize = (value) => escapeHtml(value ?? '-');
     const top = sanitize(gridMap.top);
     const left = sanitize(gridMap.left);
@@ -1650,7 +1650,7 @@
     const right = sanitize(gridMap.right);
     const bottom = sanitize(gridMap.bottom);
 
-    const html = [
+    return [
       '<div class="status-grid">',
       '<div class="status-cell status-top">↑<br>' + top + '</div>',
       '<div class="status-cell status-left">←<br>' + left + '</div>',
@@ -1659,9 +1659,13 @@
       '<div class="status-cell status-bottom">↓<br>' + bottom + '</div>',
       '</div>'
     ].join('');
+  }
 
+  function setStatusGrid(gridMap, isWarn, detailText){
+    const html = buildStatusGridHtml(gridMap);
     statusLine.innerHTML = html;
     statusLine.dataset.fullText = (detailText !== undefined ? detailText : '') || '';
+    statusLine.dataset.detailHtml = html;
     statusLine.className = 'status' + (isWarn ? ' warn' : '');
   }
 
@@ -1695,11 +1699,17 @@
 
 
   function openStatusOverlay(){
+    const gridHtml = statusLine.dataset.detailHtml;
     const msg = statusLine.dataset.fullText || statusLine.textContent || '';
 
-    if(!msg.trim()) return;
+    if(!msg.trim() && !gridHtml) return;
 
-    statusOverlayContent.textContent = msg.replace(/\s*\|\s*/g, '\n');
+    if(gridHtml){
+      statusOverlayContent.innerHTML = gridHtml;
+    }else{
+      statusOverlayContent.textContent = msg.replace(/\s*\|\s*/g, '\n');
+    }
+
     statusOverlay.classList.add('open');
     statusOverlay.setAttribute('aria-hidden', 'false');
   }
@@ -4956,7 +4966,7 @@
           right: '우 ' + rightDir.eVerdict + '\n(' + rightDir.eEx + '/' + rightDir.eMax + ')',
           bottom: '하 ' + bottomDir.eVerdict + '\n(' + bottomDir.eEx + '/' + bottomDir.eMax + ')'
         };
-        
+
         const detail =
           `뚫린 픽셀: ${exposed}/${maxPossible}\n` +
           '방향별: 위쪽(' + topDir.ex + '/' + topDir.max + ') → ' + topDir.verdict + ', ' +
