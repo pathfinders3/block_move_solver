@@ -1979,6 +1979,68 @@
     ];
   }
 
+  // 헬퍼: 짧은 방향 라벨 ('위쪽' -> '상', '아래쪽' -> '하', '왼쪽' -> '좌', '우측' -> '우')
+  function shortDirLabel(name){
+    switch(String(name)){
+      case '위쪽': return '상';
+      case '아래쪽': return '하';
+      case '왼쪽': return '좌';
+      case '우측': return '우';
+      default: return name.replace(/[^\S\u0000-\u007F]+/g, '');
+    }
+  }
+
+  // 헬퍼: 중앙 텍스트(총 X/Y + 판정)와 완전 뚫린 방향 목록 생성
+  function formatCenterWithFullDirs(count, max, dirInfo, checkEdge = false, threshold = 2/3){
+    const base = '총 ' + count + '/' + max;
+    let text = base;
+    if(max > 0){
+      const frac = count / max;
+      const verdict = (frac >= threshold) ? '거의 열림' : '닫힘';
+      text += ' (' + verdict + ')';
+
+      if(Array.isArray(dirInfo)){
+        const full = [];
+        dirInfo.forEach((d)=>{
+          if(checkEdge){
+            if(d.eEx === d.eMax) full.push(shortDirLabel(d.name));
+          }else{
+            if(d.ex === d.max) full.push(shortDirLabel(d.name));
+          }
+        });
+        if(full.length > 0){
+          text += ' 《' + full.length + ':' + full.join(' ') + '》';
+        }
+      }
+    }
+    return text;
+  }
+
+  // 헬퍼: 방향 셀 문자열 생성 (useEdge=true => 면 기준, false => 모서리 포함)
+  function buildDirCell(d, useEdge){
+    const label = shortDirLabel(d.name) + ' ';
+    if(useEdge){
+      return label + d.eVerdict + '\n(' + d.eEx + '/' + d.eMax + ')';
+    }
+    return label + d.verdict + '\n(' + d.ex + '/' + d.max + ')';
+  }
+
+  // 헬퍼: dirInfo로부터 그리드 객체(top,left,center,right,bottom)를 생성
+  function buildGridFromDirInfo(dirInfo, useEdge, centerCount, centerMax){
+    const top = dirInfo.find((d)=>d.name === '위쪽');
+    const left = dirInfo.find((d)=>d.name === '왼쪽');
+    const right = dirInfo.find((d)=>d.name === '우측');
+    const bottom = dirInfo.find((d)=>d.name === '아래쪽');
+
+    return {
+      top: buildDirCell(top || { name: '위쪽', verdict: '-', ex: 0, max: 0, eEx: 0, eMax: 0, eVerdict: '-' }, useEdge),
+      left: buildDirCell(left || { name: '왼쪽', verdict: '-', ex: 0, max: 0, eEx: 0, eMax: 0, eVerdict: '-' }, useEdge),
+      center: formatCenterWithFullDirs(centerCount, centerMax, dirInfo, useEdge),
+      right: buildDirCell(right || { name: '우측', verdict: '-', ex: 0, max: 0, eEx: 0, eMax: 0, eVerdict: '-' }, useEdge),
+      bottom: buildDirCell(bottom || { name: '아래쪽', verdict: '-', ex: 0, max: 0, eEx: 0, eMax: 0, eVerdict: '-' }, useEdge)
+    };
+  }
+
 
   function getOriginalPixelInfo(x, y){
     const pixel = baseCtx.getImageData(x, y, 1, 1).data;
@@ -4965,61 +5027,8 @@
         const faceExposed = dirInfo.reduce((sum, d) => sum + d.eEx, 0);
         const faceMaxPossible = dirInfo.reduce((sum, d) => sum + d.eMax, 0);
 
-        const directionGrid = (function(){
-          const centerBase = '총 ' + faceExposed + '/' + faceMaxPossible;
-          let centerText = centerBase;
-          if(faceMaxPossible > 0){
-            const frac = faceExposed / faceMaxPossible;
-            const verdict = (frac >= 2/3) ? '거의 열림' : '닫힘';
-            centerText += ' (' + verdict + ')';
-
-            // count fully-open face directions (edgeEx === edgeMax)
-            const fullDirs = [];
-            if(topDir.eEx === topDir.eMax) fullDirs.push('상');
-            if(bottomDir.eEx === bottomDir.eMax) fullDirs.push('하');
-            if(leftDir.eEx === leftDir.eMax) fullDirs.push('좌');
-            if(rightDir.eEx === rightDir.eMax) fullDirs.push('우');
-            if(fullDirs.length > 0){
-              centerText += ' 《' + fullDirs.length + ':' + fullDirs.join(' ') + '》';
-            }
-          }
-
-          return {
-            top: '상 ' + topDir.eVerdict + '\n(' + topDir.eEx + '/' + topDir.eMax + ')',
-            left: '좌 ' + leftDir.eVerdict + '\n(' + leftDir.eEx + '/' + leftDir.eMax + ')',
-            center: centerText,
-            right: '우 ' + rightDir.eVerdict + '\n(' + rightDir.eEx + '/' + rightDir.eMax + ')',
-            bottom: '하 ' + bottomDir.eVerdict + '\n(' + bottomDir.eEx + '/' + bottomDir.eMax + ')'
-          };
-        })();
-
-        const overlayGrid = (function(){
-          const centerBase = '총 ' + exposed + '/' + maxPossible;
-          let centerText = centerBase;
-          if(maxPossible > 0){
-            const frac = exposed / maxPossible;
-            const verdict = (frac >= 2/3) ? '거의 열림' : '닫힘';
-            centerText += ' (' + verdict + ')';
-
-            // count fully-open corner-inclusive directions (ex === max)
-            const fullDirsO = [];
-            if(topDir.ex === topDir.max) fullDirsO.push('상');
-            if(bottomDir.ex === bottomDir.max) fullDirsO.push('하');
-            if(leftDir.ex === leftDir.max) fullDirsO.push('좌');
-            if(rightDir.ex === rightDir.max) fullDirsO.push('우');
-            if(fullDirsO.length > 0){
-              centerText += ' 《' + fullDirsO.length + ':' + fullDirsO.join(' ') + '》';
-            }
-          }
-
-          return {
-            top: '상 ' + topDir.verdict + '\n(' + topDir.ex + '/' + topDir.max + ')',
-            left: '좌 ' + leftDir.verdict + '\n(' + leftDir.ex + '/' + leftDir.max + ')',
-            center: centerText,
-            right: '우 ' + rightDir.verdict + '\n(' + rightDir.ex + '/' + rightDir.max + ')',
-            bottom: '하 ' + bottomDir.verdict + '\n(' + bottomDir.ex + '/' + bottomDir.max + ')'
-          };
-        })();
+        const directionGrid = buildGridFromDirInfo(dirInfo, true, faceExposed, faceMaxPossible);
+        const overlayGrid = buildGridFromDirInfo(dirInfo, false, exposed, maxPossible);
 
         const detail =
           `뚫린 픽셀: ${exposed}/${maxPossible}\n` +
