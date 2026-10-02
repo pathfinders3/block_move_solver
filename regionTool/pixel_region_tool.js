@@ -4983,13 +4983,23 @@
           };
         })();
 
-        const overlayGrid = {
-          top: '상 ' + topDir.verdict + '\n(' + topDir.ex + '/' + topDir.max + ')',
-          left: '좌 ' + leftDir.verdict + '\n(' + leftDir.ex + '/' + leftDir.max + ')',
-          center: '총 ' + exposed + '/' + maxPossible,
-          right: '우 ' + rightDir.verdict + '\n(' + rightDir.ex + '/' + rightDir.max + ')',
-          bottom: '하 ' + bottomDir.verdict + '\n(' + bottomDir.ex + '/' + bottomDir.max + ')'
-        };
+        const overlayGrid = (function(){
+          const centerBase = '총 ' + exposed + '/' + maxPossible;
+          let centerText = centerBase;
+          if(maxPossible > 0){
+            const frac = exposed / maxPossible;
+            const verdict = (frac >= 2/3) ? '거의 열림' : '닫힘';
+            centerText += ' (' + verdict + ')';
+          }
+
+          return {
+            top: '상 ' + topDir.verdict + '\n(' + topDir.ex + '/' + topDir.max + ')',
+            left: '좌 ' + leftDir.verdict + '\n(' + leftDir.ex + '/' + leftDir.max + ')',
+            center: centerText,
+            right: '우 ' + rightDir.verdict + '\n(' + rightDir.ex + '/' + rightDir.max + ')',
+            bottom: '하 ' + bottomDir.verdict + '\n(' + bottomDir.ex + '/' + bottomDir.max + ')'
+          };
+        })();
 
         const detail =
           `뚫린 픽셀: ${exposed}/${maxPossible}\n` +
