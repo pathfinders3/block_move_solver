@@ -3,6 +3,7 @@
 
   const MAX_TAR_DIM = 8000; // 안전 상한: 확대 캔버스가 너무 커지는 것을 방지
   const GROUP_TRAVERSE_MAX_GAP = 21; // 그룹 내 연속 탐색 시 최대 중심 간 거리 (px)
+  const MAX_GROUP_UNDO_STEPS = 5; // 최근 그룹 작업 undo 최대 보관 개수
 
   const srcCanvas = document.getElementById('srcCanvas');
   const tarCanvas = document.getElementById('tarCanvas');
@@ -71,6 +72,7 @@
     yellowRegions: [],        // [{x,y,size}]
     currentGroupId: 0,
     selectedGroupHistory: [],  // 최근 선택된 groupId 2개
+    groupMergeRedoStack: [],
     restrictCandidatesToGroup: false,
     selectedRegionIndex: null,
     candidateSquares: [],     // Shift+F8 후보 목록 [{x,y,size}]
@@ -1182,6 +1184,20 @@
     };
   }
 
+  function pushGroupUndoSnapshot(snapshot){
+    state.groupMergeUndoStack.push(snapshot);
+    if(state.groupMergeUndoStack.length > MAX_GROUP_UNDO_STEPS){
+      state.groupMergeUndoStack.shift();
+    }
+  }
+
+  function pushGroupRedoSnapshot(snapshot){
+    state.groupMergeRedoStack.push(snapshot);
+    if(state.groupMergeRedoStack.length > MAX_GROUP_UNDO_STEPS){
+      state.groupMergeRedoStack.shift();
+    }
+  }
+
 
   function mergeSelectedGroupsIntoFirst(){
     const firstGroupId = state.selectedGroupHistory[0];
@@ -1253,7 +1269,7 @@
     state.yellowRegions = [...kept, ...merged];
     state.currentGroupId = firstGroupId;
     state.selectedGroupHistory = [firstGroupId];
-    state.groupMergeUndoStack.push(previousSnapshot);
+    pushGroupUndoSnapshot(previousSnapshot);
 
     state.selectedRegionIndex = null;
     state.selection = null;
@@ -1275,7 +1291,10 @@
       return;
     }
 
+    const currentSnapshot = snapshotGroupUndoState();
     const snapshot = state.groupMergeUndoStack.pop();
+    pushGroupRedoSnapshot(currentSnapshot);
+
     state.yellowRegions = snapshot.yellowRegions.map((region)=>({ ...region }));
     state.currentGroupId = snapshot.currentGroupId;
     state.selectedGroupHistory = snapshot.selectedGroupHistory.slice();
@@ -1287,6 +1306,30 @@
     render();
 
     setStatus('최근 그룹 작업을 취소했습니다.', false);
+  }
+
+  function redoLastGroupMerge(){
+    if(state.groupMergeRedoStack.length === 0){
+      setStatus('되살릴 최근 그룹 작업 기록이 없습니다.', true);
+      render();
+      return;
+    }
+
+    const currentSnapshot = snapshotGroupUndoState();
+    const snapshot = state.groupMergeRedoStack.pop();
+    pushGroupUndoSnapshot(currentSnapshot);
+
+    state.yellowRegions = snapshot.yellowRegions.map((region)=>({ ...region }));
+    state.currentGroupId = snapshot.currentGroupId;
+    state.selectedGroupHistory = snapshot.selectedGroupHistory.slice();
+    state.selectedRegionIndex = snapshot.selectedRegionIndex;
+    state.selection = snapshot.selection ? { ...snapshot.selection } : null;
+
+    populateGroupSelect();
+    saveMeta();
+    render();
+
+    setStatus('최근 그룹 작업을 되살렸습니다.', false);
   }
 
 
@@ -1782,6 +1825,7 @@
       'Alt+Shift+\\ : 선택 사각형 기준, 이전 구간 유지 후 이후 구간을 새 그룹으로 분리',
       'Alt+M : 최근 2개 그룹 통합',
       'Ctrl+Z : 최근 그룹 작업 취소(통합/분리)',
+      'Ctrl+Y : 최근 그룹 작업 되살리기',
       'Alt+/ : 선택된 사각형 기준, 그룹 분할',      
       'F11 : 그룹 내 가장 큰 인덱스 선택',
       'F10 : 그룹 내 가장 작은 인덱스 선택',
@@ -4475,7 +4519,7 @@
           const selectableIds = allIds.filter((id)=> !selGroups.has(id));
           const listText = selectableIds.length ? selectableIds.join(', ') : '(없음 - 새 그룹만 가능)';
 
-          state.groupMergeUndoStack.push(snapshotGroupUndoState());
+          pushGroupUndoSnapshot(snapshotGroupUndoState());
 
           const input = window.prompt('추가할 그룹 ID를 입력하세요. 선택 가능 그룹: ' + listText + ' (빈칸이면 새 그룹 생성)', '');
 
@@ -4875,7 +4919,7 @@
               break;
             }
 
-            state.groupMergeUndoStack.push(snapshotGroupUndoState());
+            pushGroupUndoSnapshot(snapshotGroupUndoState());
 
             const ids = getGroupIds();
             const nextId = ids.length ? Math.max(...ids) + 1 : 0;
@@ -4977,7 +5021,7 @@
             break;
           }
 
-          state.groupMergeUndoStack.push(snapshotGroupUndoState());
+          pushGroupUndoSnapshot(snapshotGroupUndoState());
 
           // compute new group id
           const ids = getGroupIds();
@@ -5244,9 +5288,21 @@
       case 'z':
       case 'Z':
         if(e.ctrlKey || e.metaKey){
-          undoLastGroupMerge();
+          if(e.shiftKey){
+            redoLastGroupMerge();
+          }else{
+            undoLastGroupMerge();
+          }
         }else{
           startDirectionalCandidates('Z');
+        }
+        e.preventDefault();
+        break;
+
+      case 'y':
+      case 'Y':
+        if(e.ctrlKey || e.metaKey){
+          redoLastGroupMerge();
         }
         e.preventDefault();
         break;
