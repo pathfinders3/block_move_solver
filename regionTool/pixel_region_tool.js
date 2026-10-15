@@ -1172,6 +1172,16 @@
     saveMeta();
   }
 
+  function snapshotGroupUndoState(){
+    return {
+      yellowRegions: state.yellowRegions.map((region)=>({ ...region })),
+      currentGroupId: state.currentGroupId,
+      selectedGroupHistory: state.selectedGroupHistory.slice(),
+      selectedRegionIndex: state.selectedRegionIndex,
+      selection: state.selection ? { ...state.selection } : null
+    };
+  }
+
 
   function mergeSelectedGroupsIntoFirst(){
     const firstGroupId = state.selectedGroupHistory[0];
@@ -1215,13 +1225,7 @@
       return;
     }
 
-    const previousSnapshot = {
-      yellowRegions: state.yellowRegions.map((region)=>({ ...region })),
-      currentGroupId: state.currentGroupId,
-      selectedGroupHistory: state.selectedGroupHistory.slice(),
-      selectedRegionIndex: state.selectedRegionIndex,
-      selection: state.selection ? { ...state.selection } : null
-    };
+    const previousSnapshot = snapshotGroupUndoState();
 
     const merged = [];
     const kept = [];
@@ -1266,7 +1270,7 @@
 
   function undoLastGroupMerge(){
     if(state.groupMergeUndoStack.length === 0){
-      setStatus('취소할 그룹 통합 기록이 없습니다.', true);
+      setStatus('취소할 최근 그룹 작업 기록이 없습니다.', true);
       render();
       return;
     }
@@ -1282,7 +1286,7 @@
     saveMeta();
     render();
 
-    setStatus('그룹 통합을 취소했습니다.', false);
+    setStatus('최근 그룹 작업을 취소했습니다.', false);
   }
 
 
@@ -1777,7 +1781,7 @@
       'Alt + \' : 현재 그룹에서 다음 방향으로 연속된 사각형 이동',
       'Alt+Shift+\\ : 선택 사각형 기준, 이전 구간 유지 후 이후 구간을 새 그룹으로 분리',
       'Alt+M : 최근 2개 그룹 통합',
-      'Ctrl+Z : 최근 그룹 통합 취소',
+      'Ctrl+Z : 최근 그룹 작업 취소(통합/분리)',
       'Alt+/ : 선택된 사각형 기준, 그룹 분할',      
       'F11 : 그룹 내 가장 큰 인덱스 선택',
       'F10 : 그룹 내 가장 작은 인덱스 선택',
@@ -4863,6 +4867,8 @@
               break;
             }
 
+            state.groupMergeUndoStack.push(snapshotGroupUndoState());
+
             const ids = getGroupIds();
             const nextId = ids.length ? Math.max(...ids) + 1 : 0;
             const movedIndices = [];
@@ -4962,6 +4968,8 @@
             setStatus('분리할 수 없습니다. 그룹 전체가 모두 연결되어 있습니다.', true);
             break;
           }
+
+          state.groupMergeUndoStack.push(snapshotGroupUndoState());
 
           // compute new group id
           const ids = getGroupIds();
