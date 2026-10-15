@@ -1819,6 +1819,8 @@
       'Enter : 확정',
       'F9 : 자동 확정(S, Enter)',
       'Delete : 선택된 노란 영역 해제',
+      'Alt+Delete : 현재 그룹에서 선택 사각형 제외',
+      'Alt+R : 현재 그룹에서 선택 사각형 제외',
       'F7 : 선택된 사각형을 특정 그룹에 추가(그룹 ID 입력)',
       'Alt + ; : 현재 그룹에서 이전 방향으로 연속된 사각형 이동',
       'Alt + \' : 현재 그룹에서 다음 방향으로 연속된 사각형 이동',
@@ -5405,12 +5407,12 @@
       case 'Delete':
       case 'Backspace':
         if(e.altKey){
+          e.preventDefault();          
           removeSelectedRegionFromActiveGroup();
-          e.preventDefault();
           break;
         }else{
+          e.preventDefault();          
           deleteSelectedRegion();
-          e.preventDefault();
           break;
         }
 
