@@ -587,10 +587,9 @@
       : getRegionPrimaryGroup(r);
     const colors = getGroupColor(displayGid);
 
-    const gids = getRegionGroupIds(r);
     const multiInfo = getRegionMultiGroupInfo(r);
-    const groupCount = selected ? multiInfo.groupCount : (Array.isArray(gids) ? gids.length : 0);
-    const isMultiGroup = selected ? multiInfo.isMultiGroup : (groupCount > 1);
+    const groupCount = multiInfo.groupCount;
+    const isMultiGroup = multiInfo.isMultiGroup;
 
     // 채우기: 선택 상태여도 그룹 색상 유지
     ctx.fillStyle = colors.fill;
@@ -604,8 +603,8 @@
       dash = isMultiGroup ? [4, 4] : [];
     } else {
       lineWidth = scale > 1 ? Math.max(1, Math.min(2, Math.floor(scale / 4))) : 1;
-      strokeStyle = colors.stroke;
-      dash = [];
+      strokeStyle = isMultiGroup ? '#ffb703' : colors.stroke;
+      dash = isMultiGroup ? [4, 4] : [];
     }
 
     ctx.lineWidth = lineWidth;
