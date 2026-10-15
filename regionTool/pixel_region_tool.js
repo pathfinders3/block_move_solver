@@ -540,89 +540,105 @@
 
   // ---------- rendering ----------
 
-  function drawRegionsOn(ctx, scale){
-    function drawOneRegion(r, idx){
-      const selected = (idx === state.selectedRegionIndex);
-      // allow a display override so Tab-selection can fix a region's displayed group
-      const displayGid = (typeof r.displayGroupId === 'number') ? r.displayGroupId : getRegionPrimaryGroup(r);
-      const colors = getGroupColor(displayGid);
+  function drawRegionsOn(ctx, scale) {
+    const { yellowRegions, selectedRegionIndex } = state;
+    const selectedRegion = yellowRegions[selectedRegionIndex]; // null/undefined 인덱스면 undefined
 
-      // selected 상태여도 그룹 색상을 유지한다.
-      ctx.fillStyle = colors.fill;
-
-      ctx.fillRect(
-        r.x * scale,
-        r.y * scale,
-        r.size * scale,
-        r.size * scale
-      );
-
-      if(selected){
-        ctx.lineWidth = Math.max(2, scale / 3);
-        ctx.strokeStyle = '#ff6b6b';
-        ctx.strokeRect(
-          r.x * scale + ctx.lineWidth / 2,
-          r.y * scale + ctx.lineWidth / 2,
-          r.size * scale - ctx.lineWidth,
-          r.size * scale - ctx.lineWidth
-        );
-      }else{
-        // subtle outer border using group's stroke color
-        ctx.lineWidth = Math.max(1, scale > 1 ? Math.min(2, Math.floor(scale/4)) : 1);
-        ctx.strokeStyle = colors.stroke;
-        ctx.strokeRect(
-          r.x * scale + ctx.lineWidth / 2,
-          r.y * scale + ctx.lineWidth / 2,
-          r.size * scale - ctx.lineWidth,
-          r.size * scale - ctx.lineWidth
-        );
-      }
-
-      // multi-group badge: show small circle with count if region belongs to multiple groups
-      try{
-        const gids = getRegionGroupIds(r);
-        if(Array.isArray(gids) && gids.length > 1){
-          const displayX = r.x * scale;
-          const displayY = r.y * scale;
-          const displaySize = r.size * scale;
-          const badgeSize = Math.max(8, Math.min(16, Math.floor(scale * 3)));
-          const bx = Math.round(displayX + displaySize - badgeSize - 2);
-          const by = Math.round(displayY + 2);
-
-          // badge background
-          ctx.beginPath();
-          ctx.fillStyle = '#222';
-          ctx.arc(bx + badgeSize/2, by + badgeSize/2, badgeSize/2, 0, Math.PI * 2);
-          ctx.fill();
-
-          // badge text (count)
-          ctx.fillStyle = '#fff';
-          const fontSize = Math.max(10, Math.floor(badgeSize * 0.8));
-          ctx.font = fontSize + 'px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(String(gids.length), bx + badgeSize/2, by + badgeSize/2);
-        }
-      }catch(e){
-        /* ignore badge errors */
-      }
-    }
-
-    // draw non-selected regions first
-    state.yellowRegions.forEach((r, idx)=>{
-      if(idx === state.selectedRegionIndex) return;
-      drawOneRegion(r, idx);
+    ctx.save();
+    yellowRegions.forEach((r, idx) => {
+      if (r !== selectedRegion) drawRegion(ctx, r, scale, false);
     });
-
-    // draw selected region last so overlap cannot hide it
-    if(
-      state.selectedRegionIndex !== null &&
-      state.yellowRegions[state.selectedRegionIndex]
-    ){
-      drawOneRegion(state.yellowRegions[state.selectedRegionIndex], state.selectedRegionIndex);
-    }
+    // 선택된 region은 겹침에 가려지지 않도록 마지막에 그린다
+    if (selectedRegion) drawRegion(ctx, selectedRegion, scale, true);
+    ctx.restore();
   }
 
+  function getRegionMultiGroupInfo(region) {
+    if (!region) return { isMultiGroup: false, groupCount: 0, groupIds: [] };
+
+    const samePosRegions = state.yellowRegions.filter((other) =>
+      other &&
+      other.x === region.x &&
+      other.y === region.y &&
+      other.size === region.size
+    );
+
+    const mergedIds = new Set();
+    samePosRegions.forEach((other) => {
+      getRegionGroupIds(other).forEach((gid) => mergedIds.add(gid));
+    });
+
+    const groupIds = Array.from(mergedIds).sort((a, b) => a - b);
+    return {
+      isMultiGroup: groupIds.length > 1,
+      groupCount: groupIds.length,
+      groupIds
+    };
+  }
+
+  function drawRegion(ctx, r, scale, selected) {
+    const x = r.x * scale;
+    const y = r.y * scale;
+    const size = r.size * scale;
+
+    // Tab 선택 시 displayGroupId로 표시 그룹을 고정할 수 있다
+    const displayGid = typeof r.displayGroupId === 'number'
+      ? r.displayGroupId
+      : getRegionPrimaryGroup(r);
+    const colors = getGroupColor(displayGid);
+
+    const gids = getRegionGroupIds(r);
+    const multiInfo = getRegionMultiGroupInfo(r);
+    const groupCount = selected ? multiInfo.groupCount : (Array.isArray(gids) ? gids.length : 0);
+    const isMultiGroup = selected ? multiInfo.isMultiGroup : (groupCount > 1);
+
+    // 채우기: 선택 상태여도 그룹 색상 유지
+    ctx.fillStyle = colors.fill;
+    ctx.fillRect(x, y, size, size);
+
+    // 테두리
+    let lineWidth, strokeStyle, dash;
+    if (selected) {
+      lineWidth = Math.max(2, scale / 3);
+      strokeStyle = isMultiGroup ? '#ffb703' : '#ff6b6b';
+      dash = isMultiGroup ? [4, 4] : [];
+    } else {
+      lineWidth = scale > 1 ? Math.max(1, Math.min(2, Math.floor(scale / 4))) : 1;
+      strokeStyle = colors.stroke;
+      dash = [];
+    }
+
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = strokeStyle;
+    ctx.setLineDash(dash);
+    ctx.strokeRect(
+      x + lineWidth / 2,
+      y + lineWidth / 2,
+      size - lineWidth,
+      size - lineWidth
+    );
+    ctx.setLineDash([]);
+
+    if (isMultiGroup) drawGroupBadge(ctx, x, y, size, scale, groupCount);
+  }
+
+  function drawGroupBadge(ctx, x, y, size, scale, count) {
+    const badgeSize = Math.max(8, Math.min(16, Math.floor(scale * 3)));
+    const radius = badgeSize / 2;
+    const cx = Math.round(x + size - badgeSize - 2) + radius;
+    const cy = Math.round(y + 2) + radius;
+
+    ctx.beginPath();
+    ctx.fillStyle = '#222';
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = `${Math.max(10, Math.floor(badgeSize * 0.8))}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(count), cx, cy);
+  }
 
   function drawSelectionOn(ctx, scale){
 
