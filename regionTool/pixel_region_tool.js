@@ -599,11 +599,11 @@
     let lineWidth, strokeStyle, dash;
     if (selected) {
       lineWidth = Math.max(2, scale / 3);
-      strokeStyle = isMultiGroup ? '#ffb703' : '#ff6b6b';
+      strokeStyle = isMultiGroup ? '#213703' : '#ff6b6b';
       dash = isMultiGroup ? [4, 4] : [];
     } else {
       lineWidth = scale > 1 ? Math.max(1, Math.min(2, Math.floor(scale / 4))) : 1;
-      strokeStyle = isMultiGroup ? '#ffb703' : colors.stroke;
+      strokeStyle = isMultiGroup ? '#213703' : colors.stroke;
       dash = isMultiGroup ? [4, 4] : [];
     }
 
@@ -618,7 +618,6 @@
     );
     ctx.setLineDash([]);
 
-    if (isMultiGroup) drawGroupBadge(ctx, x, y, size, scale, groupCount);
   }
 
   function drawGroupBadge(ctx, x, y, size, scale, count) {
