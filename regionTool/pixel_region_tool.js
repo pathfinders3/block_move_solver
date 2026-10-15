@@ -1772,6 +1772,10 @@
       'Enter : 확정',
       'F9 : 자동 확정(S, Enter)',
       'Delete : 선택된 노란 영역 해제',
+      'F7 : 선택된 사각형을 특정 그룹에 추가(그룹 ID 입력)',
+      'Alt + ; : 현재 그룹에서 이전 방향으로 연속된 사각형 이동',
+      'Alt + \' : 현재 그룹에서 다음 방향으로 연속된 사각형 이동',
+      'Alt+Shift+\\ : 선택 사각형 기준, 이전 구간 유지 후 이후 구간을 새 그룹으로 분리',
       'Alt+M : 최근 2개 그룹 통합',
       'Ctrl+Z : 최근 그룹 통합 취소',
       'Alt+/ : 선택된 사각형 기준, 그룹 분할',      
@@ -4819,7 +4823,74 @@
         }
 
       case '\\':
+      case '|':
         {
+          if(e.altKey && e.shiftKey){
+            e.preventDefault();
+
+            if(state.selectedRegionIndex === null){
+              setStatus('분리할 기준이 되는 선택된 노란 영역이 없습니다.', true);
+              break;
+            }
+
+            const currentIdx = state.selectedRegionIndex;
+            const current = state.yellowRegions[currentIdx];
+            if(!current){
+              setStatus('선택된 노란 영역을 찾을 수 없습니다.', true);
+              break;
+            }
+
+            const gid = getRegionPrimaryGroup(current);
+
+            const groupList = state.yellowRegions
+              .map((region, index)=>({ region, index }))
+              .filter(({ region })=> regionHasGroup(region, gid))
+              .sort((a, b)=>a.index - b.index);
+
+            if(groupList.length === 0){
+              setStatus('현재 그룹에 분리할 요소가 없습니다.', true);
+              break;
+            }
+
+            const posOriginal = groupList.findIndex((g)=>g.index === currentIdx);
+            if(posOriginal < 0){
+              setStatus('현재 선택된 사각형의 위치를 찾을 수 없습니다.', true);
+              break;
+            }
+
+            if(posOriginal <= 0){
+              setStatus('분리 기준은 첫 사각형이 아닌 위치여야 하며, 이전 구간을 남겨둘 수 있습니다.', true);
+              break;
+            }
+
+            const ids = getGroupIds();
+            const nextId = ids.length ? Math.max(...ids) + 1 : 0;
+            const movedIndices = [];
+
+            for(let p = posOriginal; p < groupList.length; p++){
+              const origIndex = groupList[p].index;
+              const region = state.yellowRegions[origIndex];
+              const oldGroupId = getRegionPrimaryGroup(region);
+              removeRegionFromGroup(region, oldGroupId);
+              addRegionToGroup(region, nextId);
+              movedIndices.push(origIndex);
+            }
+
+            state.selectedRegionIndex = groupList[posOriginal].index;
+            state.selection = {
+              x: state.yellowRegions[state.selectedRegionIndex].x,
+              y: state.yellowRegions[state.selectedRegionIndex].y,
+              size: state.yellowRegions[state.selectedRegionIndex].size
+            };
+
+            populateGroupSelect();
+            saveMeta();
+            render();
+
+            setStatus('분리 완료: 선택 기준 이후 구간을 새 그룹 ' + nextId + '로 이동 (' + movedIndices.length + '개)', false);
+            break;
+          }
+
           // Alt + \ : 현재 선택된 사각형을 중심으로 이전/다음 방향으로 연속된(가까운) 블록만 새 그룹으로 분리
           if(!e.altKey) break;
           e.preventDefault();
