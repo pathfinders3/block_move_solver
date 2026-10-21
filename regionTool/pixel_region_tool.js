@@ -1258,6 +1258,10 @@
       currentGroupId: state.currentGroupId,
       selectedGroupHistory: state.selectedGroupHistory.slice(),
       selectedRegionIndex: state.selectedRegionIndex,
+      multiSelectedRegionIndices: getValidMultiSelectedRegionIndices().slice(),
+      multiSelectAnchorIndex: Number.isInteger(state.multiSelectAnchorIndex)
+        ? state.multiSelectAnchorIndex
+        : null,
       selection: state.selection ? { ...state.selection } : null
     };
   }
@@ -1377,6 +1381,12 @@
     state.currentGroupId = snapshot.currentGroupId;
     state.selectedGroupHistory = snapshot.selectedGroupHistory.slice();
     state.selectedRegionIndex = snapshot.selectedRegionIndex;
+    state.multiSelectedRegionIndices = Array.isArray(snapshot.multiSelectedRegionIndices)
+      ? snapshot.multiSelectedRegionIndices.slice()
+      : [];
+    state.multiSelectAnchorIndex = Number.isInteger(snapshot.multiSelectAnchorIndex)
+      ? snapshot.multiSelectAnchorIndex
+      : null;
     state.selection = snapshot.selection ? { ...snapshot.selection } : null;
 
     populateGroupSelect();
@@ -1401,6 +1411,12 @@
     state.currentGroupId = snapshot.currentGroupId;
     state.selectedGroupHistory = snapshot.selectedGroupHistory.slice();
     state.selectedRegionIndex = snapshot.selectedRegionIndex;
+    state.multiSelectedRegionIndices = Array.isArray(snapshot.multiSelectedRegionIndices)
+      ? snapshot.multiSelectedRegionIndices.slice()
+      : [];
+    state.multiSelectAnchorIndex = Number.isInteger(snapshot.multiSelectAnchorIndex)
+      ? snapshot.multiSelectAnchorIndex
+      : null;
     state.selection = snapshot.selection ? { ...snapshot.selection } : null;
 
     populateGroupSelect();
@@ -4240,6 +4256,10 @@
     }
 
     if(targets.length === 0) return;
+
+    const previousSnapshot = snapshotGroupUndoState();
+    pushGroupUndoSnapshot(previousSnapshot);
+    state.groupMergeRedoStack = [];
 
     const uniqueTargetsDesc = Array.from(new Set(targets)).sort((a, b)=>b - a);
     uniqueTargetsDesc.forEach((idx)=>{
