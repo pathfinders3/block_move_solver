@@ -1919,7 +1919,7 @@
       '다중 선택 후 Delete : 선택된 노란 영역 일괄 해제',
       'Alt+Delete : 현재 그룹에서 선택 사각형 제외',
       'Alt+R : 현재 그룹에서 선택 사각형 제외',
-      'F7 : 선택된 사각형을 특정 그룹에 추가(그룹 ID 입력)',
+      'F7 : 선택된(다중 선택 포함) 사각형을 특정 그룹에 추가(그룹 ID 입력)',
       'Alt + ; : 현재 그룹에서 이전 방향으로 연속된 사각형 이동',
       'Alt + \' : 현재 그룹에서 다음 방향으로 연속된 사각형 이동',
       'Alt+Shift+\\ : 선택 사각형 기준, 이전 구간 유지 후 이후 구간을 새 그룹으로 분리',
@@ -4648,31 +4648,54 @@
         {
           e.preventDefault();
 
-          if(!state.selection){
+          const multiSelected = getValidMultiSelectedRegionIndices();
+          let selectedItems = [];
+
+          if(multiSelected.length > 0){
+            selectedItems = multiSelected
+              .map((index)=>({ index, region: state.yellowRegions[index] }))
+              .filter(({ region })=>!!region);
+          }else if(state.selection){
+            const selectedIndex =
+              state.selectedRegionIndex !== null &&
+              state.yellowRegions[state.selectedRegionIndex]
+                ? state.selectedRegionIndex
+                : state.yellowRegions.findIndex((r)=>
+                  r.x === state.selection.x &&
+                  r.y === state.selection.y &&
+                  r.size === state.selection.size
+                );
+
+            if(selectedIndex >= 0 && state.yellowRegions[selectedIndex]){
+              selectedItems = [{ index: selectedIndex, region: state.yellowRegions[selectedIndex] }];
+            }
+          }
+
+          if(selectedItems.length === 0){
             setStatus('F7: 추가할 사각형을 먼저 선택하세요.', true);
             break;
           }
 
-          const sel = state.selection;
-
-          // list available groups, but exclude groups this selection already belongs to
-          const selGroups = new Set();
-          state.yellowRegions.forEach((r)=>{
-            if(r.x === sel.x && r.y === sel.y && r.size === sel.size){
-              getRegionGroupIds(r).forEach((g)=> selGroups.add(g));
-            }
+          // list available groups: at least one selected item must be addable to that group
+          const selectedRegions = selectedItems.map((item)=>item.region);
+          const selectedGroupUnion = new Set();
+          selectedRegions.forEach((region)=>{
+            getRegionGroupIds(region).forEach((gid)=>selectedGroupUnion.add(gid));
           });
 
           const allIds = getGroupIds();
-          const selectableIds = allIds.filter((id)=> !selGroups.has(id));
+          const selectableIds = allIds.filter((id)=>
+            selectedRegions.some((region)=>!regionHasGroup(region, id))
+          );
           const listText = selectableIds.length ? selectableIds.join(', ') : '(없음 - 새 그룹만 가능)';
 
-          pushGroupUndoSnapshot(snapshotGroupUndoState());
+          const selectedCountText = selectedItems.length > 1
+            ? ('선택 ' + selectedItems.length + '개, ')
+            : '';
 
-          const input = window.prompt('추가할 그룹 ID를 입력하세요. 선택 가능 그룹: ' + listText + ' (빈칸이면 새 그룹 생성)', '');
+          const input = window.prompt(selectedCountText + '추가할 그룹 ID를 입력하세요. 선택 가능 그룹: ' + listText + ' (빈칸이면 새 그룹 생성)', '');
 
           if(input === null){
-            state.groupMergeUndoStack.pop();
             break; // cancelled
           }
 
@@ -4684,102 +4707,116 @@
           }else{
             const parsed = parseInt(input, 10);
             if(Number.isNaN(parsed)){
-              state.groupMergeUndoStack.pop();
               setStatus('유효한 그룹 ID가 아닙니다.', true);
               break;
             }
-            // disallow choosing a group that the selected region already belongs to
-            if(selGroups.has(parsed)){
-              state.groupMergeUndoStack.pop();
-              setStatus('선택된 사각형이 이미 그룹 ' + parsed + ' 에 속해 있으므로 해당 그룹은 선택할 수 없습니다.', true);
-              break;
-            }
-            // also disallow choosing a non-selectable existing group (for consistency)
-            if(allIds.includes(parsed) && !selectableIds.includes(parsed)){
-              state.groupMergeUndoStack.pop();
-              setStatus('선택할 수 없는 그룹입니다.', true);
+
+            if(selectableIds.length > 0 && !selectableIds.includes(parsed) && allIds.includes(parsed)){
+              setStatus('선택된 모든 사각형이 이미 그룹 ' + parsed + ' 에 속해 있습니다. 다른 그룹을 선택하세요.', true);
               break;
             }
 
             targetGroupId = parsed;
           }
 
-          // prepare new region
-          const newRegion = { x: sel.x, y: sel.y, size: sel.size };
+          pushGroupUndoSnapshot(snapshotGroupUndoState());
+          state.groupMergeRedoStack = [];
 
-          // find indices of regions belonging to target group
-          const groupList = state.yellowRegions
-            .map((region, index)=>({ region, index }))
-            .filter(({ region })=> regionHasGroup(region, targetGroupId))
-            .sort((a, b)=>a.index - b.index);
-
-          if(groupList.length === 0){
-            // empty group: just append
-            addRegionToGroup(newRegion, targetGroupId);
-            state.yellowRegions.push(newRegion);
-            state.currentGroupId = targetGroupId;
-            populateGroupSelect();
-            saveMeta();
-            setStatus('그룹 ' + targetGroupId + '에 새 사각형을 추가했습니다. (빈 그룹)', false);
-            render();
-            break;
-          }
-
-          // compute nearest region in that group by center distance
           function centerOf(r){ return { x: r.x + r.size/2, y: r.y + r.size/2 }; }
 
-          const selCenter = centerOf(newRegion);
+          function insertRegionToTargetGroup(newRegion, gid){
+            const groupList = state.yellowRegions
+              .map((region, index)=>({ region, index }))
+              .filter(({ region })=> regionHasGroup(region, gid))
+              .sort((a, b)=>a.index - b.index);
 
-          let nearest = null;
-          let nearestDist = Infinity;
+            if(groupList.length === 0){
+              addRegionToGroup(newRegion, gid);
+              state.yellowRegions.push(newRegion);
+              return state.yellowRegions.length - 1;
+            }
 
-          for(const item of groupList){
-            const c = centerOf(item.region);
-            const d = Math.hypot(c.x - selCenter.x, c.y - selCenter.y);
-            if(d < nearestDist){ nearestDist = d; nearest = item; }
+            const selCenter = centerOf(newRegion);
+
+            let nearest = null;
+            let nearestDist = Infinity;
+
+            for(const item of groupList){
+              const c = centerOf(item.region);
+              const d = Math.hypot(c.x - selCenter.x, c.y - selCenter.y);
+              if(d < nearestDist){ nearestDist = d; nearest = item; }
+            }
+
+            if(!nearest){
+              addRegionToGroup(newRegion, gid);
+              state.yellowRegions.push(newRegion);
+              return state.yellowRegions.length - 1;
+            }
+
+            const firstIdx = groupList[0].index;
+            const lastIdx = groupList[groupList.length - 1].index;
+            const nearestIdx = nearest.index;
+
+            let insertAt = null;
+            if(nearestIdx === firstIdx){
+              insertAt = firstIdx;
+            }else if(nearestIdx === lastIdx){
+              insertAt = lastIdx + 1;
+            }else{
+              insertAt = nearestIdx + 1;
+            }
+
+            addRegionToGroup(newRegion, gid);
+            state.yellowRegions.splice(insertAt, 0, newRegion);
+            return insertAt;
           }
 
-          if(!nearest){
-            // fallback append
-            addRegionToGroup(newRegion, targetGroupId);
-            state.yellowRegions.push(newRegion);
-            populateGroupSelect();
-            saveMeta();
-            setStatus('그룹 ' + targetGroupId + '에 새 사각형을 추가했습니다.', false);
-            render();
+          let inserted = 0;
+          let skipped = 0;
+          const insertedIndices = [];
+
+          for(const item of selectedItems){
+            if(regionHasGroup(item.region, targetGroupId)){
+              skipped++;
+              continue;
+            }
+
+            const newRegion = {
+              x: item.region.x,
+              y: item.region.y,
+              size: item.region.size
+            };
+
+            const insertedIndex = insertRegionToTargetGroup(newRegion, targetGroupId);
+            insertedIndices.push(insertedIndex);
+            inserted++;
+          }
+
+          if(inserted === 0){
+            state.groupMergeUndoStack.pop();
+            setStatus('추가할 수 있는 사각형이 없습니다. (선택된 사각형이 이미 대상 그룹에 속해 있음)', true);
             break;
           }
 
-          const firstIdx = groupList[0].index;
-          const lastIdx = groupList[groupList.length - 1].index;
-          const nearestIdx = nearest.index;
-
-          let insertAt = null;
-
-          if(nearestIdx === firstIdx){
-            // insert before first (becomes new first)
-            insertAt = firstIdx;
-          }else if(nearestIdx === lastIdx){
-            // insert after last
-            insertAt = lastIdx + 1;
-          }else{
-            // insert after nearest by default
-            insertAt = nearestIdx + 1;
-          }
-
-          // insert into array at computed position
-          addRegionToGroup(newRegion, targetGroupId);
-          state.yellowRegions.splice(insertAt, 0, newRegion);
-
-          // update selection to the newly inserted region
-          state.selectedRegionIndex = insertAt;
-          state.selection = { x: newRegion.x, y: newRegion.y, size: newRegion.size };
+          // update selection to one of inserted regions (last inserted)
+          const selectedInsertIndex = insertedIndices[insertedIndices.length - 1];
+          const selectedInsertRegion = state.yellowRegions[selectedInsertIndex];
+          state.selectedRegionIndex = selectedInsertIndex;
+          state.selection = selectedInsertRegion
+            ? { x: selectedInsertRegion.x, y: selectedInsertRegion.y, size: selectedInsertRegion.size }
+            : null;
           state.currentGroupId = targetGroupId;
+          state.multiSelectedRegionIndices = insertedIndices.slice();
+          state.multiSelectAnchorIndex = selectedInsertIndex;
+          pushSelectedGroupHistory(targetGroupId);
 
           populateGroupSelect();
           saveMeta();
           clearCandidateSquares();
-          setStatus('그룹 ' + targetGroupId + '에 사각형을 추가했습니다. 위치: index ' + insertAt, false);
+          setStatus(
+            '그룹 ' + targetGroupId + '에 사각형을 추가했습니다. 추가 ' + inserted + '개' + (skipped > 0 ? (', 건너뜀 ' + skipped + '개') : '') + '.',
+            false
+          );
           render();
           break;
         }
