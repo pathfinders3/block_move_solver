@@ -1919,6 +1919,7 @@
       '다중 선택 후 Delete : 선택된 노란 영역 일괄 해제',
       'Alt+Delete : 현재 그룹에서 선택 사각형 제외',
       'Alt+R : 현재 그룹에서 선택 사각형 제외',
+      'Alt+Shift+R : 선택된(다중 포함) 사각형을 입력한 그룹에서 제외',
       'F7 : 선택된(다중 선택 포함) 사각형을 특정 그룹에 추가(그룹 ID 입력)',
       'Alt + ; : 현재 그룹에서 이전 방향으로 연속된 사각형 이동',
       'Alt + \' : 현재 그룹에서 다음 방향으로 연속된 사각형 이동',
@@ -4375,6 +4376,153 @@
     render();
   }
 
+  function removeSelectedRegionsFromSpecificGroup(){
+    const multiSelected = getValidMultiSelectedRegionIndices();
+    let selectedItems = [];
+
+    if(multiSelected.length > 0){
+      selectedItems = multiSelected
+        .map((index)=>({ index, region: state.yellowRegions[index] }))
+        .filter(({ region })=>!!region);
+    }else if(state.selection){
+      const selectedIndex =
+        state.selectedRegionIndex !== null &&
+        state.yellowRegions[state.selectedRegionIndex]
+          ? state.selectedRegionIndex
+          : state.yellowRegions.findIndex((r)=>
+            r.x === state.selection.x &&
+            r.y === state.selection.y &&
+            r.size === state.selection.size
+          );
+
+      if(selectedIndex >= 0 && state.yellowRegions[selectedIndex]){
+        selectedItems = [{ index: selectedIndex, region: state.yellowRegions[selectedIndex] }];
+      }
+    }
+
+    if(selectedItems.length === 0){
+      setStatus('제외할 선택된 노란 영역이 없습니다.', true);
+      return;
+    }
+
+    const allIds = getGroupIds();
+    const listText = allIds.length ? allIds.join(', ') : '(없음)';
+    const input = window.prompt('제외할 그룹 ID를 입력하세요. 현재 그룹 목록: ' + listText, String(state.currentGroupId));
+
+    if(input === null){
+      return;
+    }
+
+    const gid = parseInt(input, 10);
+    if(Number.isNaN(gid)){
+      setStatus('유효한 그룹 ID가 아닙니다.', true);
+      return;
+    }
+
+    const previousSnapshot = snapshotGroupUndoState();
+    pushGroupUndoSnapshot(previousSnapshot);
+    state.groupMergeRedoStack = [];
+
+    const selectedGeometries = Array.from(new Map(
+      selectedItems.map((item)=>{
+        const r = item.region;
+        return [r.x + ':' + r.y + ':' + r.size, { x: r.x, y: r.y, size: r.size }];
+      })
+    ).values());
+
+    let removedEntries = 0;
+    let removedMemberships = 0;
+    let skipped = 0;
+
+    for(const geom of selectedGeometries){
+      const samePosRegions = state.yellowRegions.filter((r)=>
+        r &&
+        r.x === geom.x &&
+        r.y === geom.y &&
+        r.size === geom.size
+      );
+
+      const targetForRemoval = samePosRegions.find((r)=>regionHasGroup(r, gid));
+      if(!targetForRemoval){
+        skipped++;
+        continue;
+      }
+
+      const targetIndex = state.yellowRegions.indexOf(targetForRemoval);
+      if(targetIndex < 0){
+        skipped++;
+        continue;
+      }
+
+      const gids = getRegionGroupIds(targetForRemoval);
+      if(gids.length <= 1){
+        state.yellowRegions.splice(targetIndex, 1);
+        removedEntries++;
+      }else{
+        removeRegionFromGroup(targetForRemoval, gid);
+        removedMemberships++;
+      }
+
+      state.yellowRegions
+        .filter((r)=>
+          r &&
+          r.x === geom.x &&
+          r.y === geom.y &&
+          r.size === geom.size
+        )
+        .forEach((r)=>{
+          if(typeof r.displayGroupId === 'number' && r.displayGroupId === gid){
+            r.displayGroupId = getRegionPrimaryGroup(r);
+          }
+        });
+    }
+
+    if(removedEntries === 0 && removedMemberships === 0){
+      state.groupMergeUndoStack.pop();
+      setStatus('선택된 사각형들 중 그룹 ' + gid + ' 에 속한 항목이 없습니다.', true);
+      return;
+    }
+
+    normalizeRegionGroupAssignments();
+
+    const reselectionIndices = Array.from(new Set(
+      selectedGeometries
+        .map((geom)=>state.yellowRegions.findIndex((r)=>
+          r.x === geom.x &&
+          r.y === geom.y &&
+          r.size === geom.size
+        ))
+        .filter((idx)=>idx >= 0)
+    )).sort((a, b)=>a - b);
+
+    const selectedAfter = reselectionIndices.length > 0 ? reselectionIndices[0] : null;
+    state.multiSelectedRegionIndices = reselectionIndices;
+    state.multiSelectAnchorIndex = reselectionIndices.length > 0 ? reselectionIndices[reselectionIndices.length - 1] : null;
+    state.selectedRegionIndex = selectedAfter;
+    state.selection = selectedAfter !== null && state.yellowRegions[selectedAfter]
+      ? {
+        x: state.yellowRegions[selectedAfter].x,
+        y: state.yellowRegions[selectedAfter].y,
+        size: state.yellowRegions[selectedAfter].size
+      }
+      : null;
+
+    if(state.selectedRegionIndex !== null && state.yellowRegions[state.selectedRegionIndex]){
+      state.currentGroupId = getRegionPrimaryGroup(state.yellowRegions[state.selectedRegionIndex]);
+      pushSelectedGroupHistory(state.currentGroupId);
+    }
+
+    populateGroupSelect();
+    saveMeta();
+    clearCandidateSquares();
+    render();
+
+    setStatus(
+      '그룹 ' + gid + '에서 제외 완료: 항목 삭제 ' + removedEntries + '개, 그룹만 제거 ' + removedMemberships + '개, 건너뜀 ' + skipped + '개.',
+      false
+    );
+  }
+
   // 연속 그룹 탐색: direction = 'forward' | 'backward'
   function continuousGroupTraverse(direction, options){
     const opts = options || {};
@@ -5577,7 +5725,11 @@
         {
           if(e.altKey){
             e.preventDefault();
-            removeSelectedRegionFromActiveGroup();
+            if(e.shiftKey){
+              removeSelectedRegionsFromSpecificGroup();
+            }else{
+              removeSelectedRegionFromActiveGroup();
+            }
           }
           break;
         }
