@@ -75,6 +75,8 @@
     groupMergeRedoStack: [],
     restrictCandidatesToGroup: false,
     selectedRegionIndex: null,
+    multiSelectedRegionIndices: [],
+    multiSelectAnchorIndex: null,
     candidateSquares: [],     // Shift+F8 후보 목록 [{x,y,size}]
     selectedCandidateIndex: 0,
     candidateMode: null,      // 'expansion' | 'directional'
@@ -96,6 +98,56 @@
   let hoverOriginalPixel = null;
   let lastValidOriginalPixel = null;
   let toastTimer = null;
+
+  function getValidMultiSelectedRegionIndices(){
+    if(!Array.isArray(state.multiSelectedRegionIndices)){
+      return [];
+    }
+
+    const unique = Array.from(new Set(
+      state.multiSelectedRegionIndices.filter((idx)=>Number.isInteger(idx))
+    ));
+
+    return unique.filter((idx)=>idx >= 0 && idx < state.yellowRegions.length);
+  }
+
+  function clearMultiSelectedRegions(){
+    state.multiSelectedRegionIndices = [];
+    state.multiSelectAnchorIndex = null;
+  }
+
+  function toggleRegionMultiSelection(index){
+    if(!Number.isInteger(index)) return;
+    if(index < 0 || index >= state.yellowRegions.length) return;
+
+    const selected = new Set(getValidMultiSelectedRegionIndices());
+    if(selected.has(index)){
+      selected.delete(index);
+    }else{
+      selected.add(index);
+    }
+
+    state.multiSelectedRegionIndices = Array.from(selected).sort((a, b)=>a - b);
+  }
+
+  function selectRegionRange(fromIndex, toIndex, options = {}){
+    if(!Number.isInteger(fromIndex) || !Number.isInteger(toIndex)) return;
+    if(fromIndex < 0 || toIndex < 0) return;
+    if(fromIndex >= state.yellowRegions.length || toIndex >= state.yellowRegions.length) return;
+
+    const replace = !!options.replace;
+    const start = Math.min(fromIndex, toIndex);
+    const end = Math.max(fromIndex, toIndex);
+    const selected = replace
+      ? new Set()
+      : new Set(getValidMultiSelectedRegionIndices());
+
+    for(let i = start; i <= end; i++){
+      selected.add(i);
+    }
+
+    state.multiSelectedRegionIndices = Array.from(selected).sort((a, b)=>a - b);
+  }
 
   function getGroupIds(){
     const all = [];
@@ -516,6 +568,7 @@
         if(resetRegions){
           state.yellowRegions = [];
           state.selectedRegionIndex = null;
+          clearMultiSelectedRegions();
 
           state.selection = {
             x: 0,
@@ -542,14 +595,25 @@
 
   function drawRegionsOn(ctx, scale) {
     const { yellowRegions, selectedRegionIndex } = state;
-    const selectedRegion = yellowRegions[selectedRegionIndex]; // null/undefined 인덱스면 undefined
+    const selectedIndices = new Set(getValidMultiSelectedRegionIndices());
+
+    if(
+      selectedRegionIndex !== null &&
+      yellowRegions[selectedRegionIndex]
+    ){
+      selectedIndices.add(selectedRegionIndex);
+    }
 
     ctx.save();
     yellowRegions.forEach((r, idx) => {
-      if (r !== selectedRegion) drawRegion(ctx, r, scale, false);
+      if (!selectedIndices.has(idx)) drawRegion(ctx, r, scale, false);
     });
-    // 선택된 region은 겹침에 가려지지 않도록 마지막에 그린다
-    if (selectedRegion) drawRegion(ctx, selectedRegion, scale, true);
+
+    // 선택된 region(단일/다중)은 겹침에 가려지지 않도록 마지막에 그린다
+    yellowRegions.forEach((r, idx) => {
+      if (selectedIndices.has(idx)) drawRegion(ctx, r, scale, true);
+    });
+
     ctx.restore();
   }
 
@@ -600,11 +664,11 @@
     if (selected) {
       lineWidth = Math.max(2, scale / 3);
       strokeStyle = isMultiGroup ? '#213703' : '#ff6b6b';
-      dash = isMultiGroup ? [4, 4] : [];
+      dash = isMultiGroup ? [2, 2] : [];
     } else {
       lineWidth = scale > 1 ? Math.max(1, Math.min(2, Math.floor(scale / 4))) : 1;
       strokeStyle = isMultiGroup ? '#213703' : colors.stroke;
-      dash = isMultiGroup ? [4, 4] : [];
+      dash = isMultiGroup ? [2, 2] : [];
     }
 
     ctx.lineWidth = lineWidth;
@@ -1833,6 +1897,10 @@
       'Enter : 확정',
       'F9 : 자동 확정(S, Enter)',
       'Delete : 선택된 노란 영역 해제',
+      'Ctrl/Cmd+클릭 : 다중 선택 토글',
+      'Shift+클릭 : 앵커부터 현재까지 범위 선택',
+      'Shift+Ctrl/Cmd+클릭 : 범위를 기존 선택에 추가',
+      '다중 선택 후 Delete : 선택된 노란 영역 일괄 해제',
       'Alt+Delete : 현재 그룹에서 선택 사각형 제외',
       'Alt+R : 현재 그룹에서 선택 사각형 제외',
       'F7 : 선택된 사각형을 특정 그룹에 추가(그룹 ID 입력)',
@@ -2871,6 +2939,7 @@
 
     state.yellowRegions = [];
     state.selectedRegionIndex = null;
+    clearMultiSelectedRegions();
     clearCandidateSquares();
 
     render();
@@ -2898,6 +2967,7 @@
     state.yellowRegions = [];
     state.selection = null;
     state.selectedRegionIndex = null;
+    clearMultiSelectedRegions();
     clearCandidateSquares();
 
     srcCanvas.width = 1;
@@ -3045,6 +3115,28 @@
       const targetRegion = state.yellowRegions[idx];
       const prevRegion = idx > 0 ? state.yellowRegions[idx - 1] : null;
 
+      const hasToggleModifier = !!(e.ctrlKey || e.metaKey);
+      const hasRangeModifier = !!e.shiftKey;
+
+      if(hasRangeModifier){
+        const anchor =
+          Number.isInteger(state.multiSelectAnchorIndex)
+            ? state.multiSelectAnchorIndex
+            : (
+              state.selectedRegionIndex !== null
+                ? state.selectedRegionIndex
+                : idx
+            );
+
+        selectRegionRange(anchor, idx, { replace: !hasToggleModifier });
+      }else if(hasToggleModifier){
+        toggleRegionMultiSelection(idx);
+      }else{
+        clearMultiSelectedRegions();
+      }
+
+      state.multiSelectAnchorIndex = idx;
+
       state.selectedRegionIndex = idx;
       state.selection = {
         x: targetRegion.x,
@@ -3059,11 +3151,15 @@
       saveMeta();
       clearCandidateSquares();
 
-      setStatus(buildSelectedRegionStatus(targetRegion, idx, prevRegion), false);
+      const multiCount = getValidMultiSelectedRegionIndices().length;
+      const multiText = multiCount > 1 ? (' | 다중 선택 ' + multiCount + '개') : '';
+
+      setStatus(buildSelectedRegionStatus(targetRegion, idx, prevRegion) + multiText, false);
 
     }else{
 
       state.selectedRegionIndex = null;
+      clearMultiSelectedRegions();
 
       const size =
         state.squareSize;
@@ -4127,17 +4223,31 @@
 
 
   function deleteSelectedRegion(){
+    const multiSelected = getValidMultiSelectedRegionIndices();
+    const targets = [];
 
-    if(
-      state.selectedRegionIndex === null
-    ) return;
+    if(multiSelected.length > 0){
+      targets.push(...multiSelected);
+      if(
+        state.selectedRegionIndex !== null &&
+        state.yellowRegions[state.selectedRegionIndex] &&
+        targets.indexOf(state.selectedRegionIndex) < 0
+      ){
+        targets.push(state.selectedRegionIndex);
+      }
+    }else if(state.selectedRegionIndex !== null){
+      targets.push(state.selectedRegionIndex);
+    }
 
-    state.yellowRegions.splice(
-      state.selectedRegionIndex,
-      1
-    );
+    if(targets.length === 0) return;
+
+    const uniqueTargetsDesc = Array.from(new Set(targets)).sort((a, b)=>b - a);
+    uniqueTargetsDesc.forEach((idx)=>{
+      state.yellowRegions.splice(idx, 1);
+    });
 
     state.selectedRegionIndex = null;
+    clearMultiSelectedRegions();
     clearCandidateSquares();
 
     render();
@@ -4145,7 +4255,9 @@
     saveMeta();
 
     setStatus(
-      '노란 영역을 해제했습니다.',
+      uniqueTargetsDesc.length > 1
+        ? (uniqueTargetsDesc.length + '개의 노란 영역을 해제했습니다.')
+        : '노란 영역을 해제했습니다.',
       false
     );
   }
