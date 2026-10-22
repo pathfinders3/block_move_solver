@@ -1919,11 +1919,11 @@
       '다중 선택 후 Delete : 선택된 노란 영역 일괄 해제',
       'Alt+Delete : 현재 그룹에서 선택 사각형 제외',
       'Alt+R : 현재 그룹에서 선택 사각형 제외',
-      'Alt+Shift+R : 선택된(다중 포함) 사각형을 입력한 그룹에서 제외',
-      'F7 : 선택된(다중 선택 포함) 사각형을 특정 그룹에 추가(그룹 ID 입력)',
+      'F7 : 선택된(다중 선택 포함) 사각형을 특정 그룹에 추가(그룹 ID 입력)',      
+      'Alt+Shift+- : 선택된(다중 포함) 사각형을 입력한 그룹에서 제외',
+      'Alt+Shift+\\ : 선택 사각형 기준, 이전 구간 유지 후 이후 구간을 새 그룹으로 분리',      
       'Alt + ; : 현재 그룹에서 이전 방향으로 연속된 사각형 이동',
       'Alt + \' : 현재 그룹에서 다음 방향으로 연속된 사각형 이동',
-      'Alt+Shift+\\ : 선택 사각형 기준, 이전 구간 유지 후 이후 구간을 새 그룹으로 분리',
       'Alt+M : 최근 2개 그룹 통합',
       'Ctrl+Z : 최근 그룹 작업 취소(통합/분리)',
       'Ctrl+Y : 최근 그룹 작업 되살리기',
@@ -4435,12 +4435,7 @@
     let skipped = 0;
 
     for(const geom of selectedGeometries){
-      const samePosRegions = state.yellowRegions.filter((r)=>
-        r &&
-        r.x === geom.x &&
-        r.y === geom.y &&
-        r.size === geom.size
-      );
+      const samePosRegions = getSamePositionRegions(geom);
 
       const targetForRemoval = samePosRegions.find((r)=>regionHasGroup(r, gid));
       if(!targetForRemoval){
@@ -4463,14 +4458,7 @@
         removedMemberships++;
       }
 
-      state.yellowRegions
-        .filter((r)=>
-          r &&
-          r.x === geom.x &&
-          r.y === geom.y &&
-          r.size === geom.size
-        )
-        .forEach((r)=>{
+      getSamePositionRegions(geom).forEach((r)=>{
           if(typeof r.displayGroupId === 'number' && r.displayGroupId === gid){
             r.displayGroupId = getRegionPrimaryGroup(r);
           }
@@ -5665,6 +5653,12 @@
       case '-':
       case 'Subtract':
       case 'NumpadSubtract':
+        if(e.altKey && e.shiftKey){
+          e.preventDefault();
+          removeSelectedRegionsFromSpecificGroup();
+          break;
+        }
+
         if(
           state.candidateMode === 'directional' &&
           state.candidateSizeGroups.length > 1
@@ -5725,11 +5719,7 @@
         {
           if(e.altKey){
             e.preventDefault();
-            if(e.shiftKey){
-              removeSelectedRegionsFromSpecificGroup();
-            }else{
-              removeSelectedRegionFromActiveGroup();
-            }
+            removeSelectedRegionFromActiveGroup();
           }
           break;
         }
